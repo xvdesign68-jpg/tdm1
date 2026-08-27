@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-17** (tách module + eslint — app.min.js GIỐNG TỪNG BYTE v119-16, refactor 0 đổi hành vi).
+- Zip mới nhất: **v119-18** (banner mất kết nối thông minh).
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -85,6 +85,11 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **eslint** nối vào build (lỗi = dừng build): config `eslint.config.mjs` (no-undef/no-redeclare/no-dupe-keys/no-unreachable/no-const-assign...), globals sinh tự động. Lint sạch. `CSS` (CSS.escape) là browser global — đã khai báo.
 - Lint lập công ngay: phát hiện **9 code chết** (chỉ có định nghĩa, 0 nơi gọi): `promoBannerHtml`, `openPromoBannerEditor`, `ZALO_IC`, `zaloDial`, `pvMoveNext`, `openFbAccounts`, `scannedRow`, `ROLE_CHIP`, `roleCanEditLead` — GIỮ NGUYÊN trong v119-17 (cam kết byte-identical), dọn ở zip sau.
 - `_redirects` chặn thêm `/src/*`. smoke.js: bước tìm kiếm đổi sang poll 3s (hết flaky do chờ cứng 400ms).
+
+## Việc đã làm ở v119-18 (phiên 27/08/2026 — banner báo nhầm trên máy user)
+- Chẩn đoán ảnh user: banner "Không kết nối được máy chủ" hiện TRONG KHI app có dữ liệu = watchdog 8s bật nhầm lúc mạng chậm tải Firebase SDK, và banner KHÔNG BAO GIỜ tự tắt.
+- Fix (live.js + 90-boot.js): (1) watchdog 8s → 15s; (2) `fbUp()` bắn `sl-fb-up` khi SL_FB sẵn sàng + mỗi snapshot leads thành công → app tự gỡ banner loại 'net'; (3) banner 2 loại — 'net' ("kết nối chậm/gián đoạn - tự cập nhật khi có mạng", tự tắt) vs 'channel' (permission/index/rebuild lỗi: hiện tên kênh, KHÔNG tự tắt, nhắc báo quản trị; channel đè net, sl-fb-up không gỡ channel).
+- Test 5 kịch bản banner bằng Playwright (bắn event trực tiếp, MODE firebase + projectId 'PROJECT_ID' để boot không chạy): net hiện → up gỡ; channel đè net; up không gỡ channel; nút ✕ đóng. PASS hết + smoke 7/7.
 
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết ở trên + nâng dần part sang ES module thật (import/export tường minh) — làm khi bắt đầu v120.

@@ -140,6 +140,21 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **Pháp lý**: lead quét từ group chưa có đồng ý → Nghị định 13/2023; tin mở đầu tôn trọng + có opt-out, giữ log.
 - **Còn chờ anh cung cấp**: `bizAlias`, `page_pid` kênh Zalo cá nhân, `block_id` kịch bản; Biz Token đặt lúc deploy (không qua chat).
 - Báo cáo phân tích Zalo (3 phương án + checkpoint) đã gửi anh dạng artifact.
+- ⛔ **BẾ TẮC (test Cloud Shell 27/08)**: Biz Token anh có là loại `object:biz` (payload JWT: id=biz, exp≈vĩnh viễn). `/partner/bizs/...` trả **403 "Token không hợp lệ"** (cửa partner cần token `object:partner`); `/bizs/...` trả **401** với MỌI kiểu header (Bearer/access-token/x-access-token/token/x-api-key/query) → REST API Smax không nhận token biz này. Node `n8n-nodes-bizflow` chạy được vì tác giả là **partner**. Muốn đi Smax REST phải xin Smax cấp token partner / bật API — **tạm gác**, chuyển sang func.vn.
+
+## Tích hợp Zalo + Facebook cá nhân qua **func.vn** (HƯỚNG MỚI — phiên 27/08/2026)
+- **func.vn = Bizflow rebrand, "Account Hub"** cho Zalo User/OA, Facebook User/Page, WhatsApp. Tài liệu công khai đầy đủ: `docs.func.vn` (bản gộp máy đọc: `docs.func.vn/llms-full.txt` ~107KB — anh tải & upload cho em vì egress của em chặn func.vn/smax; máy anh/Cloud Shell KHÔNG bị chặn).
+- **Vì sao chọn func.vn thay Smax**: token nằm SẴN trên UI (nút copy) — hết cảnh dò 401/403. Có Task Manager giãn nhịp chống checkpoint sẵn trong nền tảng.
+- **Cơ chế**: kết nối account (Zalo=quét QR; Facebook=login/cookie trong "trình duyệt ảo" server của func) → tạo **Function API** chọn **Action** → func cấp endpoint + Bearer token.
+  - Gọi chung: `POST https://public-api.func.vn/functions/api` · Header `Authorization: Bearer <token>` · body `{ "action":"<ACTION>", "data":{...} }`. (POST only.)
+  - Token 2 loại: **API Token** (riêng 1 function) / **Account Token** (chung account, copy ở `accounts/settings`) → ta dùng Account Token + endpoint generic cho gọn.
+  - **Execution Mode**: `Immediate` hoặc **`Task Manager`** (hàng đợi + giãn khung giờ/tần suất → chống spam/ban).
+  - **Webhook** (Function Webhook): khai URL + auth Bearer/Basic/None + tick event (tin nhắn mới, kết bạn mới…) → func đẩy realtime về SmartLead; có "dồn webhook theo hội thoại".
+- **Zalo User API — ĐỦ phễu outbound**: `FIND_USER`(theo SĐT) → `REQUEST_FRIEND` → `GET_REQUEST_FRIEND_STATUS`/`ACCEPT_FRIEND` → `USER_SEND_MESSAGE` (hỗ trợ markdown/màu/size, `\n`; nhóm có `mentions`). Có module "Tự động kết bạn Zalo Cá nhân" + Campaign (chạy loạt từ Google Sheet theo khung giờ, file cần cột `account_pid`,`contact_pid`).
+- **Facebook User API — GIỚI HẠN QUAN TRỌNG**: KHÔNG có tìm-theo-SĐT/kết-bạn/nhắn-người-lạ (Meta khóa). Chỉ: `GET_USER`, posts (`GET_USER_POSTS`,`CREATE_POST`,`CREATE_GROUP_POST`), `GET_COMMENTS`/`CREATE_COMMENT`/`CREATE_REACTION`, group, và **inbox qua Page** (`PAGE_GET_THREADS`,`PAGE_SEND_MESSAGE` — chỉ người ĐÃ tương tác Page; có mẹo gửi >24h ghép Page+User). FB "giả lập trình duyệt" → linh hoạt hơn Page API nhưng **nhạy ban hơn**. ⇒ **Zalo = săn lead chủ động; Facebook = engagement + đón inbound (Auto Approve Friend) + Page inbox**, KHÔNG cold-add. Không hứa cold-outreach FB với anh.
+- **Kiến trúc SmartLead**: FE nút → CF `sendFunc(leadId,action)` POST func generic endpoint (Account Token ở Secret Manager) → func thao tác; func→webhook→CF `funcWebhook`→Firestore→UI realtime. Van an toàn 2 lớp (Task Manager func + van SmartLead: ≤30 mời/ngày/nick Zalo, FB thấp hơn, giãn giờ, đa dạng nội dung, opt-out).
+- **BẢO MẬT**: **Account Token func = secret** → CHỈ Secret Manager + CF, không frontend/zip/git. FE chỉ gọi `SL_FB.sendFunc(leadId)`. `account_pid` (trên URL) KHÔNG phải secret.
+- **Còn chờ anh**: mua gói + kết nối Zalo User (QR); cho em **`account_pid`**; **Account Token** dán lúc deploy (không qua chat). Có `account_pid` → em soạn lệnh Cloud Shell test `FIND_USER`+`REQUEST_FRIEND` một SĐT của anh trước khi viết CF.
 
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.

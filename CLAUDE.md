@@ -66,11 +66,22 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **buildData memoize**: `buildScansMemo`/`buildScannedMemo` theo reference mảng — lead mới không kéo theo sort lại 1000 scan + 5000 scanned.
 - **tools/**: `build.mjs` (build 1 lệnh + hash ?v= + zip) + `smoke.js` (7 check tự động, PASS hết mới gửi zip). Drift-check khi chuyển: mọi min build lại từ source giống hệt byte.
 
+## Backend: bản đồ 3 codebase + kết quả audit 27/08/2026 (ĐÃ ĐÓNG)
+- **3 codebase cùng deploy lên project `smartlead-z15`** (Cloud Shell, account xuanvinh.marketingpartners):
+  - `~/firebase-s13` — CHÍNH: Firestore Rules + functions lõi (manualScan, assistant*, brightdataUsage, gcpUsage, approveEngagement bản mới, scheduledScan, cleanup...).
+  - `~/codebase2` — Sheet sync + auto-send FB (syncLeadToSheet, syncDraftToSheet, backfillSheet, triggerAutoSend, autoSendEngine, generateDrafts). Mỗi function 1 thư mục con.
+  - `~/smartlead-zalo-fn` — cụm Zalo (bootstrapZaloTokens, sendZaloZBS, refreshZaloToken, notifyBrandZalo).
+- ⚠ **Trùng tên giữa s13 và codebase2** (`manualScan`, `approveEngagement`, `syncLeadToSheet` có ở CẢ 2 — bản codebase2 là snapshot CŨ, guard yếu hơn). Deploy sau đè deploy trước → khi deploy từ codebase2 CHỈ deploy đúng function Sheet (`--only functions:tên`), không deploy trùm. Nghi ngờ thì so `updateTime` (gcloud functions describe).
+- **Kết quả audit** (đã kiểm tận code qua LỆNH #1–#7):
+  - Rules `users/{uid}`: guard field-level `diff().affectedKeys().hasAny(['role','active','brand','leadFrom','leadTo','leadFromAt','leadToAt'])` — user thường KHÔNG tự sửa được quyền. Create ép pending+inactive. Delete chỉ superadmin. → lỗ "leo thang quyền qua setMyProfile" trong audit = ĐÓNG.
+  - 10/10 function HTTPS/callable có auth: verifyIdToken + role check (401/403) hoặc `isAdmin(request.auth)` (callable). `backfillSheet` khoá theo đúng email Super Admin. `manualScan` đang chạy là bản s13 mới (22/08), 2 lớp X-API-Token/verifyCaller.
+  - ⚠ Ghi nhớ: `backfillDrafts` trong codebase2 (CHƯA deploy) có guard lỏng `if(!ok && (API_TOKEN||Authorization))` — env không set API_TOKEN + không gửi header là LỌT. Nếu sau này deploy PHẢI sửa thành `if(!ok) return 401` trước.
+  - `backfillSheet` = công cụ đổ bù lead CŨ vào Google Sheet (chạy tay khi mới nối/đổi Sheet) — giữ lại, đã khoá.
+
 ## Việc còn tồn (chờ anh chốt)
 - **Tách `app.js` thành 4–6 ES module** + tách `boot()` live.js — refactor lớn, làm ZIP RIÊNG sau khi v119-16 chạy ổn ở production (kèm eslint khi đó mới có giá trị).
 - Pipeline chưa diff theo lead.id như feed (đã cap 50/cột nên nhẹ; diff làm cùng đợt tách module).
 - `buildData` whitelist → pass-through (bug "field rơi khỏi rebuild" từng dính 2 lần) — làm cùng đợt tách module.
-- Backend: chạy LỆNH rà Firestore Rules `users` (chặn tự sửa role/active/brand qua setMyProfile) + xác nhận Cloud Functions bắt buộc token — em đã soạn, chờ anh dán Cloud Shell.
 - `assigned_at`/giờ ghi chú vẫn dùng đồng hồ máy client (đổi sang serverTimestamp cần migrate dữ liệu ms cũ — lợi nhỏ, để sau).
 - Ngoài code: research Zalo cá nhân (yêu cầu 26/08); xoay key OpenAI; xoá lead rác "Lan Anh Nguyễn".
 - Chi tiết: báo cáo audit đã gửi anh (57 phát hiện, lọc theo mức độ/nhóm).

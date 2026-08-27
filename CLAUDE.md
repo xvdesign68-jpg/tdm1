@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-21** (hết double ghi chú).
+- Zip mới nhất: **v119-22** (UI mới nút chọn chế độ ghi chú).
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -115,6 +115,11 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Nguyên nhân: `addLeadNote` còn `notesCache.push(...)` SAU khi addDoc ack — tàn dư đúng đắn thời getDocs, nhưng từ khi notes realtime (v167) thì listener đã tự đưa ghi chú vào notesCache NGAY lúc addDoc (latency compensation) → push = bản thứ 2, và không có snapshot nào sửa lại (dữ liệu không đổi). CHỈ LỘ SAU KHI tạo index notes (trước đó listener user thường chết → không double nhưng cũng không realtime).
 - Fix: bỏ push/sort trong `addLeadNote` + bỏ filter trong `deleteLeadNote` (listener là nguồn duy nhất, vốn tức thời); thêm dedupe theo `nid` trong `notesIdx()` (tầng hiển thị miễn nhiễm mọi nguồn trùng tương lai). Test Playwright: lưu 1 lần → đúng 1 ghi chú; bơm 2 bản trùng nid → vẫn vẽ 1. Smoke 7/7.
 - Bài học đi cùng v119-20: chuyển một luồng đọc sang realtime thì PHẢI rà mọi optimistic-update tay của luồng ghi tương ứng — latency compensation đã làm việc đó, giữ cả hai là double.
+
+## Việc đã làm ở v119-22 (phiên 27/08/2026 — anh chê UI nút chọn chế độ ghi chú)
+- Nút toggle team/riêng tư trước mượn class `.ln-save` (nền xanh đậm đặc → emoji 👥 chìm, trạng thái riêng tư style inline chắp vá, tranh vai với nút Lưu).
+- Làm lại: class riêng `.ln-vis` — chip NHẠT có nhãn chữ "👥 Team" (xanh brand nhạt) / "🔒 Riêng tư" (hổ phách, đồng bộ badge 🔒 trong danh sách ghi chú); nút Lưu đặc giữ vai chính. CSS trong app.css cạnh `.ln-save`.
+- Screenshot 2 trạng thái đã gửi anh duyệt; regression test notes 3/3 + smoke 7/7.
 
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.

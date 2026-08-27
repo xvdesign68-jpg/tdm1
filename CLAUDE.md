@@ -31,14 +31,16 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Khi patch text file Rules đã tự chèn block mới: pattern tìm kiếm phải không match nội dung vừa chèn (bài học lỗi LỆNH #2).
 
 ## Kiến trúc & version (tham khảo nhanh)
-- **Frontend**: HTML/CSS/JS thuần + Firebase Web SDK (ES module qua CDN gstatic). `app.js` là monolith UI/render (~5600 dòng, 1 IIFE); `live.js` lo Firebase auth + Firestore realtime, expose `window.SL_FB`; state chảy `data.js (demo) → let D → live.js buildData → SLApp.reload`.
+- **Frontend**: HTML/CSS/JS thuần + Firebase Web SDK (ES module qua CDN gstatic). TỪ v119-17: UI/render nằm ở **`src/app/*.js` (11 part theo section, chung scope IIFE)** — `assets/js/app.js` là FILE SINH TỰ ĐỘNG do build ghép lại (đừng sửa tay, sửa trong src/app). `live.js` lo Firebase auth + Firestore realtime, expose `window.SL_FB`; state chảy `data.js (demo) → let D → live.js buildData → SLApp.reload`.
+- **Part map src/app**: 10-core-overview (state D, helpers, esc/parseTS, widgets, view overview) · 20-feed (promo banner + lead feed) · 30-pipeline · 40-roi · 50-config-views (sources/keywords/scoring/alerts/reports/integrations) · 60-scan-views (history/scanned) · 65-charts-lead-modal · 70-shell-tools (palette Cmd-K, bell, account, backfill) · 80-rbac-auth (SLAuth, login/MFA) · 85-users-admin · 90-boot (router go(), SLApp, fbDown). `_wrapper.json` giữ IIFE wrapper.
+- **eslint** chạy TRONG build (lỗi = dừng build): no-undef bắt biến gõ nhầm/chưa khai báo nhờ `tools/gen-globals.mjs` tự quét khai báo top-level mọi part → `tools/.globals.json`. no-unused-vars tắt cho part (dùng chéo part là bình thường); muốn săn code chết: đếm `\btên\b` trên toàn src/app.
 - **Backend**: Firebase project `smartlead-z15` (Firestore + Auth). Phân quyền THẬT ở **Firestore Rules server-side**. Vai trò: superadmin → admin (theo brand) → sales (theo brand).
 - **Bảo mật**: Firebase web apiKey là công khai hợp lệ (KHÔNG phải secret). Mọi secret thật (BrightData/Telegram/OpenAI/VPS) giữ ở backend, không bao giờ vào zip.
 - **Version marker nội bộ** trong code (comment `/* v.. */`) chỉ là changelog; `?v=` do `tools/build.mjs` tự hash — đừng sửa tay.
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-16** (trọn gói 5 nhóm fix + bộ build/test tự động).
+- Zip mới nhất: **v119-17** (tách module + eslint — app.min.js GIỐNG TỪNG BYTE v119-16, refactor 0 đổi hành vi).
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -78,8 +80,15 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
   - ⚠ Ghi nhớ: `backfillDrafts` trong codebase2 (CHƯA deploy) có guard lỏng `if(!ok && (API_TOKEN||Authorization))` — env không set API_TOKEN + không gửi header là LỌT. Nếu sau này deploy PHẢI sửa thành `if(!ok) return 401` trước.
   - `backfillSheet` = công cụ đổ bù lead CŨ vào Google Sheet (chạy tay khi mới nối/đổi Sheet) — giữ lại, đã khoá.
 
+## Việc đã làm ở v119-17 (phiên 27/08/2026 — tách module + eslint)
+- Cắt `app.js` (5674 dòng) thành **11 part trong `src/app/`** theo đúng banner section có sẵn — cắt nguyên byte, KHÔNG sửa code. build.mjs ghép wrapper + part (thứ tự theo tên file) → `assets/js/app.js` (file sinh). **Chứng minh 0 regression: `app.min.js` sau tách giống HỆT TỪNG BYTE bản v119-16 production.**
+- **eslint** nối vào build (lỗi = dừng build): config `eslint.config.mjs` (no-undef/no-redeclare/no-dupe-keys/no-unreachable/no-const-assign...), globals sinh tự động. Lint sạch. `CSS` (CSS.escape) là browser global — đã khai báo.
+- Lint lập công ngay: phát hiện **9 code chết** (chỉ có định nghĩa, 0 nơi gọi): `promoBannerHtml`, `openPromoBannerEditor`, `ZALO_IC`, `zaloDial`, `pvMoveNext`, `openFbAccounts`, `scannedRow`, `ROLE_CHIP`, `roleCanEditLead` — GIỮ NGUYÊN trong v119-17 (cam kết byte-identical), dọn ở zip sau.
+- `_redirects` chặn thêm `/src/*`. smoke.js: bước tìm kiếm đổi sang poll 3s (hết flaky do chờ cứng 400ms).
+
 ## Việc còn tồn (chờ anh chốt)
-- **Tách `app.js` thành 4–6 ES module** + tách `boot()` live.js — refactor lớn, làm ZIP RIÊNG sau khi v119-16 chạy ổn ở production (kèm eslint khi đó mới có giá trị).
+- Dọn 9 code chết ở trên + nâng dần part sang ES module thật (import/export tường minh) — làm khi bắt đầu v120.
+- Tách `boot()` live.js (616/769 dòng một hàm) — đợt sau, cùng nhịp v120.
 - Pipeline chưa diff theo lead.id như feed (đã cap 50/cột nên nhẹ; diff làm cùng đợt tách module).
 - `buildData` whitelist → pass-through (bug "field rơi khỏi rebuild" từng dính 2 lần) — làm cùng đợt tách module.
 - `assigned_at`/giờ ghi chú vẫn dùng đồng hồ máy client (đổi sang serverTimestamp cần migrate dữ liệu ms cũ — lợi nhỏ, để sau).

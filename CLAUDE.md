@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-18** (banner mất kết nối thông minh).
+- Zip mới nhất: **v119-19** (vòng rà soát tổng 3-agent → fix trọn các phát hiện).
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -91,8 +91,19 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Fix (live.js + 90-boot.js): (1) watchdog 8s → 15s; (2) `fbUp()` bắn `sl-fb-up` khi SL_FB sẵn sàng + mỗi snapshot leads thành công → app tự gỡ banner loại 'net'; (3) banner 2 loại — 'net' ("kết nối chậm/gián đoạn - tự cập nhật khi có mạng", tự tắt) vs 'channel' (permission/index/rebuild lỗi: hiện tên kênh, KHÔNG tự tắt, nhắc báo quản trị; channel đè net, sl-fb-up không gỡ channel).
 - Test 5 kịch bản banner bằng Playwright (bắn event trực tiếp, MODE firebase + projectId 'PROJECT_ID' để boot không chạy): net hiện → up gỡ; channel đè net; up không gỡ channel; nút ✕ đóng. PASS hết + smoke 7/7.
 
+## Việc đã làm ở v119-19 (phiên 27/08/2026 — vòng rà soát tổng bằng 3 agent đối kháng)
+- **live.js**: `dataEpoch` vô hiệu hoá auto-fill/loadOlder đang bay khi stopData/đổi khung (chống lead brand/khung CŨ tiêm vào phiên mới — lỗ cách ly dữ liệu); `subLeadsB` đổi khung → dọn `leadsExtra/leadsCapped/autoFillKey`; `absorbDropped` tôn trọng mép dưới khung (`fromD`); `fbUp()` chỉ bắn khi `!snap.metadata.fromCache` (snapshot cache không phải bằng chứng có mạng); mutex `loadingOlder` chống nút "Tải thêm" đè auto-fill; rebuild khử trùng lặp CẢ BÊN TRONG leadsExtra; `score` ép Number tại 3 điểm nạp (sink HTML dùng ${l.score} không esc).
+- **30-pipeline**: `pvAgeMs` thiếu mọi mốc → null/'—' (hết "1 phút vĩnh viễn"), thêm fallback `l.time`; nhánh **QUÁ HẸN** ưu tiên cao nhất trong hint; `pvApplyStage` hoàn tác ĐỦ (stage_at/first_care_at/pvJust) khi server từ chối; `pvColMore.clear()` khi đổi filter.
+- **20-feed**: đếm tải khi giao + rail "CHỜ GIAO" loại `dropped`; `volat` strip chip ⏱/⏰ (hết thay nguyên thẻ mỗi phút); `leadNo` cache +length check; `data-ndel` tách theo ':' CUỐI.
+- **90-boot**: lỗi channel THỨ HAI cập nhật text banner thay vì bị nuốt.
+- **tools**: gen-globals lỗi = DỪNG build (trước bị nuốt thành "bỏ qua eslint"); `rm -f` zip trước khi nén (zip append lên file cũ = file đã xoá vẫn ship); filter part siết `NN-tên.js` + warn; `declNames` viết lại (bắt đủ declarator thứ 2+, hết tên rác). netlify.toml: `/*.html` là pattern chết → liệt kê tường minh 4 trang.
+- Gate eslint mới **lập công ngay trong phiên**: chặn 1 lỗi comment-nuốt-code của chính đợt sửa này trước khi vào zip.
+- Kết luận 3 agent: v119-18 KHÔNG có lỗi nghiêm trọng nào đã ship (zip = source 100%, không secret, build tái lập); các lỗi trên là edge-case đổi brand/khung giữa phiên + kẽ hở quy trình.
+
 ## Việc còn tồn (chờ anh chốt)
-- Dọn 9 code chết ở trên + nâng dần part sang ES module thật (import/export tường minh) — làm khi bắt đầu v120.
+- Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.
+- (Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không — liên quan sink `${l.score}` (client đã ép Number nên rủi ro thấp).
+- logo-mark.png tham chiếu từ JS (màn login 80-rbac-auth) không có ?v= — nếu thay logo thì đổi TÊN file.
 - Tách `boot()` live.js (616/769 dòng một hàm) — đợt sau, cùng nhịp v120.
 - Pipeline chưa diff theo lead.id như feed (đã cap 50/cột nên nhẹ; diff làm cùng đợt tách module).
 - `buildData` whitelist → pass-through (bug "field rơi khỏi rebuild" từng dính 2 lần) — làm cùng đợt tách module.

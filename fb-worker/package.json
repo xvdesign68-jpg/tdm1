@@ -1,0 +1,27 @@
+{
+  "name": "smartlead-fb-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SmartLead FB Worker — điều khiển Facebook User qua AdsPower (Local API + Puppeteer) để react/comment/inbox lead. Chạy trên VPS của anh Vinh.",
+  "type": "commonjs",
+  "bin": {
+    "fbw": "test.js"
+  },
+  "scripts": {
+    "list": "node test.js list",
+    "open": "node test.js open",
+    "test:react": "node test.js react",
+    "test:comment": "node test.js comment",
+    "test:inbox": "node test.js inbox",
+    "worker": "node worker.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^22.15.0"
+  },
+  "optionalDependencies": {
+    "firebase-admin": "^12.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

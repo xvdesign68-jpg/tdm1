@@ -1,0 +1,7 @@
+node_modules/
+.env
+state.json
+*.log
+# TUYỆT ĐỐI không commit service account / secret
+serviceAccount*.json
+*credentials*.json

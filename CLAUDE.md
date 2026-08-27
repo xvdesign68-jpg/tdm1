@@ -127,6 +127,20 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Test Playwright kịch bản thật: người nhận đang gõ dở → ghi chú đồng nghiệp đến → hiện NGAY + focus giữ + chữ gõ dở nguyên + caret đúng (4/4) + regression notes 3/3 + smoke 7/7.
 - Lưu ý chẩn đoán kèm: phiên user mở TRƯỚC khi tạo index notes (chiều 27/08) có listener đã chết → không realtime là đúng, cần F5 một lần sau index; báo cáo sau thời điểm đó mới là bug này.
 
+## Tích hợp Zalo cá nhân qua Smax (đang làm — phiên 27/08/2026)
+- **Hướng chốt**: SmartLead → Cloud Function gọi THẲNG REST API Smax bằng **Biz Token** (quyền cao, chủ động; không cần tạo Trigger Bot API từng kịch bản, không cần n8n). Rủi ro checkpoint do Smax + kịch bản gánh.
+- **API Smax (moi từ source node npm `n8n-nodes-bizflow` v1.1.1 — tài liệu Smax giấu endpoint)**:
+  - Base: `https://api.smax.ai/partner/bizs` · Header: `Authorization: Bearer <accessToken>` (accessToken = Biz Token) · cần `bizAlias`.
+  - Gửi kịch bản: `POST /{bizAlias}/send` body `{block_id, page_pid, customer_pid, attrs?, block_attrs?, messenger_tag?}`.
+  - Khách: `POST /{bizAlias}/customers` (tạo) · `PUT|GET /{bizAlias}/pages/{page_pid}/customers/{customer_pid}`.
+  - Đơn: `POST|PUT|GET /{bizAlias}/orders`.
+  - Kết bạn Zalo theo SĐT = thẻ **Find/Add ZaloUser** + **ZaloUser Request Friend** chạy TRONG block kịch bản (không phải REST riêng). Đồng bộ ngược = thẻ **JsonAPI** trong block POST về CF SmartLead.
+- **BẢO MẬT**: Biz Token quyền toàn biz → CHỈ ở Cloud Function + Secret Manager, KHÔNG bao giờ frontend/zip/git. Frontend chỉ gọi `SL_FB.sendZaloSmax(leadId)`.
+- **Giới hạn Zalo cá nhân**: ≤30 lời mời kết bạn/24h, ≤2000 bạn/nick; session Zalo Web dùng chung (nick chạy Smax không login Zalo Web nơi khác). Đặt van an toàn phía SmartLead theo ngưỡng này.
+- **Pháp lý**: lead quét từ group chưa có đồng ý → Nghị định 13/2023; tin mở đầu tôn trọng + có opt-out, giữ log.
+- **Còn chờ anh cung cấp**: `bizAlias`, `page_pid` kênh Zalo cá nhân, `block_id` kịch bản; Biz Token đặt lúc deploy (không qua chat).
+- Báo cáo phân tích Zalo (3 phương án + checkpoint) đã gửi anh dạng artifact.
+
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.
 - (Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không — liên quan sink `${l.score}` (client đã ép Number nên rủi ro thấp).

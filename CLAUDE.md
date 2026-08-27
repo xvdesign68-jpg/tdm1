@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-19** (vòng rà soát tổng 3-agent → fix trọn các phát hiện).
+- Zip mới nhất: **v119-20** (fix "lưu ghi chú phải F5 mới thấy").
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -104,6 +104,12 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Banner lỗi kênh (v119-18) trên máy user thường lộ ra: truy vấn ghi chú collectionGroup THIẾU INDEX từ ngày ra mắt tính năng — code cũ nuốt lỗi bằng console.warn nên sales/admin brand KHÔNG BAO GIỜ tải được ghi chú server mà không ai biết. Super Admin không lọc nên không cần index → máy anh không thấy lỗi.
 - Đã tạo đủ 3 index qua Cloud Shell (LỆNH #2–#4): composite `notes(brand,vis)` COLLECTION_GROUP (gcloud composite create — OK ngay); 2 single-field override `brand`/`by_uid` COLLECTION_GROUP (gcloud `fields update` KHÔNG hỗ trợ query-scope ở version anh dùng, composite kèm `__name__` bị Firestore từ chối → phải PATCH REST `collectionGroups/notes/fields/{field}?updateMask=indexConfig` với indexConfig đủ 4 index: 3 mặc định COLLECTION + 1 COLLECTION_GROUP asc).
 - Bài học: (1) mọi truy vấn collectionGroup MỚI phải kiểm index phạm vi COLLECTION_GROUP trước khi ship; (2) tạo field override bằng REST PATCH như trên (gcloud/console không tiện); (3) grep composite list dễ cắt ngang block — index "lạ" CICAgJiH2JAK hoá ra của scanned_posts.
+
+## Việc đã làm ở v119-20 (phiên 27/08/2026 — user báo lưu ghi chú phải F5 mới thấy)
+- Nguyên nhân 3 tầng: snapshot realtime thay `notesCache` bằng MẢNG MỚI trước cả khi addDoc ack → `D.notes` (mảng cũ) không có ghi chú mới; `renderFeed()` ngay sau lưu đọc D.notes cũ; `SLApp.reload` mang mảng mới thì bị deferReload hoãn VÔ HẠN vì saveNote tự `ni.focus()` trả con trỏ vào ô ghi chú (typingInView luôn true).
+- Fix: live.js expose `notesSnapshot:()=>notesCache`; saveNote + handler xoá (`data-ndel`) trong 20-feed làm `D.notes=window.SL_FB.notesSnapshot()` TRƯỚC khi renderFeed → hiện/biến mất ngay, con trỏ vẫn giữ trong ô (không đụng cơ chế defer — vẫn cần cho update của người khác khi đang gõ).
+- Test Playwright riêng: fake SL_FB mô phỏng đúng ngữ nghĩa notesCache-mảng-mới → LƯU hiện ngay ✅, focus giữ ✅, XOÁ biến mất ngay ✅ + smoke 7/7.
+- Ghi nhớ pattern: mọi thao tác ghi có optimistic-update trong live.js mà app render từ `D.*` phải có đường làm tươi D tương ứng (D chỉ đổi khi reload, mà reload có thể bị hoãn do focus).
 
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.

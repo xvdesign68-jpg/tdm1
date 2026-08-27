@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-22** (UI mới nút chọn chế độ ghi chú).
+- Zip mới nhất: **v119-23** (người nhận thấy ghi chú realtime kể cả khi đang gõ).
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -120,6 +120,12 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Nút toggle team/riêng tư trước mượn class `.ln-save` (nền xanh đậm đặc → emoji 👥 chìm, trạng thái riêng tư style inline chắp vá, tranh vai với nút Lưu).
 - Làm lại: class riêng `.ln-vis` — chip NHẠT có nhãn chữ "👥 Team" (xanh brand nhạt) / "🔒 Riêng tư" (hổ phách, đồng bộ badge 🔒 trong danh sách ghi chú); nút Lưu đặc giữ vai chính. CSS trong app.css cạnh `.ln-save`.
 - Screenshot 2 trạng thái đã gửi anh duyệt; regression test notes 3/3 + smoke 7/7.
+
+## Việc đã làm ở v119-23 (phiên 27/08/2026 — user báo NGƯỜI NHẬN không thấy ghi chú realtime, phải F5)
+- Nguyên nhân: `SLApp.reload` hoãn TOÀN BỘ cập nhật khi bất kỳ input nào trong #view giữ focus (deferReload retry 1.5s tới khi blur). Người nhận thường đứng sẵn ở ô ghi chú của chính lead đó (2 sales cùng chăm 1 lead) → mọi snapshot bị hoãn vô hạn → tưởng "không realtime, phải F5". v119-20 chỉ fix phía NGƯỜI LƯU.
+- Fix 2 tầng: (1) renderFeed khi thay thẻ giờ giữ cả FOCUS + caret (selectionStart/End) của `[data-ninput]`, không chỉ giữ value; (2) 90-boot reload: focus ở ô ghi chú + đang ở feed → KHÔNG hoãn, đi thẳng đường diff feed (an toàn nhờ (1)); input khác (ô lọc rail...) vẫn hoãn như cũ vì rail repaint bằng innerHTML.
+- Test Playwright kịch bản thật: người nhận đang gõ dở → ghi chú đồng nghiệp đến → hiện NGAY + focus giữ + chữ gõ dở nguyên + caret đúng (4/4) + regression notes 3/3 + smoke 7/7.
+- Lưu ý chẩn đoán kèm: phiên user mở TRƯỚC khi tạo index notes (chiều 27/08) có listener đã chết → không realtime là đúng, cần F5 một lần sau index; báo cáo sau thời điểm đó mới là bug này.
 
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.

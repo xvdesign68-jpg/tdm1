@@ -100,6 +100,11 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Gate eslint mới **lập công ngay trong phiên**: chặn 1 lỗi comment-nuốt-code của chính đợt sửa này trước khi vào zip.
 - Kết luận 3 agent: v119-18 KHÔNG có lỗi nghiêm trọng nào đã ship (zip = source 100%, không secret, build tái lập); các lỗi trên là edge-case đổi brand/khung giữa phiên + kẽ hở quy trình.
 
+## Sự cố "notes failed-precondition" 27/08/2026 (ĐÃ XỬ LÝ XONG)
+- Banner lỗi kênh (v119-18) trên máy user thường lộ ra: truy vấn ghi chú collectionGroup THIẾU INDEX từ ngày ra mắt tính năng — code cũ nuốt lỗi bằng console.warn nên sales/admin brand KHÔNG BAO GIỜ tải được ghi chú server mà không ai biết. Super Admin không lọc nên không cần index → máy anh không thấy lỗi.
+- Đã tạo đủ 3 index qua Cloud Shell (LỆNH #2–#4): composite `notes(brand,vis)` COLLECTION_GROUP (gcloud composite create — OK ngay); 2 single-field override `brand`/`by_uid` COLLECTION_GROUP (gcloud `fields update` KHÔNG hỗ trợ query-scope ở version anh dùng, composite kèm `__name__` bị Firestore từ chối → phải PATCH REST `collectionGroups/notes/fields/{field}?updateMask=indexConfig` với indexConfig đủ 4 index: 3 mặc định COLLECTION + 1 COLLECTION_GROUP asc).
+- Bài học: (1) mọi truy vấn collectionGroup MỚI phải kiểm index phạm vi COLLECTION_GROUP trước khi ship; (2) tạo field override bằng REST PATCH như trên (gcloud/console không tiện); (3) grep composite list dễ cắt ngang block — index "lạ" CICAgJiH2JAK hoá ra của scanned_posts.
+
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.
 - (Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không — liên quan sink `${l.score}` (client đã ép Number nên rủi ro thấp).

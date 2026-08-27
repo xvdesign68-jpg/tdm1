@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-20** (fix "lưu ghi chú phải F5 mới thấy").
+- Zip mới nhất: **v119-21** (hết double ghi chú).
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -110,6 +110,11 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - Fix: live.js expose `notesSnapshot:()=>notesCache`; saveNote + handler xoá (`data-ndel`) trong 20-feed làm `D.notes=window.SL_FB.notesSnapshot()` TRƯỚC khi renderFeed → hiện/biến mất ngay, con trỏ vẫn giữ trong ô (không đụng cơ chế defer — vẫn cần cho update của người khác khi đang gõ).
 - Test Playwright riêng: fake SL_FB mô phỏng đúng ngữ nghĩa notesCache-mảng-mới → LƯU hiện ngay ✅, focus giữ ✅, XOÁ biến mất ngay ✅ + smoke 7/7.
 - Ghi nhớ pattern: mọi thao tác ghi có optimistic-update trong live.js mà app render từ `D.*` phải có đường làm tươi D tương ứng (D chỉ đổi khi reload, mà reload có thể bị hoãn do focus).
+
+## Việc đã làm ở v119-21 (phiên 27/08/2026 — user báo ghi chú double thành 2 bản giống hệt)
+- Nguyên nhân: `addLeadNote` còn `notesCache.push(...)` SAU khi addDoc ack — tàn dư đúng đắn thời getDocs, nhưng từ khi notes realtime (v167) thì listener đã tự đưa ghi chú vào notesCache NGAY lúc addDoc (latency compensation) → push = bản thứ 2, và không có snapshot nào sửa lại (dữ liệu không đổi). CHỈ LỘ SAU KHI tạo index notes (trước đó listener user thường chết → không double nhưng cũng không realtime).
+- Fix: bỏ push/sort trong `addLeadNote` + bỏ filter trong `deleteLeadNote` (listener là nguồn duy nhất, vốn tức thời); thêm dedupe theo `nid` trong `notesIdx()` (tầng hiển thị miễn nhiễm mọi nguồn trùng tương lai). Test Playwright: lưu 1 lần → đúng 1 ghi chú; bơm 2 bản trùng nid → vẫn vẽ 1. Smoke 7/7.
+- Bài học đi cùng v119-20: chuyển một luồng đọc sang realtime thì PHẢI rà mọi optimistic-update tay của luồng ghi tương ứng — latency compensation đã làm việc đó, giữ cả hai là double.
 
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.

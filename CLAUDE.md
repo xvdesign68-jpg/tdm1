@@ -12,23 +12,17 @@
 ### 1. Frontend (SmartLead SPA tĩnh) → GIAO BẰNG ZIP
 Anh **không dùng git cho code app**. Anh giữ source gốc, mỗi lần cần sửa sẽ gửi zip; em sửa rồi **trả về một zip mới** để anh **kéo-thả lên Netlify** (site `smartlead.z15miracle.com.vn`).
 
-Các bước em phải làm mỗi lần sửa frontend:
+Các bước em phải làm mỗi lần sửa frontend (TỪ v119-16 dùng script, không còn bump ?v= tay):
 ```bash
-cd <thư mục smartlead>            # cwd reset giữa các lệnh → luôn cd trước
-node --check assets/js/app.js     # và live.js — bắt lỗi cú pháp
-npx --yes esbuild assets/js/app.js  --minify --charset=utf8 --outfile=assets/min/js/app.min.js
-npx --yes esbuild assets/js/live.js --minify --charset=utf8 --outfile=assets/min/js/live.min.js
-npx --yes esbuild assets/css/app.css --minify --charset=utf8 --outfile=assets/min/css/app.min.css   # chỉ khi sửa CSS
-cp -f assets/min/js/app.min.js  assets/js/app.min.js     # giữ bản đồng bộ (zip chứa cả 2 vị trí)
-cp -f assets/min/js/live.min.js assets/js/live.min.js
-# Bump ?v= trong app.html cho ĐÚNG file vừa build (số hiện tại +1):
-sed -i 's#app\.min\.js?v=164#app.min.js?v=165#'  app.html
-sed -i 's#live\.min\.js?v=47#live.min.js?v=48#'   app.html
-# Đóng zip tên MỚI khác biệt (stage qua /tmp, loại *.bak):
-rm -rf /tmp/slz && mkdir -p /tmp/slz && cp -r . /tmp/slz/
-cd /tmp/slz && zip -qr /tmp/<tên-mới>.zip . -x '*.bak*'
+cd <thư mục smartlead>
+node tools/build.mjs --zip /tmp/smartleads17deploy-<tên-mới>.zip
+# = node --check + esbuild minify TOÀN BỘ js/css + cp bản đồng bộ + TỰ HASH ?v= theo nội dung file
+#   (không còn lớp lỗi "quên bump + cache immutable 1 năm") + đóng zip loại *.bak*/node_modules/.git
+# Smoke test trước khi gửi zip (cần npm i playwright-core 1 lần, Chromium ở /opt/pw-browsers):
+NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 ```
 - **Verify bản min** bằng string literal tiếng Việt (esbuild đổi tên biến local): `grep 'Mặc định chung' assets/min/js/app.min.js`. Truy cập `window.*` và string literal luôn được giữ nguyên.
+- Zip vẫn chứa source (quy trình khứ hồi của anh) nhưng `_redirects` đã CHẶN truy cập công khai `/assets/js/*`, `/assets/css/*`, `/tools/*` (404!).
 - Gửi zip cho anh qua SendUserFile, **nói rõ "zip MỚI NHẤT cần deploy"** (thư mục outputs của anh không xoá được file cũ). Nhắc anh **Cmd+Shift+R** (Mac) / **Ctrl+F5** sau khi deploy.
 - Chỉ implement đúng những gì đã **chốt** với anh.
 
@@ -40,17 +34,11 @@ cd /tmp/slz && zip -qr /tmp/<tên-mới>.zip . -x '*.bak*'
 - **Frontend**: HTML/CSS/JS thuần + Firebase Web SDK (ES module qua CDN gstatic). `app.js` là monolith UI/render (~5600 dòng, 1 IIFE); `live.js` lo Firebase auth + Firestore realtime, expose `window.SL_FB`; state chảy `data.js (demo) → let D → live.js buildData → SLApp.reload`.
 - **Backend**: Firebase project `smartlead-z15` (Firestore + Auth). Phân quyền THẬT ở **Firestore Rules server-side**. Vai trò: superadmin → admin (theo brand) → sales (theo brand).
 - **Bảo mật**: Firebase web apiKey là công khai hợp lệ (KHÔNG phải secret). Mọi secret thật (BrightData/Telegram/OpenAI/VPS) giữ ở backend, không bao giờ vào zip.
-- **Version marker nội bộ** trong code (comment `/* v.. */`) và `?v=` trong app.html được đánh số thủ công — dễ quên bump. (Đề xuất tương lai: script build tự hash `?v=`.)
+- **Version marker nội bộ** trong code (comment `/* v.. */`) chỉ là changelog; `?v=` do `tools/build.mjs` tự hash — đừng sửa tay.
 
-### Lịch sử version (cập nhật mỗi lần build)
-| File | v hiện tại |
-|---|---|
-| app.min.js | **166** |
-| live.min.js | **49** |
-| app.min.css | 42 |
-| pipeline-v2.min.css | 47 |
-| tokens.min.css | 17 |
-- Zip mới nhất: **v119-15** (tăng tốc F5 + hết lag — gói hiệu năng A+B+C).
+### Version
+- Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
+- Zip mới nhất: **v119-16** (trọn gói 5 nhóm fix + bộ build/test tự động).
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -67,9 +55,22 @@ cd /tmp/slz && zip -qr /tmp/<tên-mới>.zip . -x '*.bak*'
 - **C** app.html: thêm `defer` cho 8 script classic (giữ nguyên thứ tự; module live.js vốn defer).
 - Smoke test Playwright (MODE=demo, headless_shell trong `/opt/pw-browsers`): bơm 450 lead → DOM 200 card + nút hiện thêm đúng, không console error. Cách test: copy thư mục, ghi đè `firebase-config.min.js` = `window.SL_CONFIG={MODE:"demo"}`, serve http.server.
 
+## Việc đã làm ở v119-16 (phiên 27/08/2026 — "xử lý hết 5 nhóm")
+- **Pipeline dữ liệu THẬT**: bỏ bảng demo `pvExt`; `pvOf()` tính tuổi/kẹt từ `stage_at` (ghi mới mỗi lần kéo thẻ, fallback `first_care_at`/`detected_at`); "Hẹn hôm nay" từ `fu_at`; đổi nhãn "Gợi ý từ AI" → "Việc cần chú ý"; cap 50 thẻ/cột + nút hiện thêm (`pvColMore`).
+- **Nút Loại thật**: `dropped:true` ghi Firestore (optimistic + revert khi lỗi); pipeline lọc `!l.dropped` (lead vẫn còn trong kho/feed).
+- **Regex "tỷ"**: `\b` → lookahead `(?![A-Za-zÀ-ỹ0-9])` (nhánh 'tỷ' trước đây KHÔNG BAO GIỜ khớp).
+- **snapErr()** live.js: listener lỗi terminal (permission-denied/failed-precondition) bắn `sl-fb-down` → banner, hết "chết im"; `rebuild()` bọc try/catch cũng bắn banner.
+- **Feed search bỏ dấu**: dùng `fold()` + cache `l.__q` trên object lead.
+- **Vá nhỏ**: parseTS chặn Invalid Date; fuChip dùng giờ máy (đồng bộ bộ đếm "hôm nay"); bd_month tự đổi doc khi sang tháng (check 30'); spread `{...d.data(), id:d.id}` (doc id thắng field trùng tên) toàn bộ live.js; điều kiện nick đồng bộ `getActiveNicks()`; privacy/terms tokens v17; xoá `api-live.js` + 3 ảnh không dùng; `_redirects` chặn source; CSP thêm `frame-ancestors 'self'`.
+- **Notes realtime**: `loadNotes()` → `onSnapshot` (hưởng cache resume + ghi chú đồng nghiệp tự hiện; `reloadNotes()` thành no-op khi đã subscribe, cờ `notesSubbed` reset trong stopData).
+- **buildData memoize**: `buildScansMemo`/`buildScannedMemo` theo reference mảng — lead mới không kéo theo sort lại 1000 scan + 5000 scanned.
+- **tools/**: `build.mjs` (build 1 lệnh + hash ?v= + zip) + `smoke.js` (7 check tự động, PASS hết mới gửi zip). Drift-check khi chuyển: mọi min build lại từ source giống hệt byte.
+
 ## Việc còn tồn (chờ anh chốt)
-- Pipeline view chưa cap card + chưa diff (vẫn đập innerHTML toàn bộ) — làm tương tự feed nếu anh thấy pipeline lag.
-- `buildData` chưa memoize theo kênh; `loadNotes` superadmin vẫn đọc toàn bộ notes 1 lượt (getDocs không hưởng cache resume).
-- **Kiến trúc**: tách `app.js` thành 4–6 ES module + script build tự hash `?v=`; giữ bộ smoke test Playwright làm nền.
-- Backend (khi anh cần): các bug Firestore khác trong báo cáo audit (onSnapshot lỗi chết im, phân trang theo docSnapshot...).
+- **Tách `app.js` thành 4–6 ES module** + tách `boot()` live.js — refactor lớn, làm ZIP RIÊNG sau khi v119-16 chạy ổn ở production (kèm eslint khi đó mới có giá trị).
+- Pipeline chưa diff theo lead.id như feed (đã cap 50/cột nên nhẹ; diff làm cùng đợt tách module).
+- `buildData` whitelist → pass-through (bug "field rơi khỏi rebuild" từng dính 2 lần) — làm cùng đợt tách module.
+- Backend: chạy LỆNH rà Firestore Rules `users` (chặn tự sửa role/active/brand qua setMyProfile) + xác nhận Cloud Functions bắt buộc token — em đã soạn, chờ anh dán Cloud Shell.
+- `assigned_at`/giờ ghi chú vẫn dùng đồng hồ máy client (đổi sang serverTimestamp cần migrate dữ liệu ms cũ — lợi nhỏ, để sau).
+- Ngoài code: research Zalo cá nhân (yêu cầu 26/08); xoay key OpenAI; xoá lead rác "Lan Anh Nguyễn".
 - Chi tiết: báo cáo audit đã gửi anh (57 phát hiện, lọc theo mức độ/nhóm).

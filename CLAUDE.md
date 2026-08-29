@@ -224,6 +224,16 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **Worker VPS** (`worker.mjs` bản 29/08, đã gửi): thêm action `add_friend` (API nội bộ `gqlFriend` doc_id 28400389149651601 + DOM `domFriend` dự phòng, tự bỏ qua nếu đã là bạn/đã gửi lời mời); `getUid`/`uidOf` helper; inbox DOM messenger (`domInbox` mở messenger.com/t/<uid>). config.json thêm `graphql.friendDocId`. Worker `onSuccess` là bên ADVANCE thread (step→nextStep, active, nextAt+delay, taskStatus:'done'); `onFail` retry 15'×maxTries(5)→dead-letter; `onNeedLogin` cờ needLogin.
 - **CÒN NGHIỆM THU**: web → Tiếp cận → gán nick engine=AdsPower + Profile ID + brand, bật nick + bật brand → trong ~5' "Hoạt động gần đây" hiện React→Comment→**Gửi lời mời kết bạn**→Inbox. LƯU Ý: nếu chưa accept kết bạn, inbox có thể trượt vài lần→dead-letter sau ~75' (FB thường vẫn cho gửi sau khi đã gửi lời mời nên đa số OK; ca khó chỉnh sau).
 
+## ★ NGHIỆM THU REACT API NỘI BỘ ADSPOWER — OK (phiên 29/08)
+- **Bug đã sửa**: lệnh react/comment nội bộ gửi THIẾU biến top-level bắt buộc → FB trả `noncoercible_variable_value` (code 1675012). Phải bơm ĐỦ bộ biến khớp capture thật:
+  - **REACT** (`gqlReact`): `{input:{feedback_id, feedback_reaction_id:String, feedback_source:(group?'PROFILE':'OBJECT'), actor_id:<uid nick>, session_id:<uuid>, client_mutation_id}, scale:1, canUseNicknameOnComet:false, useDefaultActor:false, __relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider:false}`. Bài NHÓM → `feedback_source:'PROFILE'`.
+  - **COMMENT** (`gqlComment`): input thêm `formatting_style:null, is_inline_vote_enabled_for_qna:false, vod_video_timestamp:null`; top-level thêm `inviteShortLinkKey:null` + 5 relay flags (`groups_comet_use_glv:false, CommentActionLinksRewriteEnabled:true, CommentAvatarStickerAnimatedImage:false, IsWorkUser:false, CommentAutoTranslationType:'AUTO_TRANSLATE'`) + `feedLocation:'GROUP'`, `feedbackSource:0`, `groupID`.
+  - Các field analytics (`attribution_id_v2`, `tracking`, `is_tracking_encrypted`) là TÙY CHỌN — bỏ được.
+- **Worker react flow mới**: API ok → XONG ngay (bỏ bẫy verify-rồi-DOM-lại cũ gây timeout); API fail → DOM `hover({force:true})`+click force (vượt lớp ảnh che pointer) rồi verify. Worker in `react API: OK|FAIL <sample>` + `comment API: ...` để soi.
+- **KẾT QUẢ THẬT (21:03, nick k1g9yjdv, lead PHSl8krFTmkuf0PehL1W)**: `react API: OK` — response `feedback_react.feedback{reaction_count:6}` = react thật vào bài nhóm qua API nội bộ, không cần DOM. Engine tự đẩy tiếp comment→kết bạn→inbox các tick sau.
+- **File hiện trạng**: worker.mjs bản 29/08 (react+comment đủ biến, add_friend API, inbox DOM). config.json có `graphql.reactDocId/commentDocId/friendDocId`.
+- **Dọn**: `diag.mjs`/`reset.mjs` để trong `~/firebase-s13/functions` (xoá sau bằng `rm`); `errors/*.png` trên VPS.
+
 ## ★ LUỒNG COMMENT-LEAD (chưa code — cần bổ sung)
 - BrightData quét cả comment → lead có thể LÀ 1 comment (`comment_id`/`comment_url`). Engine+worker hiện chỉ xử lý lead-là-BÀI. Cần: phát hiện lead là comment → tym comment + REPLY comment đó (comment con). `feedback_id` của comment dựng cùng cách (base64 từ comment_id — xác nhận khi test); reply = CHÍNH `useCometUFICreateCommentMutation` với feedback_id = feedback_id của comment cha. Làm cùng đợt add-friend.
 

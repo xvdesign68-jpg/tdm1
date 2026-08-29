@@ -234,6 +234,13 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **File hiện trạng**: worker.mjs bản 29/08 (react+comment đủ biến, add_friend API, inbox DOM). config.json có `graphql.reactDocId/commentDocId/friendDocId`.
 - **Dọn**: `diag.mjs`/`reset.mjs` để trong `~/firebase-s13/functions` (xoá sau bằng `rm`); `errors/*.png` trên VPS.
 
+## ★ FUNNEL 1-LEAD-1-PHIÊN cho AdsPower (LỆNH K3, phiên 29/08 — anh chốt)
+- **Anh chốt**: các bước CÙNG 1 lead (react→comment→kết bạn→inbox) làm **LIỀN trong 1 phiên mở nick** (cách nhau vài giây); chỉ **giữa các lead khác nhau** mới giãn nhịp (engine pace 3–8'). Lý do trước đây mỗi bước cách 5–8' là do mô hình per-step-per-tick (mỗi tick engine đẩy 1 bước + pace/nick + scheduler 5'). Đổi sang funnel: nhanh + rẻ (mở nick 1 lần làm hết) + vẫn an toàn giữa lead.
+- **Engine (outreach.js, LỆNH K3 thay khối ADSPOWER cũ)**: `stepNickAdspower` nạp 1 lead mới → `apEnqueueFunnel`: reserve cap từng bước qua `tryConsume` (react/comment/friend/inbox; inbox chỉ khi có add_friend + uid số) → ghi **1 task `action:'funnel'`** vào `outreach_tasks/{leadId}__funnel` (payload: post_url, reaction, comment_msg=inbox_msg=lead.reply, uid, profile_url, steps[]) + thread `step:'funnel'` lease nextAt+30' + lưu `fpayload` trên thread để RETRY. Retry: thread active tới hạn (needLogin đẩy nextAt+20') → re-enqueue nguyên fpayload (không reserve cap lại). Thread cũ per-step (không fpayload) → set active:false (tự dọn).
+- **Worker (worker.mjs)**: `execOnPage` gặp `action:'funnel'` → `runFunnel`: mở post 1 lần, chạy tuần tự các step trong `payload.steps`, **giãn 3–7s giữa bước**, LOG TỪNG BƯỚC vào outreach_log (react/comment trên post; add_friend + inbox mở profile/messenger). needLogin ở bất kỳ đâu → throw → runNick.onNeedLogin (giữ retry). Xong → thread done. runNick KHÔNG gọi onSuccess cho funnel.
+- **"⚡ Xử lý ngay"**: giờ ít tác dụng trên AdsPower (funnel vốn làm liền trong phiên); vẫn còn ý nghĩa cho kênh func (chain trong tick). Pace GIỮA lead vẫn áp (an toàn).
+- **Sau deploy PHẢI `node reset.mjs`** (xoá thread/task per-step cũ) để chạy funnel sạch.
+
 ## ★ LUỒNG COMMENT-LEAD (chưa code — cần bổ sung)
 - BrightData quét cả comment → lead có thể LÀ 1 comment (`comment_id`/`comment_url`). Engine+worker hiện chỉ xử lý lead-là-BÀI. Cần: phát hiện lead là comment → tym comment + REPLY comment đó (comment con). `feedback_id` của comment dựng cùng cách (base64 từ comment_id — xác nhận khi test); reply = CHÍNH `useCometUFICreateCommentMutation` với feedback_id = feedback_id của comment cha. Làm cùng đợt add-friend.
 

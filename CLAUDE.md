@@ -209,6 +209,17 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **Đã nhồi vào config.json** (`graphql.reactDocId`/`commentDocId`) + `gqlReact`/`gqlComment`/`fbGraphql` trong worker (bản gửi 29/08). Header worker in `API nội bộ=BẬT`. DOM vẫn là fallback + verify.
 - **LƯU Ý**: `doc_id` ĐỔI khi FB deploy → khi react/comment API bắt đầu lỗi hàng loạt, chạy lại `capture.mjs` lấy doc_id mới, cập nhật config.json. `fb_dtsg` tự lấy runtime nên không lo. Comment-API nhiều field (relay flags) → có thể cần tinh chỉnh, DOM fallback che.
 
+## ★ KẾT BẠN là BƯỚC BẮT BUỘC trước INBOX (anh chốt 29/08 — em sửa lại quan điểm)
+- Anh phản hồi: automation CHỈ chạm Lead đã lọc kỹ nhiều lần → rủi ro "add nhầm người vô tội" ~0; và **thực tế nhiều khi KHÔNG kết bạn thì KHÔNG inbox được** (tin rơi Message Request ẩn / FB chặn nút gửi tới khi có quan hệ). ⇒ **add-friend KHÔNG bỏ qua nữa** (đảo lại khuyến nghị cũ của em), thành bước bắt buộc trước inbox.
+- **Phễu mới (lead là BÀI)**: React → Comment → **Kết bạn (người đăng)** → chờ 5–10' → Inbox (DOM messenger). Logic: gửi lời mời → thread bước `friend_sent` → tick sau thử inbox, còn chặn thì hẹn lại tối đa vài lần.
+- **INBOX không có "API nội bộ"**: Messenger gửi qua **WebSocket/MQTT**, KHÔNG qua `/api/graphql/` → capture không lấy được → inbox AdsPower buộc chạy **DOM** (mở `messenger.com/t/<uid>` gõ+gửi). Đây là lợi thế AdsPower so với func (mở messenger thật bằng nick khách).
+- **CAPTURE kết bạn (đang chờ)**: log 28/09 CÓ tên `FriendingCometFriendRequestSendMutation` (dòng 137) nhưng **KHÔNG có payload/doc_id** (bộ lọc capture cũ chỉ bắt React/Comment/Feedback). Đã sửa `capture.mjs` mở rộng regex bắt thêm `Friend|Friending|Request|Poke|Follow` → gửi anh chạy lại (bấm KẾT BẠN 1 người) → lấy doc_id + variables lệnh kết bạn.
+- **VAN kết bạn (điểm nhạy ban #1)**: khởi đầu **≤10/ngày/nick** (nới dần tối đa ~20), giãn ≥ vài phút/lời mời, khung 8–22h VN. React 40 · Comment 12 · Inbox 8 giữ nguyên.
+- **CÒN LÀM**: (1) có doc_id kết bạn → thêm action `add_friend` vào `enqueueTask`+worker+engine, chỉnh phễu; (2) inbox DOM messenger cho AdsPower; (3) van add-friend + trạng thái `friend_sent`/chờ-accept trong outreach_threads.
+
+## ★ LUỒNG COMMENT-LEAD (chưa code — cần bổ sung)
+- BrightData quét cả comment → lead có thể LÀ 1 comment (`comment_id`/`comment_url`). Engine+worker hiện chỉ xử lý lead-là-BÀI. Cần: phát hiện lead là comment → tym comment + REPLY comment đó (comment con). `feedback_id` của comment dựng cùng cách (base64 từ comment_id — xác nhận khi test); reply = CHÍNH `useCometUFICreateCommentMutation` với feedback_id = feedback_id của comment cha. Làm cùng đợt add-friend.
+
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.
 - (Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không — liên quan sink `${l.score}` (client đã ép Number nên rủi ro thấp).

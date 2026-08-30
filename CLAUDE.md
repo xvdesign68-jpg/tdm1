@@ -264,6 +264,12 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **Backend (LỆNH M)**: Rules thêm `match /workers/{wid}` read=isSuperAdmin, write=false (worker ghi bằng Admin SDK). fb_accounts write=isSuperAdmin sẵn có → setFbAccountWorker/clearNickFlag OK. KHÔNG cần index.
 - **Ước lượng VPS** (anh hỏi): nghẽn = RAM (mỗi Chromium ~1.2GB). Công thức: nick cùng lúc ≈ (RAM_GB−3.5)/1.2, không vượt vCPU; gán ≈ ×35–50. NVMe7 (16GB/10CPU)=6–8 cùng lúc,~250–350 gán; NVMe9 (32GB/16CPU)=10–12,~350–500. ~3000 nick ≈ 8–10 máy. Bắt đầu maxConcurrent thấp, nâng tới RAM~85%.
 
+## ★ v119-32 — Chỉnh maxConcurrent VPS ngay trên web (realtime) — ĐÃ LÀM
+- **Worker**: `effMax` = số nick mở cùng lúc HIỆU LỰC; `refreshCfg()` mỗi 15s đọc `worker_config/{workerId}.maxConcurrent` (clamp 1–40) → đè `config.json`; tick dùng `effMax`; heartbeat báo `maxConcurrent:effMax`. Worker đọc worker_config bằng Admin SDK (bỏ qua Rules).
+- **FE (zip v119-32)**: live.js `setWorkerConcurrency(workerId,n)` = setDoc `worker_config/{workerId}`; 45-outreach.js panel VPS cột "Nick chạy" → `<input data-oa-worker-max>` (running / [ô số] nick) + handler change/Enter. CSS .oa-vmax/.oa-vrun. smoke 16/16 (thêm check ô maxConcurrent).
+- **Backend (LỆNH N)**: Rules `match /worker_config/{wid}` read,write=isSuperAdmin. Không cần index.
+- **Vận hành**: Super Admin gõ số nick cùng lúc trên panel → worker áp dụng ~15s; vừa nâng vừa nhìn RAM% cùng panel, tới ~85% thì dừng.
+
 ## ★ LUỒNG COMMENT-LEAD (chưa code — cần bổ sung)
 - BrightData quét cả comment → lead có thể LÀ 1 comment (`comment_id`/`comment_url`). Engine+worker hiện chỉ xử lý lead-là-BÀI. Cần: phát hiện lead là comment → tym comment + REPLY comment đó (comment con). `feedback_id` của comment dựng cùng cách (base64 từ comment_id — xác nhận khi test); reply = CHÍNH `useCometUFICreateCommentMutation` với feedback_id = feedback_id của comment cha. Làm cùng đợt add-friend.
 

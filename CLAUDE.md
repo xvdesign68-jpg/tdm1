@@ -242,6 +242,12 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **"⚡ Xử lý ngay"**: giờ ít tác dụng trên AdsPower (funnel vốn làm liền trong phiên); vẫn còn ý nghĩa cho kênh func (chain trong tick). Pace GIỮA lead vẫn áp (an toàn).
 - **Sau deploy PHẢI `node reset.mjs`** (xoá thread/task per-step cũ) để chạy funnel sạch.
 
+## ★ DOM kết bạn/inbox AdsPower — bài học selector (phiên 30/08, nghiệm thu lead Nguyễn Út)
+- **Báo GIẢ nguy hiểm đã sửa**: `domInboxProfile` cũ có selector ô nhập QUÁ CHUNG (`div[contenteditable][role=textbox]`) → khi nút Nhắn tin chưa mở khung chat, nó vớ nhầm **ô "Viết bình luận" dưới bài trên profile** rồi gõ + Enter = **đăng comment bậy lên tường khách** nhưng web báo "đã inbox". ⇒ giờ tìm ô soạn bằng `evaluateHandle`: quét `div[contenteditable][role=textbox]` hiển thị, **LOẠI** ô có aria-label chứa "bình luận/comment/viết bình", ưu tiên ô "tin nhắn/message". Luôn VERIFY ô sạch sau gửi (còn chữ → thử nút Gửi → vẫn còn → THẤT BẠI thật, không báo done giả).
+- **Nút "Thêm bạn bè" hay bị GIẤU trong menu "..."**: profile lấy "Theo dõi" làm nút chính (vd người đã đủ 5000 bạn) → "Thêm bạn bè" nằm trong dropdown "..." (mục "Quan hệ kết nối"). `domFriend`: không thấy nút top-level → duyệt các `div[role=button][aria-haspopup=menu]`, click từng cái, tìm `div[role=menuitem]:has-text("Thêm bạn bè")`.
+- **Lỗi bước funnel phải VĂNG RA outer catch** (đừng nuốt bằng try/catch nội bộ) thì mới chụp được `errors/<leadId>__<step>_<i>.png` (chụp MỌI tab, gồm tab messenger mới mở). Bài học: try/catch nội bộ nuốt lỗi = không có ảnh chẩn đoán.
+- Profile ~31% lead có author_url; người 5000 bạn không nhận thêm bạn (lời mời treo) nhưng vẫn inbox được (tin vào Message Request).
+
 ## ★ LUỒNG COMMENT-LEAD (chưa code — cần bổ sung)
 - BrightData quét cả comment → lead có thể LÀ 1 comment (`comment_id`/`comment_url`). Engine+worker hiện chỉ xử lý lead-là-BÀI. Cần: phát hiện lead là comment → tym comment + REPLY comment đó (comment con). `feedback_id` của comment dựng cùng cách (base64 từ comment_id — xác nhận khi test); reply = CHÍNH `useCometUFICreateCommentMutation` với feedback_id = feedback_id của comment cha. Làm cùng đợt add-friend.
 

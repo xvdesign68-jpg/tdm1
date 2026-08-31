@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-33** (thẻ brand KPI realtime từ outreach_log). v119-32: chỉnh maxConcurrent VPS từ web. v119-31: panel "Máy chủ (VPS)" + badge checkpoint + gán nick→VPS.
+- Zip mới nhất: **v119-34** (thẻ brand KPI chính xác mọi quy mô — engine ghi tổng hợp ngày lên `outreach_stats`). v119-33: KPI realtime từ outreach_log. v119-32: chỉnh maxConcurrent VPS từ web. v119-31: panel "Máy chủ (VPS)" + badge checkpoint + gán nick→VPS.
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.
@@ -272,7 +272,15 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ## ★ v119-33 — Thẻ brand KPI realtime (đóng lỗ v119-26) — ĐÃ LÀM
 - **Lỗ cũ**: thẻ brand đọc `brands.outreach.usage/funnel/replied` mà engine chưa ghi tổng hợp → hiện 0. **Fix (FE-only, không đụng backend)**: `oaBrandStats(code)` tính REALTIME từ `D.outreachLog` (đã subscribe) — lọc brandCode + hôm nay (oaLogMs so với oaTodayStart): react=/cảm xúc/, comment=/Bình luận/, inbox=/Inbox/ (status done); replied=status 'reply'; funnel=distinct leadId. oaCfg thật→oaBrandStats; demo→giữ OA_DEMO_BRANDS. Van hiển thị `oaCap(kind,nicks)=nicks×OA_ENGINE_CAP{react40,comment12,inbox8}`. Log snapshot → rebuild(['outreach']) → thẻ tự cập nhật. smoke 16/16.
-- **HẠN CHẾ**: tính từ 100 log gần nhất (limit query) → volume lớn (>100 hành động/ngày nhiều brand) sẽ undercount; giải pháp scale = engine ghi tổng hợp ngày lên brands.outreach (đợt dashboard scale).
+- **HẠN CHẾ**: tính từ 100 log gần nhất (limit query) → volume lớn (>100 hành động/ngày nhiều brand) sẽ undercount; giải pháp scale = engine ghi tổng hợp ngày lên brands.outreach (đợt dashboard scale). → **ĐÃ ĐÓNG ở v119-34**.
+
+## ★ v119-34 — Thẻ brand KPI chính xác MỌI QUY MÔ (đóng hạn chế v119-33) — ĐÃ LÀM
+- **Vấn đề**: v119-33 tính KPI từ 100 log gần nhất → scale lớn (nhiều brand × >100 hành động/ngày) undercount. Anh chốt "cho engine ghi tổng hợp ngày -> làm luôn cả thể".
+- **Giải pháp**: counter cộng dồn realtime trong collection **`outreach_stats/{brandCode}__{ngàyVN}`** = `{brandCode, day, react, comment, inbox, friend, replied, at}` (dùng `FieldValue.increment(1)` — an toàn đa VPS ghi đồng thời, không cần đọc-rồi-ghi). Chọn collection riêng thay vì `brands.outreach` vì increment + subscribe realtime gọn hơn, không đụng doc brand (Rules brands=isSuperAdmin).
+- **Bên GHI**: (a) **Worker AdsPower** (`worker.mjs`): mỗi bước funnel done → `bumpStat(brandCode, statFieldOf(step))` trong `logStep` + `addLog` (Admin SDK, bỏ qua Rules). (b) **Engine func** (`outreach.js`): patch `addLog(o)` — dò field từ `o.status`+`o.action` (reply→replied; done + /cảm xúc|Bình luận|Inbox|kết bạn/) → increment. (c) **funcWebhook** reply cũng qua addLog → +replied. Ngày VN = `new Date(Date.now()+7h).toISOString().slice(0,10)`.
+- **Bên ĐỌC (FE)**: live.js `lazyOutreach` subscribe `outreach_stats` (super: `where day==hôm nay`; brand user: `where brandCode==byBrand` rồi lọc ngày client) → `D.outreachStats`. 45-outreach.js `oaBrandStats(code)` **ưu tiên `D.outreachStats[code]`** (chính xác tuyệt đối), rỗng thì fallback tính từ log như v119-33. `funnel`=react count (proxy số lead chạm). Van hiển thị vẫn `oaCap(kind,nicks)`.
+- **build 12 part eslint sạch + smoke 16/16**. Zip `v119-34-brandstats`.
+- **Backend (LỆNH P + Q, gửi anh chạy Cloud Shell)**: P = patch `outreach.js` addLog (node script tìm `.add(Object.assign({ at: FieldValue.serverTimestamp() }, o));` chèn khối bump, idempotent check `outreach_stats`) → deploy `outreachTick,funcWebhook` asia-southeast1. Q = Rules `match /outreach_stats/{id}` read=super || (active && brandCode==myBrand), write=false → deploy firestore:rules. KHÔNG cần index (đọc theo brandCode HOẶC day, single-field tự có).
 
 ## ★ RESEARCH: đổi AdsPower sang iOS/mobile để né checkpoint? — KHÔNG NÊN (phiên 31/08)
 - **Kết luận**: KHÔNG đổi sang iOS/mobile-mode. (1) "mobile ít checkpoint" là market belief, chưa có bằng chứng; checkpoint do HÀNH VI + nhất quán fingerprint + proxy/location + account health, không phải loại thiết bị. (2) "iOS" trên AdsPower = Chromium/Blink desktop giả UA/TLS mobile, KHÔNG phải Safari/WebKit iPhone thật → còn mismatch tầng engine; spoof UA mobile trên phần cứng desktop là mismatch DỄ bắt. (3) Chi phí lớn với hệ mình: đổi profile → facebook.com trả mobile web → VỠ hết selector desktop + API nội bộ Comet (doc_id) → phải capture + viết lại toàn bộ. Lợi mơ hồ, rủi ro tăng. (4) Hướng mobile THẬT chỉ có nghĩa với cloud phone/app native (kiến trúc riêng, đắt) — nếu muốn thì A/B test nhỏ đo thật, đừng đổi cả dàn theo niềm tin. Giữ desktop + tối ưu proxy dân cư khớp vùng + hành vi bảo thủ + nick chính chủ.

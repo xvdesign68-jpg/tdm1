@@ -40,7 +40,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ### Version
 - Từ **v119-16**: `?v=` là **hash 10 ký tự theo nội dung file** do `tools/build.mjs` tự sinh — KHÔNG còn số đếm tay (số v164/v47... cũ đã đóng băng; marker `/* v167 */` trong code chỉ còn là changelog).
-- Zip mới nhất: **v119-36** (gia cố automation: tenancy + van nhạy ≤30 + repaint + múi giờ; kèm worker.mjs bảo vệ nick). v119-35: ⚙️ cấu hình automation/brand (ma trận nhiệt độ×hành động + van/nick). v119-34: KPI chính xác mọi quy mô (`outreach_stats`). v119-33: KPI realtime. v119-32: maxConcurrent từ web. v119-31: panel VPS + checkpoint.
+- Zip mới nhất: **v119-36b** (sửa nhãn van hiện nguyên `${...}` — lỗi template-literal-trong-chuỗi-nháy-đơn; chỉ hiển thị, không ảnh hưởng chạy). v119-36 (gia cố automation: tenancy + van nhạy ≤30 + repaint + múi giờ; kèm worker.mjs bảo vệ nick). v119-35: ⚙️ cấu hình automation/brand (ma trận nhiệt độ×hành động + van/nick). v119-34: KPI chính xác mọi quy mô (`outreach_stats`). v119-33: KPI realtime. v119-32: maxConcurrent từ web. v119-31: panel VPS + checkpoint.
 
 ## Việc đã fix ở v119-14 (phiên 27/08/2026)
 1. **`window.CURRENT_USER`** không bao giờ được gán → thêm `window.CURRENT_USER=CURRENT_USER` trong `SLAuth.show` (app.js). Khôi phục "Lead của tôi", nút xoá ghi chú của chính mình, `first_care_by`.

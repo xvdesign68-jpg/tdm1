@@ -354,6 +354,12 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - **Nghiệm thu**: khi engine bốc trúng lead-là-comment → "Hoạt động gần đây" hiện *Thả cảm xúc vào bình luận → Trả lời bình luận* (thay vì đụng bài).
 - **CÒN TỒN nhỏ**: (1) worker comment-lead chạy DOM (chưa API nội bộ) — muốn nhanh/nhẹ hơn thì capture doc_id react-comment + reply rồi bật API (fallback DOM vẫn che). (2) func path (nick func) chưa xử lý comment-lead — nick anh chạy AdsPower nên không ảnh hưởng.
 
+## ★ v119-37 — Sửa "giật giật chớp chớp" tab Tiếp cận (phiên 01/09) — ĐÃ LÀM
+- **Anh báo**: mục Tiếp cận thỉnh thoảng giật/chớp. **Chẩn đoán (live.js)**: 3 kênh `onSnapshot` (`outreach_log`/`workers`/`outreach_stats`) đều gọi `oaRepaint()` → `rebuild(['outreach'])` = vẽ lại **FULL innerHTML** cả view. Các doc dùng `at:serverTimestamp()` + heartbeat 30s → **mỗi lần ghi bắn snapshot 2 LẦN** (ước lượng local + xác nhận server); lúc 1 nick chạy phễu, log/stats đổ liên tục → repaint dồn dập = chớp.
+- **Fix (FE-only, live.js `oaRepaint`)**: (1) **SIGNATURE-GUARD** — `oaSignature()` dựng chữ ký từ dữ liệu HIỂN THỊ (outreachLog id+status 8 dòng đầu · outreachStats react/comment/friend/inbox/replied theo brand · workers id+online+running+max+ram%); `sig===oaSig` → BỎ vẽ (cắt double-fire serverTimestamp + refire cache; CỐ TÌNH bỏ chuỗi "x phút trước" khỏi chữ ký vì nó tự đổi mỗi snapshot mà không phải thay đổi thật). (2) **Gộp 500ms trailing** — 1 burst nhiều snapshot chỉ vẽ 1 lần, lấy state mới nhất. Giữ nguyên guard cũ (không vẽ khi đang gõ ô maxConcurrent).
+- build 12 part eslint sạch + **smoke 19/19** + không lỗi JS. Zip **v119-37-oaflicker**.
+- **CÒN TỒN nhỏ**: heartbeat 30s đổi RAM%/running vẫn vẽ lại full view 1 lần/30s (dữ liệu thật, không phải strobe) — muốn hết hẳn thì diff riêng panel VPS (refactor, để sau nếu anh còn thấy cộm).
+
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.
 - (Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không — liên quan sink `${l.score}` (client đã ép Number nên rủi ro thấp).

@@ -360,6 +360,25 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 - build 12 part eslint sạch + **smoke 19/19** + không lỗi JS. Zip **v119-37-oaflicker**.
 - **CÒN TỒN nhỏ**: heartbeat 30s đổi RAM%/running vẫn vẽ lại full view 1 lần/30s (dữ liệu thật, không phải strobe) — muốn hết hẳn thì diff riêng panel VPS (refactor, để sau nếu anh còn thấy cộm).
 
+## ★ v119-38 / worker 2026-09-01e — RÀ SOÁT TỔNG TRƯỚC GA (2 agent đối kháng FE + worker) (phiên 01/09) — ĐÃ LÀM
+- Anh yêu cầu rà toàn diện automation trước khi phát hành cho khách. Bung 2 agent (FE + worker) đọc code thật; em kiểm chứng từng phát hiện rồi fix. XSS/tenancy/ma-trận-clamp/oaSignature-append-only: **đã soi, an toàn**. Các lỗi THẬT đã sửa:
+- **Worker (`worker.mjs` 2026-09-01e — chép đè MỌI VPS) — nhóm "nhầm chỗ / bay nick":**
+  1. **[CHẶN] `findCommentEl` khớp comment_id kiểu SUBSTRING** (`a[href*="comment_id=<cid>"]`) → dính prefix (`12345`⊂`123456`) + `reply_comment_id=` → tym/reply NHẦM comment/bài. Fix: `page.evaluate` khớp **regex ranh giới** `[?&]comment_id=<cid>(&|$)` (số hoá cid), đánh dấu `data-sl-target` đúng article; KHÔNG khớp chuẩn → **THROW fail-closed** (thà bỏ lỡ còn hơn nhầm).
+  2. **[CHẶN] `replyComment` lấy ô soạn PAGE-WIDE** (`firstVisible(page,...)`) → vớ nhầm ô reply comment khác. Fix: scope ô soạn TRONG `el` (khung comment mục tiêu); không thấy → THROW.
+  3. **[CHẶN] `verifyCommentReact` false → TOGGLE strobe**: tym rồi verify text "Đã thích" (không phải layout nào cũng đổi) → false → throw → retry → tym LẠI = **tắt like** lặp tới dead-letter. Fix: react comment-lead **best-effort** — bỏ qua nếu đã thích; bấm 1 lần; verify best-effort; **luôn stepOk=true** (không toggle-retry). React nhẹ nhất, chấp nhận thiếu 1 like còn hơn lật like.
+  4. **[CHẶN] điểm mù checkpoint**: `detectChallengeStrict` chỉ chạy khi step THROW; soft-block/rate-limit làm verify-false (không throw) thì lọt → hammer tiếp nick đang bị bóp. Fix: chạy `detectChallengeStrict` cả ở nhánh stepOk=false trước khi dừng.
+  5. **[VỪA] `domInbox` (đường uid) KHÔNG verify** → báo inbox giả. Fix: thêm verify ô-sạch (khớp `domInboxProfile`).
+  6. **[VỪA] zombie `withTimeout`/reaper**: watchdog resolve sớm nhưng runNick chạy nền; reaper 15' requeue → mở lại cùng profile + zombie `adspowerStop` tắt nhầm phiên mới. Fix: **guard theo thế hệ chạy** (`runGen` Map, `superseded()`) → zombie KHÔNG adspowerStop; **nới cutoff reaper** = max(15', nickTimeout+12'). (Chưa cancel cứng — refactor sau; AdsPower single-instance/profile nên rủi ro double thấp.)
+  7. **[VỪA] needLogin loop vô hạn**: nick đăng xuất vẫn re-enqueue mỗi 20' mãi. Fix: `onNeedLogin` đếm `needLoginCount`, ≥3 → `active:false` (tự tạm dừng); reset khi thành công.
+  8. **[NHẸ] `markDone` lỗi ghi giữa chừng → double**: thêm retry 3× arrayUnion. Đổi tên biến `os` (che module `os`) → `osx`.
+- **FE (zip v119-38-ga-harden):**
+  1. **[VỪA→NẶNG] 3 handler chỉ revert CONTROL không revert MODEL** → repaint kế (log/heartbeat) bật lại giá trị THẤT BẠI. Nguy nhất: **tắt nick lỗi mạng → checkbox hiện TẮT nhưng server vẫn active:true → engine tiếp tục chạy nick tưởng đã dừng**. Fix cả 3: bật/tắt nick (`a.active=!on`+re-render), đổi engine (`a.engine=prev`), "Xử lý ngay" (`b.outreach.immediate=!on`) — revert đủ model như handler brand/worker đúng.
+  2. **[VỪA] VPS ĐƠN crash cứng → panel báo 🟢 online mãi** (isOnline chỉ tính lại trong snapshot workers; 1 VPS chết → hết snapshot). Fix: lưu `_ls` (lastSeen ms) + **timer 60s** tự tính lại isOnline từ `_ls`, quá 120s → hạ 🔴; chỉ chạy khi ở tab Tiếp cận; dọn timer khi đổi phiên.
+  3. **[NHẸ-VỪA] Bổ sung giám sát KẾT BẠN** (bước bay nick #1 nhưng trước đây KHÔNG có van/đồng hồ): `oaBrandStats` thêm `friend`; thẻ brand thêm **van Kết bạn** (bar màu `--hot`); KPI "Thao tác đã gửi" cộng friend (`kb N`). OA_CAPS/OA_CAP_LABEL thêm friend. CSS `.oa-friend`.
+  4. **[NHẸ] `clearTimeout(oaPaintT)`** khi đổi phiên (dọn timer repaint lạc).
+- build 12 part eslint sạch + **smoke 19/19** + không lỗi JS.
+- **CÒN TỒN (không chặn GA, đã cân nhắc)**: (a) worker comment-lead chạy DOM fail-closed — nếu FB đổi format permalink comment thì bước comment-lead sẽ THROW→dead-letter (an toàn, chỉ thiếu hiệu quả) → nghiệm thu bằng 1 lead-comment thật, chỉnh selector nếu cần; (b) func-path reply log thiếu name/brandName/temp (`outreach.js:383`) — func-only, hiển thị dòng reply thành "Lạnh 0đ" (nick anh chạy AdsPower nên không ảnh hưởng); (c) heartbeat 30s vẫn vẽ lại full view 1 lần/30s khi RAM%/running đổi (dữ liệu thật, không strobe); (d) worker zombie chưa cancel cứng (đã guard adspowerStop + nới reaper).
+
 ## Việc còn tồn (chờ anh chốt)
 - Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.
 - (Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không — liên quan sink `${l.score}` (client đã ép Number nên rủi ro thấp).

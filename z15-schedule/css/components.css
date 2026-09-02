@@ -595,3 +595,80 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .page-head__sub { color: var(--fg-secondary); font-size: 13.5px; margin-top: 4px; }
 .toolbar { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .spinner { width: 16px; height: 16px; border: 2px solid var(--border-strong); border-right-color: var(--action); border-radius: 50%; animation: spin .7s linear infinite; }
+
+/* =====================================================================
+   v1.1 — lớp lịch, ưu tiên, RSVP, chuẩn bị, riêng tư, thẻ xem nhanh
+   ===================================================================== */
+.ev-pill[data-type="focus"] { --ev: var(--ev-focus); background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--ev) 8%, transparent) 6px 7px); }
+.ev-pill[data-type="travel"] { --ev: var(--ev-travel); }
+.ev-pill[data-type="travel"] .ev-pill__bar { background: repeating-linear-gradient(180deg, var(--ev) 0 4px, transparent 4px 7px); }
+.ev-pill.is-private { --ev: var(--ev-private); background: var(--bg-sunken); color: var(--fg-secondary); }
+.ev-pill.is-private .ev-pill__title { font-style: italic; font-weight: 500; }
+.ev-pill[data-prio="1"] .ev-pill__title { font-weight: 600; }
+.ev-pill[data-prio="3"] .ev-pill__bar { opacity: .5; background: repeating-linear-gradient(180deg, var(--ev) 0 5px, transparent 5px 8px); }
+.prio { display: inline-flex; align-items: center; justify-content: center; height: 16px; min-width: 22px; padding: 0 4px; border-radius: var(--r-xs); font: var(--t-mono-sm); font-size: 10px; font-weight: 600; letter-spacing: .02em; color: var(--fg-secondary); background: var(--bg-sunken); border: 1px solid var(--border-hair); }
+.prio[data-p="1"] { color: var(--fg-on-brand); background: var(--fg-primary); border-color: var(--fg-primary); }
+.prio[data-p="3"] { color: var(--fg-tertiary); border-style: dashed; }
+.rsvp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--fg-disabled); box-shadow: 0 0 0 2px var(--bg-surface); flex: 0 0 auto; }
+.rsvp-dot[data-rsvp="yes"] { background: var(--ok); }
+.rsvp-dot[data-rsvp="maybe"] { background: var(--warn); }
+.rsvp-dot[data-rsvp="no"] { background: var(--fg-tertiary); }
+.rsvp-dot[data-rsvp="pending"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--fg-tertiary), 0 0 0 2px var(--bg-surface); }
+.avatar .avatar__rsvp { position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%; background: var(--fg-disabled); box-shadow: 0 0 0 2px var(--bg-surface); }
+.avatar .avatar__rsvp[data-rsvp="yes"] { background: var(--ok); }
+.avatar .avatar__rsvp[data-rsvp="maybe"] { background: var(--warn); }
+.avatar .avatar__rsvp[data-rsvp="no"] { background: var(--fg-tertiary); }
+.avatar .avatar__rsvp[data-rsvp="pending"] { background: var(--bg-surface); box-shadow: inset 0 0 0 1.5px var(--fg-tertiary), 0 0 0 2px var(--bg-surface); }
+.rsvp-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--r-sm); background: var(--bg-sunken); font-size: 13px; }
+.rsvp-bar > b { margin-right: auto; font-weight: 500; }
+.rsvp-bar .btn.is-on { background: var(--primary-fill); color: var(--fg-on-brand); }
+.rsvp-summary { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; color: var(--fg-secondary); }
+.rsvp-summary span { display: inline-flex; align-items: center; gap: 4px; }
+.role-tag { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border-radius: var(--r-xs); font-size: 10px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: var(--fg-tertiary); background: var(--bg-sunken); }
+.role-tag[data-role="organizer"] { color: var(--action); background: var(--blue-50); }
+.prep { display: flex; flex-direction: column; gap: 2px; }
+.prep__item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r-sm); font-size: 13px; transition: background-color var(--dur-instant); }
+.prep__item:hover { background: var(--bg-hover); }
+.prep__check { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border-strong); display: inline-grid; place-items: center; color: transparent; flex: 0 0 auto; transition: background-color var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast); }
+.prep__check svg { width: 12px; height: 12px; }
+.prep__item.is-done .prep__check { background: var(--ok); border-color: var(--ok); color: #fff; }
+.prep__item.is-done .prep__text { color: var(--fg-tertiary); text-decoration: line-through; }
+.prep__text { flex: 1; min-width: 0; }
+.prep__owner { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--fg-tertiary); }
+.prep__add { display: flex; gap: 6px; margin-top: 6px; }
+.prep__add .input { height: 32px; font-size: 13px; }
+.prep__bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-secondary); }
+.prep__bar .progress { width: 80px; }
+.cal-chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--r-xs); font-size: 11.5px; font-weight: 500; color: var(--fg-secondary); background: var(--bg-sunken); }
+.cal-chip i { width: 8px; height: 8px; border-radius: 2px; background: var(--c, var(--fg-tertiary)); }
+.travel-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--fg-secondary); }
+.lock { display: inline-flex; color: var(--fg-tertiary); }
+
+/* Thẻ xem nhanh khi hover sự kiện */
+.ev-hover { position: fixed; z-index: var(--z-toast); width: 300px; padding: 12px 14px; border-radius: var(--r-md); background: var(--bg-surface); box-shadow: var(--shadow-pop); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.ev-hover.is-open { opacity: 1; transform: none; }
+.ev-hover__title { font-weight: 600; font-size: 13.5px; line-height: 1.35; margin: 6px 0 4px; }
+.ev-hover__row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-secondary); margin-top: 3px; }
+.ev-hover__row .icon { color: var(--fg-tertiary); }
+.ev-hover__people { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+
+/* Persona (xem với tư cách) */
+.persona-tag { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--r-full); font-size: 11.5px; font-weight: 500; background: var(--blue-50); color: var(--action); }
+
+/* Ticker "tiếp theo" trên topbar */
+.topbar__next { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--border-hair); background: var(--bg-surface); font-size: 12.5px; color: var(--fg-secondary); max-width: 320px; overflow: hidden; }
+.topbar__next:hover { border-color: var(--border-strong); color: var(--fg-primary); }
+.topbar__next .dot { width: 6px; height: 6px; background: var(--now); flex: 0 0 auto; animation: breathe var(--dur-ambient) ease-in-out infinite alternate; }
+.topbar__next b { font-weight: 600; color: var(--fg-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar__next small { font: var(--t-mono-sm); color: var(--fg-tertiary); white-space: nowrap; }
+@media (max-width: 1280px) { .topbar__next { display: none; } }
+
+/* Trình chọn ưu tiên trong form */
+.prio-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.prio-opt { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 9px; white-space: nowrap; border-radius: var(--r-sm); border: 1px solid var(--border-hair); background: var(--bg-surface); color: var(--fg-secondary); font-size: 12.5px; font-weight: 500; transition: all var(--dur-instant); }
+.prio-opt:hover { background: var(--bg-hover); }
+.prio-opt.is-on { background: var(--blue-50); border-color: var(--blue-100); color: var(--action); }
+.reminder-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.attendee-roles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.attendee-roles .chip--person { cursor: pointer; }
+.attendee-roles .chip--person.is-optional { opacity: .7; border: 1px dashed var(--border-strong); background: transparent; }

@@ -222,3 +222,8 @@ body[data-density="compact"] { --row-h: 40px; --roster-row-h: 36px; --btn-h: 30p
   :root { --dur-instant: 1ms; --dur-fast: 120ms; --dur-base: 120ms; --dur-slow: 120ms; --dur-reveal: 120ms; --stagger: 0ms; }
 }
 body.reduce-motion { --dur-instant: 1ms; --dur-fast: 120ms; --dur-base: 120ms; --dur-slow: 120ms; --dur-reveal: 120ms; --stagger: 0ms; }
+
+/* ---- lớp lịch & thành phần trợ lý (bổ sung v1.1) ---- */
+:root { --ev-focus: #0F9B8E; --ev-travel: #6B7280; --ev-private: #8A8E9A; }
+:root[data-theme="dark"] { --ev-focus: #4FC3B6; --ev-travel: #9AA1AE; --ev-private: #6E7280; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ev-focus: #4FC3B6; --ev-travel: #9AA1AE; --ev-private: #6E7280; } }

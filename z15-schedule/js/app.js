@@ -12,6 +12,7 @@
   var NAV = [
     { id: 'dashboard', label: 'Hôm nay', icon: 'home', shortcut: 'g d', desc: 'Hôm nay của bạn & nhịp đội' },
     { id: 'calendar', label: 'Lịch', icon: 'calendar-days', shortcut: 'g c', desc: 'Lịch tuần, tháng, ngày' },
+    { id: 'assistant', label: 'Điều phối', icon: 'sliders', shortcut: 'g e', desc: 'Trợ lý lịch cho CEO & quản lý' },
     { id: 'roster', label: 'Bảng ca', icon: 'grid', shortcut: 'g r', desc: 'Bảng ca nhân sự × ngày' },
     { id: 'staff', label: 'Đội ngũ', icon: 'users', shortcut: 'g s', desc: 'Danh bạ & tải công việc' },
     { id: 'projects', label: 'Dự án', icon: 'briefcase', shortcut: 'g p', desc: 'Chiến dịch & tiến độ' },
@@ -171,6 +172,8 @@
     content.innerHTML = '<div class="settings__row"><div><b>Giao diện</b><small>Sáng, tối hoặc theo hệ thống</small></div><div class="slot-theme"></div></div>' +
       '<div class="settings__row"><div><b>Mật độ hiển thị</b><small>Thoải mái hay gọn gàng</small></div><div class="slot-density"></div></div>' +
       '<div class="settings__row"><div><b>Giảm chuyển động</b><small>Tắt animation trang trí</small></div><label class="switch"><input type="checkbox" class="rm" aria-label="Giảm chuyển động"' + (s.reduceMotion ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
+      '<div class="settings__row"><div><b>Nhắc trước sự kiện của bạn</b><small>Toast trong app khi sắp tới giờ</small></div><div class="slot-remind"></div></div>' +
+      '<div class="settings__row"><div><b>Thông báo trình duyệt</b><small>Nhắc cả khi đang ở tab khác</small></div><button class="btn btn--secondary btn--sm notify-btn">' + UI.icon('bell', 15) + (typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'Đã bật' : 'Bật thông báo') + '</button></div>' +
       '<div class="settings__row"><div><b>Phím tắt một ký tự</b><small>n, t, j/k, 1/2/3, e/x… (Ctrl+K và Esc luôn hoạt động)</small></div><label class="switch"><input type="checkbox" class="ks" aria-label="Phím tắt một ký tự"' + (s.keyShortcuts === false ? '' : ' checked') + '><span class="switch__track"></span></label></div>' +
       '<div class="settings__row"><div><b>Hiển thị cuối tuần</b><small>Trong lịch tuần & bảng ca</small></div><label class="switch"><input type="checkbox" class="wk" aria-label="Hiển thị cuối tuần"' + (s.showWeekend !== false ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
       '<div class="settings__row settings__row--danger"><div><b>Dữ liệu mẫu</b><small>Đặt lại toàn bộ dữ liệu về trạng thái ban đầu</small></div><button class="btn btn--ghost-danger btn--sm reset">' + UI.icon('refresh', 15) + 'Đặt lại</button></div>' +
@@ -180,6 +183,11 @@
     content.querySelector('.rm').addEventListener('change', function (e) { S.setSetting('reduceMotion', e.target.checked); applyTheme(); });
     content.querySelector('.wk').addEventListener('change', function (e) { S.setSetting('showWeekend', e.target.checked); });
     content.querySelector('.ks').addEventListener('change', function (e) { S.setSetting('keyShortcuts', e.target.checked); });
+    content.querySelector('.slot-remind').appendChild(UI.segmented([{ value: '0', label: 'Tắt' }, { value: '5', label: "5'" }, { value: '15', label: "15'" }, { value: '30', label: "30'" }], String(s.remindMinutes == null ? 15 : s.remindMinutes), function (v) { S.setSetting('remindMinutes', +v); }, { label: 'Nhắc trước', cls: 'segmented--sm' }));
+    content.querySelector('.notify-btn').addEventListener('click', function (e) {
+      if (typeof Notification === 'undefined') return UI.toast('Trình duyệt không hỗ trợ thông báo', { kind: 'warning' });
+      Notification.requestPermission().then(function (p) { S.setSetting('browserNotify', p === 'granted'); e.target.closest('button').innerHTML = UI.icon('bell', 15) + (p === 'granted' ? 'Đã bật' : 'Bị chặn'); UI.toast(p === 'granted' ? 'Đã bật thông báo trình duyệt' : 'Bạn đã chặn thông báo — bật lại trong cài đặt trình duyệt', { kind: p === 'granted' ? 'success' : 'warning' }); });
+    });
     content.querySelector('.reset').addEventListener('click', function () {
       UI.confirm({ title: 'Đặt lại dữ liệu mẫu?', message: 'Mọi thay đổi bạn đã tạo (sự kiện, ca, yêu cầu…) sẽ bị xoá và thay bằng dữ liệu mẫu mới.', confirmLabel: 'Đặt lại', danger: true, icon: 'refresh' }).then(function (ok) {
         if (!ok) return; S.reset(); UI.closeAllLayers(); applyTheme(); mountView(R.parse(), { immediate: true }); updateBadges(); UI.toast('Đã đặt lại dữ liệu mẫu', { kind: 'brand' });
@@ -193,6 +201,10 @@
     UI.menu(els.user, [
       { heading: me.name + ' · ' + me.role },
       { label: 'Hồ sơ của tôi', icon: 'user', onClick: function () { E.staffProfile(me.id); } },
+      { heading: 'Xem với tư cách (demo)' },
+      { label: 'Nguyễn Minh Anh · Account Director', icon: 'user', checked: me.id === 's01', onClick: function () { switchUser('s01'); } },
+      { label: 'Lê Ngọc Ánh · Trợ lý CEO', icon: 'sliders', checked: me.id === 's24', onClick: function () { switchUser('s24'); } },
+      { label: 'Trần Hoàng Việt · CEO', icon: 'award', checked: me.id === 's23', onClick: function () { switchUser('s23'); } },
       { label: 'Lịch của tôi', icon: 'calendar', onClick: function () { R.go('calendar', { staff: me.id }); } },
       { label: 'Gửi yêu cầu nghỉ / remote', icon: 'send', onClick: function () { E.request(); } },
       { divider: true },
@@ -216,6 +228,9 @@
     UI.palette.register({ id: 'act:theme', label: 'Đổi giao diện sáng / tối', icon: 'moon', section: 'Hành động', shortcut: 'shift+d', keywords: 'dark light theme', run: function () { toggleTheme(); } });
     UI.palette.register({ id: 'act:settings', label: 'Mở cài đặt', icon: 'settings', section: 'Hành động', run: openSettings });
     UI.palette.register({ id: 'act:help', label: 'Xem phím tắt', icon: 'keyboard', section: 'Hành động', shortcut: '?', run: E.shortcutsHelp });
+    UI.palette.register({ id: 'act:as-ea', label: 'Xem với tư cách Trợ lý CEO (Ngọc Ánh)', icon: 'sliders', section: 'Vai trò demo', run: function () { switchUser('s24'); } });
+    UI.palette.register({ id: 'act:as-ceo', label: 'Xem với tư cách CEO (Hoàng Việt)', icon: 'award', section: 'Vai trò demo', run: function () { switchUser('s23'); } });
+    UI.palette.register({ id: 'act:as-ad', label: 'Xem với tư cách Account Director (Minh Anh)', icon: 'user', section: 'Vai trò demo', run: function () { switchUser('s01'); } });
     UI.palette.register({ id: 'act:today', label: 'Về hôm nay trong lịch', icon: 'calendar', section: 'Hành động', shortcut: 't', run: function () { R.go('calendar/week/' + U.todayISO()); } });
 
     UI.shortcuts.register('mod+k', function () { UI.palette.open(); }, 'Tìm kiếm & lệnh nhanh', 'Chung');
@@ -231,6 +246,44 @@
     }, 'Về hôm nay', 'Lịch');
     UI.shortcuts.register('[', function () { setCollapsed(!document.body.classList.contains('sidebar-collapsed'), true); }, 'Thu gọn / mở rộng menu', 'Chung');
   }
+  /* ------------------------------------------------- persona & reminders */
+  function renderUserBtn() {
+    var me = S.me();
+    els.user.innerHTML = UI.avatar(me, { size: 'sm', status: true, title: false }) + '<span class="user-btn__txt"><b>' + U.escapeHtml(U.shortName(me.name)) + '</b><small>' + U.escapeHtml(me.role) + '</small></span>' + UI.icon('chevron-down', 14);
+  }
+  function switchUser(id) {
+    if (id === S.state.currentUserId) return;
+    UI.closeAllLayers(); S.setCurrentUser(id);
+    mountView(R.parse(), { immediate: true }); updateBadges();
+    UI.toast('Đang xem với tư cách ' + S.me().name, { kind: 'brand', title: S.me().role });
+  }
+  var remindedKey = 'z15.ui.reminded';
+  function tickReminders() {
+    if (!S.state || !els.nextUp) return;
+    var me = S.state.currentUserId, today = U.todayISO(), now = U.nowMinutes();
+    var mine = S.eventsFor(me, today).filter(function (e) { return !e.allDay && S.canSee(e, me); });
+    // ticker: đang diễn ra hoặc tiếp theo
+    var live = mine.find(function (e) { return U.timeToMin(e.start) <= now && U.timeToMin(e.end) > now; });
+    var next = mine.filter(function (e) { return U.timeToMin(e.start) > now; })[0];
+    if (live) { els.nextUp.innerHTML = '<span class="dot"></span><b>' + U.escapeHtml(live.title) + '</b><small>còn ' + U.fmtDuration(U.timeToMin(live.end) - now) + '</small>'; els.nextUp.dataset.event = live.id; els.nextUp.hidden = false; }
+    else if (next) { var inMin = U.timeToMin(next.start) - now; els.nextUp.innerHTML = UI.icon('clock', 14) + '<b>' + U.escapeHtml(next.title) + '</b><small>' + next.start + ' · còn ' + U.fmtDuration(inMin) + '</small>'; els.nextUp.dataset.event = next.id; els.nextUp.hidden = false; }
+    else { els.nextUp.hidden = true; delete els.nextUp.dataset.event; }
+    // nhắc trước theo cài đặt
+    var lead = S.state.settings.remindMinutes == null ? 15 : +S.state.settings.remindMinutes; if (!lead) return;
+    var fired = U.loadJSON(remindedKey, {}); var changed = false;
+    Object.keys(fired).forEach(function (k) { if (k.indexOf(today) !== 0) { delete fired[k]; changed = true; } });
+    mine.forEach(function (e) {
+      var delta = U.timeToMin(e.start) - now, key = today + '|' + e.id + '|' + lead;
+      if (delta <= lead && delta > lead - 1.2 && !fired[key]) {
+        fired[key] = 1; changed = true;
+        var body = e.start + (e.location ? ' · ' + e.location : '') + (e.travelMinutes ? ' · nhớ đi sớm ~' + e.travelMinutes + "'" : '');
+        UI.toast(body, { kind: 'brand', title: 'Còn ' + lead + " phút: " + e.title, duration: 9000, action: { label: 'Xem', onClick: function () { E.eventDetail(e.id); } } });
+        if (S.state.settings.browserNotify && typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) { try { new Notification('Còn ' + lead + ' phút: ' + e.title, { body: body, icon: 'assets/logo-mark.svg' }); } catch (err) { } }
+      }
+    });
+    if (changed) U.saveJSON(remindedKey, fired);
+  }
+
   /* --------------------------------------------------------------- boot */
   var App = Z15.app = {
     go: R.go, route: function () { return R.current; }, mountView: function () { mountView(R.parse(), { immediate: true }); }, updateBadges: updateBadges, openSettings: openSettings, toggleTheme: toggleTheme, NAV: NAV,
@@ -245,8 +298,7 @@
       themeBtn: U.qs('#themeBtn'), clock: U.qs('#clock'), date: U.qs('#dateLabel'), bell: U.qs('#bellBtn'), bellCount: U.qs('#bellCount'), user: U.qs('#userBtn'), search: U.qs('#searchBtn'), newBtn: U.qs('#newBtn'),
       title: U.qs('#pageTitle'), sub: U.qs('#pageSub'), actions: U.qs('#pageActions'), splash: U.qs('#splash'), brand: U.qs('#brand')
     };
-    var me = S.me();
-    els.user.innerHTML = UI.avatar(me, { size: 'sm', status: true, title: false }) + '<span class="user-btn__txt"><b>' + U.escapeHtml(U.shortName(me.name)) + '</b><small>' + U.escapeHtml(me.role) + '</small></span>' + UI.icon('chevron-down', 14);
+    renderUserBtn();
     els.user.setAttribute('data-no-profile', '');
     els.brand.innerHTML = UI.logoMark(30) + '<span class="brand__txt"><b>Z15 MIRACLE</b><small>Lịch làm việc</small></span>';
 
@@ -273,11 +325,17 @@
         { label: 'Dự án mới', icon: 'briefcase', onClick: function () { E.project(); } }
       ], { placement: 'bottom-end' });
     });
-    UI.bindEventPills(els.view); UI.bindAvatars(els.view);
+    UI.bindEventPills(els.view); UI.bindAvatars(els.view); E.bindRsvp(els.view); E.installHoverCards();
+    els.nextUp = U.qs('#nextUp');
+    els.nextUp.addEventListener('click', function () { if (els.nextUp.dataset.event) E.eventDetail(els.nextUp.dataset.event); });
+    tickReminders(); setInterval(tickReminders, 30000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) tickReminders(); });
     S.subscribe(function (state, meta) {
       updateBadges();
       if (meta.type === 'settings' && meta.key === 'showWeekend' && currentView && currentView.update) currentView.update(R.current);
       if ((meta.type === 'staff:status' || meta.type === 'staff:update' || meta.type === 'reset') && (!meta.id || meta.id === S.state.currentUserId)) { var dot = els.user.querySelector('.avatar__status'); if (dot) dot.dataset.status = S.me().status; }
+      if (meta.type === 'user' || meta.type === 'reset') { renderUserBtn(); tickReminders(); }
+      if (/event/.test(meta.type || '')) tickReminders();
     });
     window.addEventListener('hashchange', onRoute);
     window.addEventListener('resize', U.debounce(function () { setActiveNav(R.current ? R.current.view : 'dashboard'); }, 120));

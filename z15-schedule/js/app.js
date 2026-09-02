@@ -70,7 +70,14 @@
   }
 
   var lastHash = null;
-  function onRoute() { if (location.hash === lastHash) return; lastHash = location.hash; mountView(R.parse()); closeMobileNav(); }
+  function onRoute() {
+    var route = R.parse();
+    // Bỏ qua hashchange "rỗng" (vd. location.replace lúc boot) nhưng vẫn cho phép bấm lại menu để về mặc định của view
+    var same = location.hash === lastHash && R.current && R.current.path === route.path && JSON.stringify(R.current.query) === JSON.stringify(route.query);
+    lastHash = location.hash;
+    if (same) return;
+    mountView(route); closeMobileNav();
+  }
 
   /* ------------------------------------------------------------ sidebar */
   function renderNav() {
@@ -213,7 +220,11 @@
     UI.shortcuts.register('shift+r', function () { E.request(); }, 'Gửi yêu cầu', 'Hành động');
     UI.shortcuts.register('shift+d', function () { toggleTheme(); }, 'Đổi giao diện sáng / tối', 'Hành động');
     UI.shortcuts.register('?', function () { E.shortcutsHelp(); }, 'Xem phím tắt', 'Chung');
-    UI.shortcuts.register('t', function () { if (R.current && R.current.view === 'calendar') { document.dispatchEvent(new CustomEvent('z15:today')); } else R.go('calendar/week/' + U.todayISO()); }, 'Về hôm nay', 'Lịch');
+    UI.shortcuts.register('t', function () {
+      // View đang mở có thể tự xử lý 'hôm nay' (calendar/roster) bằng cách gọi e.preventDefault()
+      var ev = new CustomEvent('z15:today', { cancelable: true }); document.dispatchEvent(ev);
+      if (!ev.defaultPrevented && !(R.current && (R.current.view === 'calendar' || R.current.view === 'roster'))) R.go('calendar/week/' + U.todayISO());
+    }, 'Về hôm nay', 'Lịch');
     UI.shortcuts.register('[', function () { setCollapsed(!document.body.classList.contains('sidebar-collapsed'), true); }, 'Thu gọn / mở rộng menu', 'Chung');
   }
   /* --------------------------------------------------------------- boot */

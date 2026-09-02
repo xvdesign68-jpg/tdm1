@@ -256,7 +256,7 @@
       else st.setShift(staffId, iso, type);
       pop.close();
       UI.toast((week ? 'Cả tuần của ' : U.fmtDate(iso, 'shortWeekday') + ' của ') + U.shortName(staff.name) + ' → ' + st.shiftType(type).label, { kind: 'success' });
-      if (opts.onPick) opts.onPick(type);
+      if (opts.onPick) opts.onPick(type, { week: week, date: iso, staffId: staffId });
     });
     return pop;
   };

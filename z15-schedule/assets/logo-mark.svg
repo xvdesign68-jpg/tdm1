@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Z15 Miracle">
+  <g fill="#D71920" stroke="#D71920" stroke-width="5" stroke-linejoin="round">
+    <polygon points="13,9 13,30 54,57 54,36"/>
+    <polygon points="107,9 107,30 66,57 66,36"/>
+  </g>
+  <polygon points="14,40 60,70 106,40 92,96 60,113 28,96" fill="#0B2FA6" stroke="#0B2FA6" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M60 77 V97 M47 84 L60 97 L73 84" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

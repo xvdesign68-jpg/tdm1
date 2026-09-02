@@ -1,0 +1,209 @@
+/* =====================================================================
+   Z15 Miracle · Lịch làm việc — tokens.css
+   Design tokens: "Editorial Ledger" — giấy ấm trung tính, xanh = của tôi /
+   hành động, đỏ = bây giờ / khẩn / xung đột. Light mặc định, dark ghi đè.
+   ===================================================================== */
+:root {
+  color-scheme: light dark;
+
+  /* ---- surfaces / text / borders (light) ---- */
+  --bg-canvas: #F7F7F5;
+  --bg-surface: #FFFFFF;
+  --bg-sunken: #F1F1EE;
+  --bg-hover: #F3F3F0;
+  --bg-pressed: #ECECE8;
+  --bg-selected: #EEF1FB;
+  --bg-scrim: rgba(17, 20, 28, 0.32);
+  --fg-primary: #11141C;
+  --fg-secondary: #545866;
+  --fg-tertiary: #8A8E9A;
+  --fg-disabled: #B8BBC4;
+  --fg-on-brand: #FFFFFF;
+  --border-hair: rgba(17, 20, 28, 0.08);
+  --border-strong: rgba(17, 20, 28, 0.16);
+
+  /* ---- brand blue: "của tôi / hệ thống / đi" ---- */
+  --blue-900: #071F73;
+  --blue-800: #0B2FA6;
+  --blue-700: #1E46C9;
+  --blue-600: #2B5CF0;
+  --blue-500: #5B7DFF;
+  --blue-400: #8FA6FF;
+  --blue-200: #B9C6F3;
+  --blue-100: #D9E0F7;
+  --blue-50: #EEF1FB;
+  --blue-ring: rgba(11, 47, 166, 0.28);
+  --brand-blue: var(--blue-800);
+  --action: var(--blue-700);
+  --action-hover: var(--blue-600);
+  --action-pressed: var(--blue-900);
+  --primary-fill: var(--blue-800);
+  --primary-fill-hover: var(--blue-700);
+  --border-focus: var(--blue-700);
+
+  /* ---- brand red: "bây giờ / khẩn / xung đột" ---- */
+  --red-800: #A30F14;
+  --red-700: #B5121A;
+  --red-600: #D7141A;
+  --red-500: #E8484D;
+  --red-400: #FF5C61;
+  --red-300: #FF7A7E;
+  --red-100: #F6D3D4;
+  --red-50: #FCEEEE;
+  --red-hatch: rgba(215, 20, 26, 0.10);
+  --brand-red: var(--red-600);
+  --red-ink: var(--red-700);
+  --now: var(--brand-red);
+
+  /* ---- semantic ---- */
+  --ok: #1F7A4D;      --ok-soft: #E8F3EC;
+  --warn: #A66B00;    --warn-soft: #FBF3E0;
+  --danger: var(--red-700); --danger-soft: var(--red-50);
+  --info: var(--blue-700);  --info-soft: var(--blue-50);
+
+  /* ---- shift types (ink / soft) ---- */
+  --shift-morning-ink: #9A6700;   --shift-morning-soft: #FBF3DC;
+  --shift-afternoon-ink: #0E6E8C; --shift-afternoon-soft: #E0F1F7;
+  --shift-full-ink: #3F4A7A;      --shift-full-soft: #E9EBF6;
+  --shift-remote-ink: #5E6B7D;    --shift-remote-soft: #EEF1F5;
+  --shift-onsite-ink: #7A3E9D;    --shift-onsite-soft: #F1E8F8;
+  --shift-leave-ink: #8A8E9A;     --shift-leave-soft: transparent;
+  --shift-ot-ink: #8C4A0B;        --shift-ot-soft: #FBEBD9;
+  --shift-off-ink: #B8BBC4;       --shift-off-soft: transparent;
+  --hatch-ink: rgba(17, 20, 28, 0.06);
+
+  /* ---- event types (fallback khi không gắn dự án) ---- */
+  --ev-meeting: #3F4A7A;
+  --ev-shoot: #7A3E9D;
+  --ev-deadline: #A66B00;
+  --ev-pitch: #B8497B;
+  --ev-review: #0E6E8C;
+  --ev-task: #5E6B7D;
+  --ev-training: #0F9B8E;
+  --ev-event: #9A6700;
+
+  /* ---- workload heat ramp (trung tính → slate) ---- */
+  --heat-0: var(--bg-sunken);
+  --heat-1: #E4E6EE;
+  --heat-2: #C9CDDC;
+  --heat-3: #9AA2BC;
+  --heat-4: #5F6A8F;
+
+  /* ---- signature gradient (điểm gặp duy nhất của xanh & đỏ) ---- */
+  --grad-miracle: linear-gradient(135deg, #0B2FA6 0%, #4A3FB8 55%, #D7141A 100%);
+  --grad-opacity: 1;
+  --hero-wash: radial-gradient(120% 90% at 0% 0%, rgba(11, 47, 166, 0.07), transparent 55%), radial-gradient(70% 70% at 100% 100%, rgba(215, 20, 26, 0.05), transparent 60%);
+
+  /* ---- radii ---- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+
+  /* ---- shadows (chỉ cho lớp nổi) ---- */
+  --shadow-pop: 0 0 0 1px rgba(17, 20, 28, .06), 0 2px 4px rgba(17, 20, 28, .04), 0 12px 32px -8px rgba(17, 20, 28, .14);
+  --shadow-modal: 0 0 0 1px rgba(17, 20, 28, .06), 0 24px 64px -16px rgba(17, 20, 28, .22);
+  --shadow-drag: 0 0 0 1px rgba(11, 47, 166, .20), 0 16px 40px -12px rgba(11, 47, 166, .30);
+  --shadow-toast: var(--shadow-pop);
+
+  /* ---- spacing ---- */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
+
+  /* ---- sizes ---- */
+  --sidebar-w: 240px;
+  --sidebar-w-collapsed: 68px;
+  --topbar-h: 60px;
+  --content-max: 1440px;
+  --content-pad: 32px;
+  --btn-h: 34px;
+  --btn-h-sm: 28px;
+  --btn-h-lg: 42px;
+  --input-h: 38px;
+  --row-h: 48px;
+  --roster-row-h: 44px;
+  --hour-h: 64px;
+
+  /* ---- z-index ---- */
+  --z-sticky: 10; --z-rail: 20; --z-sidebar: 30; --z-topbar: 40; --z-popover: 50; --z-drawer: 60; --z-scrim: 70; --z-modal: 71; --z-palette: 80; --z-toast: 90; --z-drag: 100; --z-splash: 120;
+
+  /* ---- typography ---- */
+  --font-ui: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --t-display: 600 40px/44px var(--font-ui);
+  --t-h1: 600 26px/32px var(--font-ui);
+  --t-h2: 600 18px/26px var(--font-ui);
+  --t-h3: 600 15px/22px var(--font-ui);
+  --t-body: 400 14px/22px var(--font-ui);
+  --t-body-sm: 400 13px/20px var(--font-ui);
+  --t-caption: 500 11.5px/16px var(--font-ui);
+  --t-mono: 500 13px/20px var(--font-mono);
+  --t-mono-sm: 500 11px/16px var(--font-mono);
+
+  /* ---- motion ---- */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
+  --dur-reveal: 480ms;
+  --dur-ambient: 1600ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ease-inout: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .64, 1);
+  --stagger: 28ms;
+}
+
+/* ---- Dark ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-canvas: #0E1015; --bg-surface: #14171E; --bg-sunken: #0B0D12; --bg-hover: #1A1E27; --bg-pressed: #20242F; --bg-selected: #172040; --bg-scrim: rgba(0, 0, 0, 0.55);
+    --fg-primary: #ECEDF1; --fg-secondary: #A2A6B3; --fg-tertiary: #6E7280; --fg-disabled: #454955;
+    --border-hair: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.14);
+    --blue-100: #22306A; --blue-50: #172040; --blue-ring: rgba(91, 125, 255, 0.35);
+    --brand-blue: var(--blue-500); --action: var(--blue-500); --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
+    --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300);
+    --ok: #4CC38A; --ok-soft: #10261B; --warn: #E5A83B; --warn-soft: #2A2110; --danger: var(--red-300); --info: var(--blue-500);
+    --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #6E7280; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
+    --ev-meeting: #A3ADD9; --ev-shoot: #C39BE0; --ev-deadline: #E5A83B; --ev-pitch: #DC7FA8; --ev-review: #5BBFDD; --ev-task: #A5B0C0; --ev-training: #4FC3B6; --ev-event: #E3B54A;
+    --heat-1: #1F2431; --heat-2: #2C3346; --heat-3: #46506C; --heat-4: #7A86AA;
+    --grad-miracle: linear-gradient(135deg, #5B7DFF 0%, #8A73E8 55%, #FF5C61 100%); --grad-opacity: .85;
+    --hero-wash: radial-gradient(120% 90% at 0% 0%, rgba(91, 125, 255, 0.10), transparent 55%), radial-gradient(70% 70% at 100% 100%, rgba(255, 92, 97, 0.06), transparent 60%);
+    --shadow-pop: 0 0 0 1px rgba(255, 255, 255, .08), 0 16px 48px -12px rgba(0, 0, 0, .6);
+    --shadow-modal: 0 0 0 1px rgba(255, 255, 255, .08), 0 32px 64px -16px rgba(0, 0, 0, .7);
+    --shadow-drag: 0 0 0 1px rgba(91, 125, 255, .35), 0 16px 40px -12px rgba(0, 0, 0, .6);
+  }
+}
+:root[data-theme="dark"] {
+  --bg-canvas: #0E1015; --bg-surface: #14171E; --bg-sunken: #0B0D12; --bg-hover: #1A1E27; --bg-pressed: #20242F; --bg-selected: #172040; --bg-scrim: rgba(0, 0, 0, 0.55);
+  --fg-primary: #ECEDF1; --fg-secondary: #A2A6B3; --fg-tertiary: #6E7280; --fg-disabled: #454955;
+  --border-hair: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.14);
+  --blue-100: #22306A; --blue-50: #172040; --blue-ring: rgba(91, 125, 255, 0.35);
+  --brand-blue: var(--blue-500); --action: var(--blue-500); --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
+  --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300);
+  --ok: #4CC38A; --ok-soft: #10261B; --warn: #E5A83B; --warn-soft: #2A2110; --danger: var(--red-300); --info: var(--blue-500);
+  --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #6E7280; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
+  --ev-meeting: #A3ADD9; --ev-shoot: #C39BE0; --ev-deadline: #E5A83B; --ev-pitch: #DC7FA8; --ev-review: #5BBFDD; --ev-task: #A5B0C0; --ev-training: #4FC3B6; --ev-event: #E3B54A;
+  --heat-1: #1F2431; --heat-2: #2C3346; --heat-3: #46506C; --heat-4: #7A86AA;
+  --grad-miracle: linear-gradient(135deg, #5B7DFF 0%, #8A73E8 55%, #FF5C61 100%); --grad-opacity: .85;
+  --hero-wash: radial-gradient(120% 90% at 0% 0%, rgba(91, 125, 255, 0.10), transparent 55%), radial-gradient(70% 70% at 100% 100%, rgba(255, 92, 97, 0.06), transparent 60%);
+  --shadow-pop: 0 0 0 1px rgba(255, 255, 255, .08), 0 16px 48px -12px rgba(0, 0, 0, .6);
+  --shadow-modal: 0 0 0 1px rgba(255, 255, 255, .08), 0 32px 64px -16px rgba(0, 0, 0, .7);
+  --shadow-drag: 0 0 0 1px rgba(91, 125, 255, .35), 0 16px 40px -12px rgba(0, 0, 0, .6);
+}
+
+/* Màn 1x: hairline đậm hơn chút để không mất */
+@media (max-resolution: 1dppx) {
+  :root { --border-hair: rgba(17, 20, 28, 0.12); }
+  :root[data-theme="dark"] { --border-hair: rgba(255, 255, 255, 0.10); }
+}
+@media (prefers-contrast: more) { :root { --border-hair: var(--border-strong); } }
+
+/* Mật độ gọn */
+body[data-density="compact"] { --row-h: 40px; --roster-row-h: 36px; --btn-h: 30px; --input-h: 34px; --hour-h: 52px; }
+
+/* Giảm chuyển động: giữ crossfade opacity ngắn, bỏ translate/scale (xem base.css) */
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-instant: 1ms; --dur-fast: 120ms; --dur-base: 120ms; --dur-slow: 120ms; --dur-reveal: 120ms; --stagger: 0ms; }
+}
+body.reduce-motion { --dur-instant: 1ms; --dur-fast: 120ms; --dur-base: 120ms; --dur-slow: 120ms; --dur-reveal: 120ms; --stagger: 0ms; }

@@ -379,7 +379,7 @@
       }
       case 'ask-agenda': {
         var ev4 = evs[0], ow = st.staff(ev4.ownerId);
-        st.notify({ kind: 'warning', title: 'Yêu cầu agenda: ' + ev4.title, body: U.shortName(st.me().name) + ' đề nghị ' + (ow ? U.shortName(ow.name) : 'chủ trì') + ' bổ sung agenda trước giờ họp.', link: '#/calendar/day/' + ev4.date, eventId: ev4.id });
+        st.notify({ kind: 'warning', title: 'Yêu cầu agenda: ' + ev4.title, body: U.shortName(st.me().name) + ' đề nghị ' + (ow ? U.shortName(ow.name) : 'chủ trì') + ' bổ sung agenda trước giờ họp.', link: '#/calendar/team/' + ev4.date, eventId: ev4.id });
         UI.toast('Đã gửi yêu cầu agenda tới ' + (ow ? U.shortName(ow.name) : 'chủ trì'), { kind: 'success' }); ok = true; break;
       }
       case 'delegate': {
@@ -538,7 +538,7 @@
           <span class="as-slot__score" role="img" aria-label="Điểm phù hợp ${Math.round(pct)}%"><i style="width:${pct}%"></i></span>
           <div class="as-slot__tags">${tags.map(function (t) { return h`<span class="tag">${t}</span>`; })}</div>
         </div>
-        <div class="as-slot__btns"><button type="button" class="btn btn--sm btn--soft" data-slot-create="${i}">${icon('plus', 14)}<span>Tạo họp</span></button><a class="btn btn--sm btn--ghost" href="#/calendar/day/${sl.date}?staff=${self.staffId}&people=${f.people.join(',')}">Xem ngày</a></div>
+        <div class="as-slot__btns"><button type="button" class="btn btn--sm btn--soft" data-slot-create="${i}">${icon('plus', 14)}<span>Tạo họp</span></button><a class="btn btn--sm btn--ghost" href="#/calendar/team/${sl.date}?people=${f.people.join(',')}">Xem ngày</a></div>
       </li>`;
     })}` : h`<li class="empty empty--sm as-find__empty"><div class="empty__icon">${icon('search', 22)}</div><p class="empty__title">Không có khung ${f.dur}' chung nào</p><p class="empty__body">Thử rút còn 30', bỏ "Tránh khối tập trung" hoặc mở rộng sang 10 ngày.</p></li>`);
   };

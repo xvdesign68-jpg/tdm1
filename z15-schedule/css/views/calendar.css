@@ -254,3 +254,244 @@ body.cal-dragging .ev-pill { pointer-events: none; }
   .cal-dh { min-height: 56px; }
   .cal-hour { right: 5px; font-size: 10px; }
 }
+
+/* =====================================================================
+   v1.2 — công cụ thanh điều khiển, lớp lịch, so sánh, xung đột, pill nâng cấp
+   ===================================================================== */
+.cal-bar__tools { display: flex; align-items: center; gap: 8px; margin-left: auto; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+.cal-tool { gap: 6px; padding: 0 10px; }
+.cal-tool .badge { margin-left: 2px; }
+.cal-tool.is-active { border-color: var(--blue-100); background: var(--blue-50); color: var(--action); }
+.cal-tool--conf { color: var(--red-ink); }
+.cal-tool--conf:hover:not(:disabled) { background: var(--red-50); }
+.cal-tool--conf .badge { margin-left: 0; }
+.cal-seg .segmented__btn .icon { width: 14px; height: 14px; }
+@media (max-width: 1180px) { .cal-tool__lbl { display: none; } .cal-tool { padding: 0 8px; } }
+
+/* hàng "So sánh" (legend) */
+.cal-bar__legend { gap: 8px; }
+.cal-legend__chip { border-left: 3px solid var(--cmp); border-radius: var(--r-xs) var(--r-full) var(--r-full) var(--r-xs); padding-left: 5px; }
+.cal-legend__hint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-tertiary); margin-left: 4px; }
+.cal-legend__sw { width: 14px; height: 10px; border-radius: 2px; background: var(--blue-50); background-image: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--action) 14%, transparent) 4px 5px); box-shadow: inset 0 0 0 1px var(--blue-100); }
+
+/* hàng công cụ chế độ Đội ngũ */
+.cal-bar__team { gap: 8px; }
+.cal-people.is-active { border-color: var(--blue-100); background: var(--blue-50); color: var(--action); }
+.cal-toggle { font-size: 12.5px; color: var(--fg-secondary); white-space: nowrap; }
+.cal-bar__tright { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.cal-tchip__short { display: none; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .04em; }
+@media (max-width: 1280px) { .cal-fgroup--tteams .cal-tchip__lbl { display: none; } .cal-fgroup--tteams .cal-tchip__short { display: inline; } .cal-fgroup--tteams .chip--btn { padding: 0 9px; } }
+
+/* pill nâng cấp: so sánh, RSVP chờ, ưu tiên, ẩn mờ */
+.ev-pill.is-compared .ev-pill__bar, .ev-pill.is-mine.is-compared .ev-pill__bar, .ev-pill.is-conflict.is-compared .ev-pill__bar { background: var(--cmp-bar, var(--cmp)); width: 3px; }
+.ev-pill.is-compared { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cmp) 28%, transparent); }
+.ev-pill.is-mine.is-compared { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cmp) 40%, var(--blue-100)); }
+.cal-pill__dash { position: absolute; inset: 0; border: 1px dashed var(--fg-tertiary); border-radius: inherit; pointer-events: none; opacity: .8; }
+.ev-pill.is-rsvp-pending .cal-pill__dash { border-left-width: 0; }
+.cal-pill__row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.cal-pill__row .ev-pill__title { flex: 1 1 auto; min-width: 0; }
+.cal-pill__tags { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+.cal-rsvpq { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: var(--r-xs); font-size: 10px; font-weight: 600; color: var(--fg-secondary); background: var(--bg-surface); border: 1px dashed var(--fg-tertiary); }
+.ev-pill .lock { margin-right: 4px; vertical-align: -1px; display: inline-flex; }
+.ev-pill.is-hiding { opacity: 0 !important; transition: opacity 120ms var(--ease-in); }
+.cal-ev .ev-pill.is-live .cal-pill__row { padding-right: 12px; }
+.cal-ev .ev-pill.is-private .ev-pill__people { display: none; }
+.cal-ev .ev-pill--compact .cal-pill__tags .prio { display: none; }
+.cal-dh__dots i { background: var(--c, var(--fg-disabled)); }
+.cal-dh.is-today .cal-dh__dots i { background: var(--c, var(--blue-400)); }
+
+/* ô rảnh chung khi so sánh */
+.cal-freecell { position: absolute; left: 2px; right: 2px; z-index: 0; display: flex; align-items: flex-start; padding: 3px 6px; border-radius: var(--r-sm); background-color: color-mix(in srgb, var(--blue-50) 60%, transparent); background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--action) 6%, transparent) 6px 7px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue-100) 55%, transparent); cursor: pointer; transition: background-color var(--dur-instant), box-shadow var(--dur-instant); overflow: hidden; text-align: left; }
+.cal-freecell:hover { background-color: var(--blue-50); box-shadow: inset 0 0 0 1px var(--blue-200); }
+.cal-freecell:focus-visible { outline-offset: -2px; }
+.cal-freecell__lbl { font: var(--t-caption); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--action); opacity: .7; }
+.cal-col.is-today .cal-freecell { background-color: color-mix(in srgb, var(--blue-100) 45%, transparent); }
+body.cal-dragging .cal-freecell { pointer-events: none; }
+
+/* popover chung */
+.popover--cal { padding: 0; }
+.cal-lay__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 10px; border-bottom: 1px solid var(--border-hair); font-size: 13.5px; }
+.cal-lay__head small { font-size: 11.5px; line-height: 1.35; text-align: right; }
+.cal-lay__acts { display: inline-flex; gap: 12px; }
+.cal-lay__list { max-height: min(60vh, 460px); overflow: auto; padding: 4px 6px 6px; }
+.cal-lay__grp + .cal-lay__grp { margin-top: 2px; }
+.cal-lay__row { display: flex; align-items: center; gap: 4px; border-radius: var(--r-sm); transition: background-color var(--dur-instant); }
+.cal-lay__row:hover { background: var(--bg-hover); }
+.cal-lay__main { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 6px 0 8px; cursor: pointer; font-size: 13px; }
+.cal-lay__main input { width: 15px; height: 15px; margin: 0; accent-color: var(--primary-fill); flex: 0 0 auto; }
+.cal-lay__sw { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(17, 20, 28, .08); }
+.cal-lay__name { flex: 1 1 auto; min-width: 0; }
+.cal-lay__n { color: var(--fg-tertiary); min-width: 2ch; text-align: right; }
+.cal-lay__row.is-off .cal-lay__name, .cal-lay__row.is-off .cal-lay__n { color: var(--fg-tertiary); }
+.cal-lay__row.is-off .cal-lay__sw { opacity: .35; }
+.cal-lay__only { font-size: 11.5px; padding: 0 8px; height: 32px; opacity: 0; transition: opacity var(--dur-fast); }
+.cal-lay__row:hover .cal-lay__only, .cal-lay__row:focus-within .cal-lay__only { opacity: 1; }
+.cal-lay__foot { padding: 8px 14px 10px; border-top: 1px solid var(--border-hair); font-size: 11.5px; line-height: 1.4; }
+.cal-cmp__slot { padding: 10px; }
+.cal-cmp__slot .staff-picker { border-color: var(--border-hair); }
+.cal-cmp__foot { display: flex; justify-content: flex-end; gap: 8px; padding: 0 10px 10px; }
+.cal-cf__list { max-height: min(62vh, 520px); overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.cal-cf__item { display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 8px; border-radius: var(--r-sm); border: 1px solid var(--border-hair); }
+.cal-cf__item[data-kind="hard"] { border-left: 2px solid var(--red-ink); }
+.cal-cf__item[data-kind="focus"] { border-left: 2px solid var(--warn); }
+.cal-cf__top { display: flex; align-items: center; gap: 8px; }
+.cal-cf__ov { color: var(--fg-secondary); }
+.cal-cf__who { margin-left: auto; }
+.cal-cf__pills { display: flex; flex-direction: column; gap: 3px; }
+.cal-cf__pills .ev-pill { width: 100%; }
+.cal-cf__acts { display: flex; gap: 6px; margin-top: 2px; }
+.cal-cf__empty { display: flex; align-items: center; gap: 8px; padding: 18px 14px; font-size: 13px; }
+.cal-cf__empty .icon { color: var(--ok); }
+.cal-side__sec--pending .rsvp-bar { margin: -2px 0 6px; padding: 8px 10px; }
+.cal-side__sec--pending .rsvp-bar > b { font-size: 12.5px; }
+
+/* =====================================================================
+   v1.2 — ĐỘI NGŨ: timeline theo giờ / lưới tuần
+   ===================================================================== */
+.cal-view--team { display: block; }
+.cal-tl { --tl-left: 220px; --tl-right: 116px; --tl-hours: 13; --tl-bar: 28px; --tl-gap: 4px; --tl-pad: 6px; --tl-minrow: 64px; --tl-hair-faint: color-mix(in srgb, var(--border-hair) 55%, transparent); position: absolute; inset: 0; overflow: auto; outline: none; }
+.cal-tl[data-density="compact"] { --tl-bar: 22px; --tl-gap: 3px; --tl-pad: 4px; --tl-minrow: 44px; }
+.cal-tl.is-anim { transition: transform var(--dur-slow) var(--ease-inout), opacity 200ms var(--ease-inout); }
+.cal-tl.is-leaving { pointer-events: none; }
+.cal-tl__inner { display: flex; flex-direction: column; min-width: 100%; width: max-content; }
+.cal-tl__row, .cal-tl__grow, .cal-tl__head { display: flex; align-items: stretch; min-width: 100%; }
+.cal-tl__person, .cal-tl__corner, .cal-tl__ghead { position: sticky; left: 0; z-index: 2; flex: 0 0 var(--tl-left); width: var(--tl-left); background: var(--bg-surface); border-right: 1px solid var(--border-hair); }
+.cal-tl__track, .cal-tl__axis, .cal-tl__gfill { position: relative; flex: 1 1 calc(var(--tl-hours) * var(--hour-h)); min-width: calc(var(--tl-hours) * var(--hour-h)); }
+.cal-tl__sum, .cal-tl__sumhead { position: sticky; right: 0; z-index: 2; flex: 0 0 var(--tl-right); width: var(--tl-right); background: var(--bg-surface); border-left: 1px solid var(--border-hair); }
+.cal-tl[data-span="week"] .cal-tl__sum, .cal-tl[data-span="week"] .cal-tl__sumhead { display: none; }
+
+/* đầu bảng */
+.cal-tl__head { position: sticky; top: 0; z-index: 4; }
+.cal-tl__head > * { background: var(--bg-surface); border-bottom: 1px solid var(--border-strong); }
+.cal-tl__corner { z-index: 5; display: flex; flex-direction: column; justify-content: flex-end; gap: 1px; padding: 10px 12px 9px 14px; }
+.cal-tl__sumhead { z-index: 5; display: flex; align-items: flex-end; padding: 0 12px 10px; }
+.cal-tl__date { font-size: 14px; font-weight: 600; }
+.cal-tl__dstats, .cal-tl__hol { font-size: 11.5px; color: var(--fg-tertiary); }
+.cal-tl__hol { display: inline-flex; align-items: center; gap: 4px; color: var(--red-ink); }
+.cal-tl__axis { min-height: 64px; }
+.cal-tl__hour { position: absolute; bottom: 8px; transform: translateX(-50%); color: var(--fg-tertiary); letter-spacing: .01em; white-space: nowrap; }
+.cal-tl__hour:first-child { transform: translateX(2px); }
+.cal-tl__hour.is-last { transform: translateX(calc(-100% - 2px)); }
+.cal-tl__nowlbl { position: absolute; bottom: 30px; transform: translateX(-50%); padding: 0 4px; border-radius: 3px; font-size: 10.5px; line-height: 16px; color: var(--fg-on-brand); background: var(--now); z-index: 3; pointer-events: none; }
+
+/* hàng team */
+.cal-tl__grow > * { background: color-mix(in srgb, var(--bg-sunken) 75%, var(--bg-surface)); border-bottom: 1px solid var(--border-hair); min-height: 34px; }
+.cal-tl__ghead { display: flex; align-items: stretch; }
+.cal-tl__gbtn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 0 10px 0 12px; text-align: left; color: var(--fg-primary); font-size: 12.5px; transition: background-color var(--dur-instant); }
+.cal-tl__gbtn:hover { background: var(--bg-hover); }
+.cal-tl__gbtn:focus-visible { outline-offset: -2px; }
+.cal-tl__gbtn b { font-weight: 600; white-space: nowrap; }
+.cal-tl__gbtn small { font-size: 11px; color: var(--fg-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: auto; }
+.cal-tl__chev { color: var(--fg-tertiary); transition: transform var(--dur-base) var(--ease-inout); flex: 0 0 auto; }
+.cal-tl__grow.is-collapsed .cal-tl__chev { transform: rotate(-90deg); }
+.cal-tl__gfill { flex: 1 1 auto; }
+
+/* hàng người */
+.cal-tl__row > * { border-bottom: 1px solid var(--border-hair); min-height: max(var(--tl-minrow), calc(var(--tl-pad) * 2 + var(--lanes, 1) * (var(--tl-bar) + var(--tl-gap)) - var(--tl-gap))); }
+.cal-tl__row:hover .cal-tl__person, .cal-tl__row:hover .cal-tl__sum { background: var(--bg-hover); }
+.cal-tl__row.is-me .cal-tl__person { box-shadow: inset 2px 0 0 var(--action); }
+.cal-tl__row.is-off > * { background: var(--bg-sunken); }
+.cal-tl__row.is-off .cal-tl__track { background-color: var(--bg-sunken); }
+.cal-tl__row.is-leave .cal-tl__track { background-color: transparent; }
+.cal-tl__row.is-leave .cal-tl__person, .cal-tl__row.is-leave .cal-tl__sum { background-image: none; }
+.cal-tl__row.is-drop .cal-tl__track { background-color: var(--bg-selected); box-shadow: inset 0 0 0 1px var(--blue-100); }
+.cal-tl__person { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 14px; }
+.cal-tl__person .avatar { flex: 0 0 auto; }
+.cal-tl__ptxt { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.cal-tl__pname { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; line-height: 17px; }
+.cal-tl__pname b { font-weight: 500; min-width: 0; }
+.cal-tl__pname .chip--xs { flex: 0 0 auto; height: 15px; padding: 0 5px; font-size: 9.5px; }
+.cal-tl__prole { font-size: 11.5px; line-height: 14px; color: var(--fg-tertiary); }
+.cal-tl__pload { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 2px; }
+.cal-tl__shiftb { height: 18px; padding: 0 5px; font-size: 10px; flex: 0 0 auto; }
+.cal-tl__shiftb .shift__short { font-size: 10px; }
+.cal-tl__load { color: var(--fg-secondary); font-size: 10.5px; }
+.cal-tl__row.has-conflict .cal-tl__load { color: var(--red-ink); }
+.cal-tl[data-density="compact"] .cal-tl__prole { display: none; }
+.cal-tl[data-density="compact"] .cal-tl__person { padding-top: 4px; padding-bottom: 4px; }
+.cal-tl[data-density="compact"] .cal-tl__pload { margin-top: 0; }
+
+/* rãnh giờ */
+.cal-tl__track {
+  cursor: copy; background-color: var(--bg-surface);
+  background-image:
+    repeating-linear-gradient(to right, var(--border-hair) 0 1px, transparent 1px calc(100% / var(--tl-hours))),
+    repeating-linear-gradient(to right, transparent 0 calc(100% / var(--tl-hours) / 2), var(--tl-hair-faint) calc(100% / var(--tl-hours) / 2) calc(100% / var(--tl-hours) / 2 + 1px), transparent calc(100% / var(--tl-hours) / 2 + 1px) calc(100% / var(--tl-hours)));
+}
+.cal-tl__row.is-leave .cal-tl__track { cursor: default; }
+.cal-tl__shift { position: absolute; top: 0; bottom: 0; --ink: var(--shift-full-ink); --soft: var(--shift-full-soft); background: color-mix(in srgb, var(--soft) 55%, transparent); pointer-events: none; }
+.cal-tl__shift[data-shift="morning"] { --soft: var(--shift-morning-soft); }
+.cal-tl__shift[data-shift="afternoon"] { --soft: var(--shift-afternoon-soft); }
+.cal-tl__shift[data-shift="onsite"] { --soft: var(--shift-onsite-soft); }
+.cal-tl__shift[data-shift="ot"] { --soft: var(--shift-ot-soft); }
+.cal-tl__shift[data-shift="remote"] { --soft: var(--shift-remote-soft); border-top: 1px dashed var(--border-strong); border-bottom: 1px dashed var(--border-strong); }
+.cal-tl__bar { position: absolute; top: calc(var(--tl-pad) + (var(--lane, 0) + var(--lanes-top, 0)) * (var(--tl-bar) + var(--tl-gap))); height: var(--tl-bar); z-index: 1; min-width: 6px; container-type: inline-size; }
+.cal-tl__bar:hover, .cal-tl__bar:focus-within { z-index: 3; }
+.cal-tl__bar.is-settling { visibility: hidden; }
+.cal-tl__bar--allday { left: 2px; right: 2px; top: var(--tl-pad); }
+.cal-tl__bar .ev-pill { position: absolute; inset: 0 1px; height: auto; padding: 0 8px 0 9px; gap: 6px; align-items: center; border-radius: var(--r-xs); cursor: grab; }
+.cal-tl__bar .ev-pill:hover { transform: none; }
+.cal-tl__bar .ev-pill__title { font-size: 12px; line-height: 16px; }
+.cal-tl__bar .ev-pill__main { flex-direction: row; align-items: baseline; gap: 6px; }
+.cal-tl__bar .ev-pill__meta { display: none; font-size: 10.5px; }
+@container (min-width: 190px) { .cal-tl__bar .ev-pill__meta { display: inline; } }
+.cal-tl__bar--short .ev-pill { padding: 0; }
+.cal-tl__bar--short .ev-pill__main, .cal-tl__bar--short .cal-pill__tags { display: none; }
+.cal-tl__bar--short .ev-pill__bar { width: 100%; border-radius: var(--r-xs); opacity: .85; }
+.cal-tl__bar .ev-pill.is-live::after { right: 5px; top: 50%; margin-top: -3px; }
+.cal-tl__bar .ev-pill.is-conflict::before { content: ""; position: absolute; right: 4px; top: 50%; margin-top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand-red); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 6v7M12 17.5h.01'/%3E%3C/svg%3E") center / 14px no-repeat, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 6v7M12 17.5h.01'/%3E%3C/svg%3E") center / 14px no-repeat, linear-gradient(#000 0 0); mask-composite: exclude; }
+.cal-tl__bar .ev-pill.is-conflict .ev-pill__title { padding-right: 12px; }
+.cal-tl__bar .ev-pill.is-dragging { opacity: .35; }
+.cal-tl .cal-ghost, .cal-tl__bar.cal-ghost { position: absolute; top: 0; left: 0; }
+.drag-layer .cal-tl__bar { container-type: normal; }
+.drag-layer .cal-tl__bar .ev-pill { position: absolute; inset: 0; }
+body.cal-dragging .cal-tl__track { cursor: grabbing; }
+.cal-tl__now { position: absolute; top: 0; bottom: 0; left: 0; right: auto; width: 1px; height: auto; z-index: 2; background: var(--now); pointer-events: none; transition: none; }
+.cal-tl__now::before { left: -3px; top: -1px; }
+.cal-tl__sum { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 4px 12px; }
+.cal-tl__sumtxt { color: var(--fg-secondary); white-space: nowrap; }
+.cal-tl__badges { display: flex; gap: 4px; min-height: 16px; }
+.cal-tl__badge { display: inline-flex; align-items: center; justify-content: center; gap: 1px; min-width: 18px; height: 16px; padding: 0 4px; border-radius: var(--r-xs); font: var(--t-mono-sm); font-size: 10.5px; font-weight: 600; background: var(--bg-sunken); color: var(--fg-tertiary); }
+.cal-tl__badge--conf { color: var(--red-ink); background: var(--red-50); }
+.cal-tl__badge--b2b { color: var(--warn); background: var(--warn-soft); }
+.cal-tl__badge b { font-weight: 600; }
+.cal-tl__empty { display: flex; justify-content: center; padding: 48px 16px; }
+.cal-tl__empty .cal-empty__box { pointer-events: auto; }
+
+/* lưới tuần */
+.cal-tl[data-span="week"] .cal-tl__inner { width: auto; }
+.cal-tl__head--week .cal-tl__dh, .cal-tl__row--week .cal-tl__cell { flex: 1 1 118px; min-width: 118px; }
+.cal-tl[data-span="week"] .cal-tl__gfill { flex: 1 1 auto; min-width: 0; }
+.cal-tl__dh { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 6px 8px; color: var(--fg-secondary); border-left: 1px solid var(--border-hair); transition: background-color var(--dur-instant); }
+.cal-tl__dh:hover { background: var(--bg-hover); }
+.cal-tl__dh:focus-visible { outline-offset: -2px; }
+.cal-tl__dh.is-weekend { background: var(--bg-sunken); }
+.cal-tl__dh.is-today .cal-dh__wd { color: var(--action); }
+.cal-tl__dh.is-today .cal-dh__num { background: var(--primary-fill); color: var(--fg-on-brand); }
+.cal-tl__dh.is-holiday .cal-dh__wd { color: var(--red-ink); }
+.cal-tl__dhhol { font: var(--t-caption); letter-spacing: 0; text-transform: none; color: var(--red-ink); max-width: 100%; }
+.cal-tl__row--week > * { min-height: 76px; }
+.cal-tl__cell { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 5px 6px 8px; border-left: 1px solid var(--border-hair); cursor: pointer; transition: background-color var(--dur-instant); min-width: 0; }
+.cal-tl__cell:hover { background: var(--bg-hover); }
+.cal-tl__cell:focus-visible { outline-offset: -2px; }
+.cal-tl__cell.is-weekend { background: var(--bg-sunken); }
+.cal-tl__cell.is-today { background: var(--bg-selected); }
+.cal-tl__cell.is-holiday { background-image: repeating-linear-gradient(45deg, transparent 0 7px, var(--hatch-ink) 7px 8px); }
+.cal-tl__cell.is-leave { background-image: repeating-linear-gradient(45deg, transparent 0 4px, var(--hatch-ink) 4px 5px); }
+.cal-tl__code { position: absolute; top: 5px; right: 6px; font-size: 10px; color: var(--fg-tertiary); }
+.cal-tl__code[data-shift="leave"] { text-decoration: line-through; }
+.cal-tl__code[data-shift="off"] { color: var(--fg-disabled); }
+.cal-tl__cellist { display: flex; flex-direction: column; gap: 2px; padding-right: 16px; min-height: 0; }
+.cal-tl__wpill { padding: 2px 6px 2px 8px; }
+.cal-tl__wpill .ev-pill__title { font-size: 11px; line-height: 14px; }
+.cal-tl__more { color: var(--fg-tertiary); padding-left: 2px; }
+.cal-tl__loadbar { position: absolute; left: 6px; right: 6px; bottom: 3px; height: 3px; border-radius: var(--r-full); background: color-mix(in srgb, var(--fg-primary) 8%, transparent); overflow: hidden; }
+.cal-tl__loadbar i { display: block; height: 100%; background: var(--fg-tertiary); border-radius: inherit; }
+.cal-tl__loadbar[data-level="high"] i { background: var(--warn); }
+.cal-tl__loadbar[data-level="over"] i { background: var(--red-ink); background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255, 255, 255, .4) 3px 5px); }
+
+@media (max-width: 900px) {
+  .cal-tl { --tl-left: 168px; --tl-right: 92px; }
+  .cal-tl__prole { display: none; }
+  .cal-bar__tright { margin-left: 0; }
+}

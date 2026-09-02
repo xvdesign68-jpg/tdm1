@@ -189,7 +189,7 @@
     /** Danh sách lớp lịch có thể bật/tắt trong view Lịch. */
     calendars: function () {
       var me = state.currentUserId, out = [
-        { id: 'company', name: 'Toàn công ty', kind: 'company', color: '#3F4A7A' },
+        { id: 'company', name: 'Toàn công ty', kind: 'company', color: '#5E6B7D' },
         { id: 'exec', name: 'Ban điều hành', kind: 'exec', color: '#3F4A7A' },
         { id: 'personal:' + me, name: 'Cá nhân (riêng tư)', kind: 'personal', color: '#5E6B7D' }
       ];

@@ -607,7 +607,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .ev-pill[data-prio="1"] .ev-pill__title { font-weight: 600; }
 .ev-pill[data-prio="3"] .ev-pill__bar { opacity: .5; background: repeating-linear-gradient(180deg, var(--ev) 0 5px, transparent 5px 8px); }
 .prio { display: inline-flex; align-items: center; justify-content: center; height: 16px; min-width: 22px; padding: 0 4px; border-radius: var(--r-xs); font: var(--t-mono-sm); font-size: 10px; font-weight: 600; letter-spacing: .02em; color: var(--fg-secondary); background: var(--bg-sunken); border: 1px solid var(--border-hair); }
-.prio[data-p="1"] { color: var(--fg-on-brand); background: var(--fg-primary); border-color: var(--fg-primary); }
+.prio[data-p="1"] { color: var(--bg-surface); background: var(--fg-primary); border-color: var(--fg-primary); }
 .prio[data-p="3"] { color: var(--fg-tertiary); border-style: dashed; }
 .rsvp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--fg-disabled); box-shadow: 0 0 0 2px var(--bg-surface); flex: 0 0 auto; }
 .rsvp-dot[data-rsvp="yes"] { background: var(--ok); }

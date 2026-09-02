@@ -254,7 +254,6 @@
   function switchUser(id) {
     if (id === S.state.currentUserId) return;
     UI.closeAllLayers(); S.setCurrentUser(id);
-    mountView(R.parse(), { immediate: true }); updateBadges();
     UI.toast('Đang xem với tư cách ' + S.me().name, { kind: 'brand', title: S.me().role });
   }
   var remindedKey = 'z15.ui.reminded';
@@ -334,7 +333,8 @@
       updateBadges();
       if (meta.type === 'settings' && meta.key === 'showWeekend' && currentView && currentView.update) currentView.update(R.current);
       if ((meta.type === 'staff:status' || meta.type === 'staff:update' || meta.type === 'reset') && (!meta.id || meta.id === S.state.currentUserId)) { var dot = els.user.querySelector('.avatar__status'); if (dot) dot.dataset.status = S.me().status; }
-      if (meta.type === 'user' || meta.type === 'reset') { renderUserBtn(); tickReminders(); }
+      if (meta.type === 'user') { renderUserBtn(); tickReminders(); mountView(R.parse(), { immediate: true }); updateBadges(); return; }
+      if (meta.type === 'reset') { renderUserBtn(); tickReminders(); }
       if (/event/.test(meta.type || '')) tickReminders();
     });
     window.addEventListener('hashchange', onRoute);

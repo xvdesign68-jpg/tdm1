@@ -294,3 +294,150 @@
 }
 body.reduce-motion .db-pulse__grid:not(.is-live) .heat { transform: none; opacity: 1; }
 body.reduce-motion .db-live__ring { display: none; }
+
+/* =====================================================================
+   v1.1 — lời mời chờ phản hồi, sắp diễn ra cần nhắc, thẻ Ban điều hành,
+   riêng tư / ưu tiên / RSVP trên hero & dòng thời gian.
+   ===================================================================== */
+.db-count { font-weight: 500; font-variant-numeric: tabular-nums; }
+/* Tạm vá cục bộ: .prio P1 (components.css) dùng nền --fg-primary + chữ --fg-on-brand → dark mode chữ trắng trên nền gần trắng */
+.db .prio[data-p="1"] { color: var(--bg-surface); }
+
+/* ---- hero: "Tiếp theo" ---- */
+.db-hero__nextrow--tags:empty { display: none; }
+.db-hero__nexttime.is-soon { color: var(--red-ink); }
+.db-hero__nexttime.is-live { color: var(--red-ink); }
+.db-hero__nextrow .prio, .db-hero__nextrow .travel-tag { flex: 0 0 auto; }
+.db-hero__nextrow .chip--warn .rsvp-dot { width: 7px; height: 7px; box-shadow: inset 0 0 0 1.5px var(--warn); }
+.db-hero__next .ev-pill { max-width: 560px; }
+
+/* ---- dòng thời gian: loại mới, riêng tư, chưa phản hồi ---- */
+.db-tl__ev[data-type="focus"] { --ev: var(--ev-focus); background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--ev) 10%, transparent) 6px 7px); }
+.db-tl__ev[data-type="travel"] { --ev: var(--ev-travel); }
+.db-tl__ev[data-prio="1"] .db-tl__evtitle { font-weight: 600; }
+.db-tl__ev.is-private { --ev: var(--ev-private); color: var(--fg-secondary); }
+.db-tl__ev.is-private .db-tl__evtitle { font-style: italic; font-weight: 500; }
+.db-tl__ev.is-pending { outline: 1.5px dashed var(--warn); outline-offset: -1.5px; }
+.db-tl__ev.is-pending:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.db-tl__lg--pending { background: transparent; border: 1.5px dashed var(--warn); border-left-width: 1.5px; }
+
+/* ---- Lời mời chờ bạn phản hồi ---- */
+.db-inv__hint { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; white-space: nowrap; }
+.db-inv__list { display: flex; flex-direction: column; gap: 8px; }
+.db-inv__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: center; padding: 10px 12px 10px 10px; border: 1px solid var(--border-hair); border-radius: var(--r-md); background: var(--bg-surface); transition: border-color var(--dur-fast), transform 200ms var(--ease-in), opacity 200ms var(--ease-in); will-change: transform; }
+.db-inv__row:hover { border-color: var(--border-strong); }
+.db-inv__row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--r-md); }
+.db-inv__row.is-leaving { transform: translateX(24px); opacity: 0; pointer-events: none; }
+.db-inv__main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.db-inv__main .ev-pill { max-width: 100%; }
+.db-inv__from { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding-left: 2px; font-size: 12px; color: var(--fg-secondary); }
+.db-inv__from b { color: var(--fg-primary); font-weight: 500; }
+.db-inv__row .rsvp-bar { padding: 0; background: transparent; gap: 6px; flex-wrap: nowrap; }
+.db-inv__row .rsvp-bar > b { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.db-inv__row .rsvp-bar .btn { height: 30px; }
+
+/* ---- Sắp diễn ra · cần nhắc ---- */
+.db-att__all { align-self: flex-start; margin-top: 2px; }
+.db-att__all .badge { margin-left: 2px; }
+.db-att__list { display: flex; flex-direction: column; }
+.db-att__row { --ev: var(--fg-secondary); display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; gap: 6px 14px; align-items: start; padding: 12px 4px 12px 0; border-bottom: 1px solid var(--border-hair); transition: transform 200ms var(--ease-in), opacity 200ms var(--ease-in); will-change: transform; }
+.db-att__row:last-child { border-bottom: 0; }
+.db-att__row.is-leaving { transform: translateX(24px); opacity: 0; pointer-events: none; }
+.db-att__row[data-type="meeting"] { --ev: var(--ev-meeting); } .db-att__row[data-type="pitch"] { --ev: var(--ev-pitch); } .db-att__row[data-type="review"] { --ev: var(--ev-review); } .db-att__row[data-type="shoot"] { --ev: var(--ev-shoot); } .db-att__row[data-type="training"] { --ev: var(--ev-training); } .db-att__row[data-type="event"] { --ev: var(--ev-event); } .db-att__row[data-type="deadline"] { --ev: var(--ev-deadline); } .db-att__row[data-type="task"] { --ev: var(--ev-task); }
+.db-att__left { display: inline-flex; align-items: center; justify-self: start; height: 22px; margin-top: 1px; padding: 0 8px; border-radius: var(--r-xs); background: var(--bg-sunken); color: var(--fg-secondary); font-weight: 600; white-space: nowrap; }
+.db-att__left.is-urgent { color: var(--red-ink); background: var(--red-50); }
+.db-att__left.is-live { color: var(--red-ink); background: var(--red-50); }
+.db-att__body { display: flex; flex-direction: column; min-width: 0; gap: 3px; padding-left: 12px; box-shadow: inset 2px 0 0 var(--ev); }
+.db-att__title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.db-att__name { font-size: 13.5px; font-weight: 500; line-height: 20px; color: var(--fg-primary); text-align: left; border-radius: var(--r-xs); }
+.db-att__name:hover { color: var(--action); text-decoration: underline; text-underline-offset: 2px; }
+.db-att__row[data-prio="1"] .db-att__name { font-weight: 600; }
+.db-att__meta { font-size: 12px; line-height: 18px; color: var(--fg-secondary); }
+.db-att__meta b { color: var(--fg-secondary); font-weight: 500; }
+.db-att__reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.db-att__reason { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--r-full); background: var(--bg-sunken); font-size: 11.5px; font-weight: 500; color: var(--fg-secondary); white-space: nowrap; }
+.db-att__reason .icon { color: var(--fg-tertiary); }
+.db-att__reason.is-overdue { color: var(--warn); background: var(--warn-soft); }
+.db-att__reason.is-overdue .icon { color: var(--warn); }
+.db-att__reason.is-quiet { background: transparent; color: var(--fg-tertiary); padding: 0 2px; }
+.db-att__prep { margin-top: 6px; padding: 2px 0 0; }
+.db-att__prep .prep__item { padding: 3px 6px 3px 0; font-size: 12.5px; }
+.db-att__prep .prep__item:hover { background: transparent; }
+.db-att__prep .prep__check { width: 16px; height: 16px; border-radius: 4px; }
+.db-att__prep .prep__check svg { width: 10px; height: 10px; }
+.db-att__prep .prep__check:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.db-att__prep .prep__owner { font-size: 11px; }
+.db-att__actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 84px; }
+.db-att__actions .btn { justify-content: center; }
+.db-att__nudged { font-size: 11px; line-height: 14px; text-align: center; white-space: nowrap; }
+
+/* ---- Sắp tới: chưa xác nhận · Nhắc ---- */
+.db-up__item { display: flex; flex-direction: column; gap: 2px; }
+.db-up__rsvp { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 1px 0 2px 12px; font-size: 11.5px; line-height: 16px; color: var(--fg-tertiary); }
+.db-up__rsvp .rsvp-dot { width: 7px; height: 7px; box-shadow: inset 0 0 0 1.5px var(--fg-tertiary); }
+.db-up__rsvp .link-btn { font-size: 11.5px; line-height: 16px; padding: 0 2px; border-radius: var(--r-xs); }
+
+/* ---- Ban điều hành: sức khoẻ lịch tuần ---- */
+.db-exec__top { display: flex; align-items: center; gap: 16px; --ring: var(--action); }
+.db-exec__ring { position: relative; width: 76px; height: 76px; flex: 0 0 auto; display: grid; place-items: center; }
+.db-exec__ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.db-exec__track { fill: none; stroke: var(--bg-sunken); stroke-width: 5; }
+.db-exec__arc { fill: none; stroke: var(--ring); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 100; }
+.db-exec__arc.is-anim { transition: stroke-dashoffset 720ms var(--ease-inout) 160ms; }
+.db-exec__score { font: 500 24px/1 var(--font-mono); letter-spacing: -0.03em; font-feature-settings: "tnum" 1; }
+.db-exec__who { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.db-exec__person { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.db-exec__person > span { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.db-exec__person b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-exec__person small { font-size: 11.5px; color: var(--fg-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-exec__label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--fg-primary); }
+.db-exec__label::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ring); flex: 0 0 auto; }
+.db-exec__sub { font-size: 12px; color: var(--fg-secondary); }
+.db-exec__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-hair); }
+.db-exec__stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.db-exec__stat .eyebrow { font-size: 10.5px; }
+.db-exec__stat b { font: 500 19px/24px var(--font-mono); letter-spacing: -0.02em; font-feature-settings: "tnum" 1; color: var(--fg-primary); }
+.db-exec__stat small { font-size: 11.5px; line-height: 15px; color: var(--fg-tertiary); }
+.db-exec__stat.is-warn b { color: var(--warn); }
+.db-exec__stat.is-bad b { color: var(--red-ink); }
+.db-exec__issues { display: flex; flex-direction: column; gap: 4px; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border-hair); }
+.db-exec__issue { display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 10px; align-items: start; width: 100%; padding: 6px 6px; border-radius: var(--r-sm); text-align: left; color: var(--fg-primary); font-size: 12.5px; line-height: 18px; transition: background-color var(--dur-instant); }
+button.db-exec__issue:hover { background: var(--bg-hover); }
+.db-exec__issue:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.db-exec__sev { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--fg-disabled); }
+.db-exec__issue[data-sev="3"] .db-exec__sev { background: var(--red-ink); }
+.db-exec__issue[data-sev="2"] .db-exec__sev { background: var(--warn); }
+.db-exec__txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.db-exec__txt small { color: var(--fg-tertiary); }
+.db-exec__clear { display: flex; align-items: center; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-hair); font-size: 12.5px; }
+.db-exec__clear .icon { color: var(--ok); }
+.db-exec__cta { width: 100%; margin-top: 14px; justify-content: center; }
+
+/* ---- responsive (v1.1) ---- */
+@media (max-width: 1280px) {
+  .db-att__row { grid-template-columns: 74px minmax(0, 1fr) auto; gap: 6px 12px; }
+}
+@media (max-width: 820px) {
+  .db-inv__row { grid-template-columns: minmax(0, 1fr); }
+  .db-inv__row .rsvp-bar { flex-wrap: wrap; padding-left: 2px; }
+  .db-inv__row .rsvp-bar > b { position: static; width: auto; height: auto; margin: 0 auto 0 0; clip: auto; }
+  .db-inv__hint { display: none; }
+  .db-att__row { grid-template-columns: 74px minmax(0, 1fr); }
+  .db-att__actions { grid-column: 2; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .db-att__nudged { text-align: left; }
+  .db-att__all { margin-top: 0; }
+}
+@media (max-width: 640px) {
+  .db-att__row { grid-template-columns: minmax(0, 1fr); }
+  .db-att__actions { grid-column: 1; }
+  .db-exec__stats { gap: 8px; }
+  .db-exec__stat b { font-size: 17px; }
+}
+
+/* ---- reduced motion (v1.1) ---- */
+@media (prefers-reduced-motion: reduce) {
+  .db-inv__row.is-leaving, .db-att__row.is-leaving { transform: none; }
+  .db-exec__arc.is-anim { transition: none; }
+}
+body.reduce-motion .db-inv__row.is-leaving, body.reduce-motion .db-att__row.is-leaving { transform: none; }
+body.reduce-motion .db-exec__arc.is-anim { transition: none; }

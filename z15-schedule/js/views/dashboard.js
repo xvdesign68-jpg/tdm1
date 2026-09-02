@@ -1,6 +1,8 @@
 /* =====================================================================
    Z15 Miracle · Lịch làm việc — views/dashboard.js
    "Hôm nay": ca gì, ở đâu, với ai, deadline nào, ai đang chờ tôi.
+   v1.1: lời mời chờ phản hồi (RSVP), sắp diễn ra cần nhắc, thẻ sức khoẻ
+   lịch cho Ban điều hành, riêng tư & ưu tiên trên hero/dòng thời gian.
    Route: #/dashboard  (?date=YYYY-MM-DD để xem ngày khác, ?friday=1 test recap)
    ===================================================================== */
 (function (global) {
@@ -20,6 +22,7 @@
   var TL_START = 6 * 60, TL_END = 22 * 60, TL_SPAN = TL_END - TL_START;
   var MEETING_TYPES = { meeting: 1, review: 1, pitch: 1, training: 1 };
   var LEAVE_TOTAL = 12, LEAVE_LEFT = 8.5;
+  var INVITES_MAX = 4, ATTENTION_MAX = 5, ATTENTION_HOURS = 48;
 
   /* ------------------------------------------------------------ helpers */
   function reduceMotion() { return U.prefersReducedMotion() || document.body.classList.contains('reduce-motion'); }
@@ -48,6 +51,29 @@
   function shiftStatus(type) { return ({ full: 'available', morning: 'available', afternoon: 'available', ot: 'busy', remote: 'remote', onsite: 'onsite', leave: 'off', off: 'off' })[type] || 'off'; }
   function isLive(ev, realISO, now) { return ev.date === realISO && !ev.allDay && U.timeToMin(ev.start) <= now && U.timeToMin(ev.end) > now; }
   function withStatus(avatarHtml, status) { return avatarHtml.replace(/<\/span>$/, '<i class="avatar__status" data-status="' + status + '"></i></span>'); }
+  function isTypingTarget(t) { return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable); }
+  /** Số giờ còn lại tới lúc bắt đầu (âm = đã bắt đầu). */
+  function hoursLeftOf(ev) { return (U.fromISO(ev.date).getTime() + (ev.allDay ? 8 * 60 : U.timeToMin(ev.start)) * 60000 - Date.now()) / 3600000; }
+  /** Nhãn "còn 18g" (mono). Đỏ chỉ khi < 3 giờ. */
+  function timeLeft(hrs) {
+    if (hrs < 0) return { text: 'đang diễn ra', cls: 'is-live' };
+    var m = Math.round(hrs * 60);
+    if (m < 60) return { text: 'còn ' + m + "'", cls: 'is-urgent' };
+    var hh = Math.floor(m / 60), mm = m % 60;
+    return { text: 'còn ' + hh + 'g' + (hh < 10 && mm >= 15 ? U.pad(mm) : ''), cls: hrs < 3 ? 'is-urgent' : '' };
+  }
+  /** Pill sự kiện có tôn trọng riêng tư + gắn data-prio. */
+  function pill(ev, opts) {
+    opts = opts || {};
+    var st = S(), me = st.state.currentUserId, see = st.canSee(ev, me), html;
+    if (see) html = UI.eventPill(ev, opts);
+    else html = UI.eventPill(Object.assign({}, ev, { title: st.displayTitle(ev, me), location: '', projectId: null, attendeeIds: [] }), Object.assign({}, opts, { cls: ((opts.cls || '') + ' is-private').trim() }));
+    html = html.replace('<div class="ev-pill', '<div data-prio="' + (ev.priority || 2) + '" class="ev-pill');
+    if (opts.tab === -1) html = html.replace(' tabindex="0"', ' tabindex="-1"');
+    return html;
+  }
+  function prioTag(ev) { return ev.priority === 1 ? raw('<span class="prio" data-p="1" title="Bắt buộc, cần chuẩn bị">P1</span>') : ''; }
+  function travelTag(ev) { return ev.travelMinutes ? h`<span class="travel-tag">${icon('map-pin', 12)}đi sớm ~${ev.travelMinutes}'</span>` : ''; }
 
   /** Ca của một người trong ngày: loại, giờ, địa điểm (lấy từ lịch quay nếu on-site). */
   function shiftInfo(staffId, iso) {
@@ -97,7 +123,7 @@
     mutate();
     var last = nodes.map(function (n) { return n.getBoundingClientRect().top; });
     var moved = [];
-    nodes.forEach(function (n, i) { var d = first[i] - last[i]; if (Math.abs(d) < 0.5) return; n.style.transition = 'none'; n.style.transform = 'translateY(' + d + 'px)'; moved.push(n); });
+    nodes.forEach(function (n, i) { var d = first[i] - last[i]; if (Math.abs(d) < 0.5 || !n.isConnected || n.hidden) return; n.style.transition = 'none'; n.style.transform = 'translateY(' + d + 'px)'; moved.push(n); });
     if (!moved.length) return;
     void document.body.offsetHeight;
     requestAnimationFrame(function () {
@@ -117,9 +143,14 @@
     this.unbinders = [];
     this.destroyed = false;
     this.inboxBusy = false;
+    this.invBusy = false;
+    this.attBusy = false;
+    this.nudgeBatch = false;
     this.pendingRerender = false;
+    this.invFocus = null;
     this.readRoute(route);
     this.kpiAnimated = false;
+    this.execAnimated = false;
 
     var wherePref = U.loadJSON(KEYS.where, 'all');
     this.whereFilter = typeof wherePref === 'string' ? wherePref : 'all';
@@ -132,7 +163,8 @@
     this.unsub = S().subscribe(function (state, meta) { self.onStore(meta); });
     this.unregisterKeys = [
       UI.shortcuts.register('i', function () { var b = self.container.querySelector('[data-checkin]'); if (b) b.click(); }, 'Check-in / Check-out', 'Hôm nay'),
-      UI.shortcuts.register('a', function () { var c = self.container.querySelector('.db-req'); if (c) { c.focus(); c.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' }); } }, 'Tới yêu cầu đang chờ', 'Hôm nay')
+      UI.shortcuts.register('a', function () { var c = self.container.querySelector('.db-req'); if (c) { c.focus(); c.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' }); } }, 'Tới yêu cầu đang chờ', 'Hôm nay'),
+      UI.shortcuts.register('r', function () { var r = self.container.querySelector('.db-inv__row'); if (r) { r.focus(); r.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' }); } }, 'Tới lời mời chờ phản hồi', 'Hôm nay')
     ];
     this.timers.push(setInterval(function () { self.tick(); }, 30000));
     this.onVis = function () { if (!document.hidden) self.tick(); };
@@ -170,14 +202,17 @@
             <section class="card card--hero db-hero reveal" style="--i:1" data-block="hero" aria-label="Ca của tôi"></section>
             <section class="card db-tl reveal" style="--i:2" data-block="timeline" aria-label="Dòng thời gian hôm nay"></section>
             <nav class="db-quick reveal" style="--i:3" data-block="quick" aria-label="Thao tác nhanh"></nav>
-            <section class="db-kpis reveal" style="--i:4" data-block="kpis" aria-label="KPI tuần"></section>
-            <section class="card db-inbox reveal" style="--i:5" data-block="inbox" aria-label="Cần bạn xử lý"></section>
+            <section class="card db-inv reveal" style="--i:4" data-block="invites" aria-label="Lời mời chờ bạn phản hồi" hidden></section>
+            <section class="db-kpis reveal" style="--i:5" data-block="kpis" aria-label="KPI tuần"></section>
+            <section class="card db-inbox reveal" style="--i:6" data-block="inbox" aria-label="Cần bạn xử lý"></section>
+            <section class="card db-att reveal" style="--i:7" data-block="attention" aria-label="Sắp diễn ra · cần nhắc" hidden></section>
             <div class="db-duo">
-              <section class="card db-up reveal" style="--i:6" data-block="upcoming" aria-label="Sắp tới của bạn"></section>
-              <section class="card db-dl reveal" style="--i:7" data-block="deadlines" aria-label="Deadline 7 ngày"></section>
+              <section class="card db-up reveal" style="--i:8" data-block="upcoming" aria-label="Sắp tới của bạn"></section>
+              <section class="card db-dl reveal" style="--i:8" data-block="deadlines" aria-label="Deadline 7 ngày"></section>
             </div>
           </div>
           <aside class="db-side">
+            <section class="card db-exec reveal" style="--i:2" data-block="exec" aria-label="Sức khoẻ lịch tuần này" hidden></section>
             <section class="card db-where reveal" style="--i:3" data-block="where" aria-label="Ai đang ở đâu"></section>
             <section class="card db-pulse reveal" style="--i:5" data-block="pulse" aria-label="Nhịp đội"></section>
             <section class="card db-fun reveal" style="--i:7" data-block="fun" aria-label="Có gì vui"></section>
@@ -191,8 +226,8 @@
   Dashboard.prototype.renderAll = function (first) {
     if (!this.alive()) return;
     this.setTitle();
-    this.renderHead(); this.renderHero(); this.renderTimeline(); this.renderQuick(); this.renderKpis(first);
-    this.renderInbox(); this.renderUpcoming(); this.renderDeadlines(); this.renderWhere(); this.renderPulse(); this.renderFun();
+    this.renderHead(); this.renderHero(); this.renderTimeline(); this.renderQuick(); this.renderInvites(); this.renderKpis(first);
+    this.renderInbox(); this.renderAttention(); this.renderUpcoming(); this.renderDeadlines(); this.renderExec(); this.renderWhere(); this.renderPulse(); this.renderFun();
   };
 
   /* ---------------------------------------------------------- 1. header */
@@ -204,6 +239,7 @@
     var meetings = myEvents.filter(function (e) { return MEETING_TYPES[e.type]; }).length;
     var others = myEvents.length - meetings;
     var pending = st.pendingRequests().filter(function (r) { return r.staffId !== me.id; }).length;
+    var invites = st.myPendingInvites ? st.myPendingInvites(me.id).length : 0;
     var eyebrow = U.weekdayLong(d) + ' · ' + U.fmtDate(d, 'dm') + ' · Tuần ' + U.isoWeek(d);
     var sub;
     if (hol) sub = h`Hôm nay nghỉ lễ <b>${hol}</b> 🇻🇳 — ngày làm việc tiếp theo: <b>${U.weekdayLong(U.fromISO(nextWorkday(iso)))} ${U.fmtDate(nextWorkday(iso), 'dm')}</b>.`;
@@ -213,6 +249,7 @@
       parts.push(info.type === 'leave' ? raw('bạn <b>nghỉ phép</b>') : info.working ? h`<b>1 ca</b> ${info.t.label.toLowerCase()}` : raw('<b>chưa xếp ca</b>'));
       parts.push(meetings ? h`<b>${meetings}</b> cuộc họp` : raw('không có cuộc họp'));
       if (others) parts.push(h`<b>${others}</b> việc khác`);
+      if (invites) parts.push(h`<a href="#/dashboard" data-jump="invites"><b>${invites}</b> lời mời chờ phản hồi</a>`);
       parts.push(pending ? h`<a href="#/requests"><b>${pending}</b> yêu cầu chờ bạn duyệt</a>` : raw('không có yêu cầu chờ'));
       var joined = parts.map(function (p, i) { return i ? raw(' <span class="db-head__sep">·</span> ' + p.s) : p; });
       sub = h`${this.isReal ? 'Hôm nay' : dmw(iso)}: ${joined}.`;
@@ -228,6 +265,33 @@
     var c = U.loadJSON(KEYS.checkin, null);
     return c && c.date === this.iso ? c : null;
   };
+  /** Sự kiện tiếp theo của tôi (từ ngày focus): kèm số phút còn lại nếu là hôm nay thật. */
+  Dashboard.prototype.nextEvent = function (staffId, fromISO) {
+    var st = S(), real = U.todayISO(), now = U.nowMinutes();
+    var e = upcomingFor(staffId, fromISO, 1)[0]; if (!e) return null;
+    var mins = e.date === real && !e.allDay ? U.timeToMin(e.start) - now : null;
+    var live = mins != null && mins <= 0 && U.timeToMin(e.end) > now;
+    return { ev: e, mins: mins, live: live, rsvp: st.rsvpOf(e, staffId), mine: e.ownerId === staffId };
+  };
+  function nextTimeText(nx) {
+    if (nx.live) return 'đang diễn ra · còn ' + U.fmtDuration(U.timeToMin(nx.ev.end) - U.nowMinutes());
+    if (nx.mins == null) return nx.ev.allDay ? 'Cả ngày' : nx.ev.start;
+    var m = Math.max(0, Math.round(nx.mins));
+    return m < 60 ? "còn " + m + "'" : 'còn ' + U.fmtDuration(m);
+  }
+  Dashboard.prototype.nextRow = function (nx, eyebrow) {
+    if (!nx) return '';
+    var soon = nx.mins != null && nx.mins < 180 && !nx.live;
+    return h`<div class="db-hero__next">
+      <div class="db-hero__nextrow">
+        <span class="eyebrow">${eyebrow}</span>
+        <span class="mono db-hero__nexttime tnum${soon ? ' is-soon' : ''}${nx.live ? ' is-live' : ''}" data-next-time="${nx.ev.id}">${nextTimeText(nx)}</span>
+        ${prioTag(nx.ev)}${travelTag(nx.ev)}
+        ${nx.rsvp === 'pending' && !nx.mine ? h`<span class="chip chip--xs chip--warn" title="Bạn chưa trả lời lời mời này"><i class="rsvp-dot" data-rsvp="pending"></i><span>Chưa phản hồi</span></span>` : ''}
+      </div>
+      ${raw(pill(nx.ev, { cls: nx.mine ? 'is-mine' : '' }))}
+    </div>`;
+  };
   Dashboard.prototype.renderHero = function () {
     if (!this.alive()) return;
     var st = S(), me = st.me(), iso = this.iso, block = this.blocks.hero;
@@ -237,7 +301,7 @@
     var calHref = '#/calendar/week/' + iso;
 
     if (!info.working) {
-      var nx = nextWorkday(iso), nxInfo = shiftInfo(me.id, nx), nxEv = upcomingFor(me.id, nx, 1)[0];
+      var nx = nextWorkday(iso), nxInfo = shiftInfo(me.id, nx), nxEv = this.nextEvent(me.id, nx);
       var eyebrow = hol ? 'Hôm nay nghỉ lễ' : weekend ? 'Cuối tuần' : info.type === 'leave' ? 'Bạn đang nghỉ phép' : 'Hôm nay không có ca';
       var title = hol ? hol + ' 🇻🇳' : weekend ? 'Nghỉ ngơi thôi' : info.type === 'leave' ? 'Nghỉ phép' : 'Chưa xếp ca';
       var body = hol ? 'Nghỉ ngơi cho khoẻ — mọi thứ vẫn đang đúng nhịp.' : weekend ? 'Việc tuần này đã xong phần của nó. Hẹn gặp lại đầu tuần.' : info.type === 'leave' ? 'Tận hưởng kỳ nghỉ nhé, lịch vẫn được giữ ổn.' : 'Có thể quản lý chưa xếp — bạn có thể nhắc một câu.';
@@ -254,7 +318,7 @@
                 ${nxInfo.start ? h`<span class="mono db-hero__nexttime">${nxInfo.start} – ${nxInfo.end}</span>` : ''}
                 ${nxInfo.location ? h`<span class="db-hero__loc">${icon('map-pin', 14)}${nxInfo.location}</span>` : ''}
               </div>
-              ${nxEv ? raw(UI.eventPill(nxEv, { cls: nxEv.ownerId === me.id ? 'is-mine' : '' })) : h`<p class="muted t-body-sm">Chưa có sự kiện nào trong ngày đó.</p>`}
+              ${nxEv ? h`<div class="db-hero__nextrow db-hero__nextrow--tags">${nxEv.ev.date !== nx ? h`<span class="faint t-body-sm">${dmw(nxEv.ev.date)}</span>` : ''}${prioTag(nxEv.ev)}${travelTag(nxEv.ev)}${nxEv.rsvp === 'pending' && !nxEv.mine ? h`<span class="chip chip--xs chip--warn"><i class="rsvp-dot" data-rsvp="pending"></i><span>Chưa phản hồi</span></span>` : ''}</div>${raw(pill(nxEv.ev, { cls: nxEv.mine ? 'is-mine' : '' }))}` : h`<p class="muted t-body-sm">Chưa có sự kiện nào trong ngày đó.</p>`}
             </div>
           </div>
           <div class="db-hero__cta">
@@ -272,6 +336,8 @@
     var phase = !this.isReal ? 'other' : now < startM ? 'before' : now < endM ? 'during' : 'after';
     var liveTxt = this.liveText(info, ci);
     var inState = ci ? (ci.out ? 'out' : 'in') : 'none';
+    var next = this.nextEvent(me.id, iso);
+    var nextEyebrow = next ? (next.ev.date === iso ? 'Tiếp theo' : 'Tiếp theo · ' + dmw(next.ev.date)) : '';
     U.render(block, h`
       <div class="db-hero__grid">
         <div class="db-hero__main">
@@ -280,12 +346,13 @@
           <div class="db-hero__meta">
             ${raw(UI.shiftBadge(info.type, { label: true, cls: 'shift--lg' }))}
             <span class="db-hero__loc">${icon('map-pin', 14)}<span>${info.location}</span></span>
-            ${info.event ? h`<button class="chip chip--btn chip--color" style="--chip:${(st.project(info.event.projectId) || {}).color || 'var(--ev-shoot)'}" data-event-open="${info.event.id}"><i class="chip__dot"></i><span>${info.event.title}</span></button>` : ''}
+            ${info.event ? h`<button class="chip chip--btn chip--color" style="--chip:${(st.project(info.event.projectId) || {}).color || 'var(--ev-shoot)'}" data-event-open="${info.event.id}"><i class="chip__dot"></i><span>${st.displayTitle(info.event, me.id)}</span></button>` : ''}
           </div>
           <div class="db-hero__mates">
             ${mates.length ? raw(UI.avatarStack(mates, { max: 5, size: 'sm' })) : ''}
             <span class="db-hero__matestxt">${mates.length ? h`Cùng ca với bạn · <b>${mates.length}</b> người` : 'Chỉ mình bạn ở ca này hôm nay'}</span>
           </div>
+          ${this.nextRow(next, nextEyebrow)}
         </div>
         <div class="db-hero__cta">
           <div class="db-checkin${inState !== 'none' ? ' is-in is-settled' : ''}" data-phase="${phase}" data-state="${inState}">
@@ -377,7 +444,7 @@
     this.tlISO = showISO;
     var team = st.staffByTeam(me.teamId).map(function (s) { return s.id; });
     var list = evsOn(showISO).filter(function (e) { return !e.allDay; }).map(function (e) {
-      var mine = e.attendeeIds.indexOf(me.id) >= 0;
+      var mine = e.attendeeIds.indexOf(me.id) >= 0 || e.ownerId === me.id;
       var teamEv = !mine && e.attendeeIds.some(function (id) { return team.indexOf(id) >= 0; });
       return { e: e, mine: mine, team: teamEv };
     }).filter(function (x) { return x.mine || x.team; });
@@ -393,21 +460,24 @@
     var now = U.nowMinutes(), real = U.todayISO(), showNow = showISO === real && now >= TL_START && now <= TL_END;
     var hours = []; for (var m = TL_START; m <= TL_END; m += 60) hours.push(m);
     var laneCount = Math.max(1, lanes.length);
+    var hasPending = list.some(function (x) { return x.mine && x.e.ownerId !== me.id && x.e.attendeeIds.indexOf(me.id) >= 0 && st.rsvpOf(x.e, me.id) === 'pending'; });
     var blocks = list.map(function (x) {
-      var e = x.e, p = e.projectId ? st.project(e.projectId) : null, isPoint = U.timeToMin(e.end) <= U.timeToMin(e.start);
+      var e = x.e, see = st.canSee(e, me.id), p = see && e.projectId ? st.project(e.projectId) : null, isPoint = U.timeToMin(e.end) <= U.timeToMin(e.start);
+      var title = st.displayTitle(e, me.id), loc = see ? e.location : '';
       var left = (x.s - TL_START) / TL_SPAN * 100, width = (x.en - x.s) / TL_SPAN * 100;
       var live = isLive(e, real, now), past = showISO === real && !live && U.timeToMin(e.end) <= now;
-      var cls = 'db-tl__ev' + (x.mine ? ' is-mine' : ' is-team') + (live ? ' is-live' : '') + (past ? ' is-past' : '') + (isPoint ? ' is-point' : '') + (width < 4.5 ? ' is-narrow' : width < 9 ? ' is-tight' : '');
+      var pending = x.mine && e.ownerId !== me.id && e.attendeeIds.indexOf(me.id) >= 0 && st.rsvpOf(e, me.id) === 'pending';
+      var cls = 'db-tl__ev' + (x.mine ? ' is-mine' : ' is-team') + (live ? ' is-live' : '') + (past ? ' is-past' : '') + (isPoint ? ' is-point' : '') + (pending ? ' is-pending' : '') + (see ? '' : ' is-private') + (width < 4.5 ? ' is-narrow' : width < 9 ? ' is-tight' : '');
       var style = 'left:' + left.toFixed(3) + '%;width:' + width.toFixed(3) + '%;--lane:' + x.lane + (p ? ';--ev:' + p.color : '');
-      var label = e.title + ', ' + timeRange(e.start, e.end) + (e.location ? ', ' + e.location : '') + (x.mine ? ', của bạn' : ', team ' + (st.team(me.teamId) || {}).name);
-      return h`<button type="button" class="${cls}" data-type="${e.type}" data-event-open="${e.id}" style="${style}" aria-label="${label}" data-tip="${e.title + ' · ' + timeRange(e.start, e.end)}"><span class="db-tl__evtitle">${e.title}</span><span class="db-tl__evmeta mono-sm">${isPoint ? e.start : timeRange(e.start, e.end)}</span></button>`;
+      var label = title + ', ' + timeRange(e.start, e.end) + (loc ? ', ' + loc : '') + (x.mine ? ', của bạn' : ', team ' + (st.team(me.teamId) || {}).name) + (pending ? ', bạn chưa phản hồi' : '') + (e.priority === 1 && see ? ', ưu tiên P1' : '');
+      return h`<button type="button" class="${cls}" data-type="${e.type}" data-prio="${e.priority || 2}" data-event-open="${e.id}" style="${style}" aria-label="${label}" data-tip="${title + ' · ' + timeRange(e.start, e.end) + (pending ? ' · chưa phản hồi' : '')}"><span class="db-tl__evtitle">${title}</span><span class="db-tl__evmeta mono-sm">${isPoint ? e.start : timeRange(e.start, e.end)}</span></button>`;
     });
     U.render(block, h`
       <div class="card__head db-tl__head">
         <div><div class="card__eyebrow">Dòng thời gian</div><h3 class="card__title">${caption ? caption : (this.isReal ? 'Hôm nay' : dmw(showISO)) + ' · 06:00 – 22:00'}</h3></div>
-        <div class="db-tl__legend"><span><i class="db-tl__lg db-tl__lg--mine"></i>Của bạn</span><span><i class="db-tl__lg db-tl__lg--team"></i>Team ${(st.team(me.teamId) || {}).name}</span>${showNow ? h`<span><i class="db-tl__lg db-tl__lg--now"></i>Bây giờ</span>` : ''}</div>
+        <div class="db-tl__legend"><span><i class="db-tl__lg db-tl__lg--mine"></i>Của bạn</span><span><i class="db-tl__lg db-tl__lg--team"></i>Team ${(st.team(me.teamId) || {}).name}</span>${hasPending ? h`<span><i class="db-tl__lg db-tl__lg--pending"></i>Chưa phản hồi</span>` : ''}${showNow ? h`<span><i class="db-tl__lg db-tl__lg--now"></i>Bây giờ</span>` : ''}</div>
       </div>
-      ${allDay.length ? h`<div class="db-tl__allday">${allDay.map(function (e) { var p = e.projectId ? st.project(e.projectId) : null; return h`<button type="button" class="chip chip--btn chip--color" style="--chip:${p ? p.color : 'var(--ev-' + e.type + ')'}" data-event-open="${e.id}"><i class="chip__dot"></i><span>Cả ngày · ${e.title}</span></button>`; })}</div>` : ''}
+      ${allDay.length ? h`<div class="db-tl__allday">${allDay.map(function (e) { var see = st.canSee(e, me.id), p = see && e.projectId ? st.project(e.projectId) : null; return h`<button type="button" class="chip chip--btn chip--color" style="--chip:${p ? p.color : 'var(--ev-' + e.type + ')'}" data-event-open="${e.id}"><i class="chip__dot"></i><span>Cả ngày · ${st.displayTitle(e, me.id)}</span></button>`; })}</div>` : ''}
       <div class="db-tl__scroll">
         <div class="db-tl__track" style="--lanes:${laneCount}">
           <div class="db-tl__hours">${hours.map(function (m, i) { return h`<span class="db-tl__hour${m === 12 * 60 ? ' is-noon' : ''}" style="left:${(m - TL_START) / TL_SPAN * 100}%"><i></i><b class="mono-sm">${U.pad(m / 60)}</b></span>`; })}</div>
@@ -439,6 +509,73 @@
     if (prev === 'leave') { UI.toast('Bạn đang nghỉ phép ' + dmw(target) + ' — không cần remote.', { kind: 'info' }); return; }
     st.setShift(me.id, target, 'remote');
     UI.toast((target === this.iso ? 'Hôm nay' : dmw(target)) + ' của bạn → Làm từ xa' + (target !== this.iso ? ' (hôm nay không có ca)' : ''), { kind: 'success', action: { label: 'Hoàn tác', onClick: function () { st.setShift(me.id, target, prev); UI.toast('Đã khôi phục ca ' + st.shiftType(prev).label.toLowerCase(), { kind: 'info' }); } } });
+  };
+
+  /* --------------------------------------- 4b. Lời mời chờ bạn phản hồi */
+  /** Gỡ hàng khỏi danh sách với chuyển động rời (translateX + mờ) rồi FLIP các hàng/khối phía sau. */
+  Dashboard.prototype.leaveRows = function (block, rows, rowSel, done) {
+    var self = this;
+    if (!rows.length || reduceMotion()) { done(); return; }
+    var all = U.qsa(rowSel, block), focusIdx = -1;
+    rows.forEach(function (r) { if (r.contains(document.activeElement)) focusIdx = all.indexOf(r); });
+    rows.forEach(function (r) { r.classList.add('is-leaving'); });
+    this.later(function () {
+      var remaining = U.qsa(rowSel, block).filter(function (r) { return rows.indexOf(r) < 0; });
+      var followers = []; var sib = block.nextElementSibling; while (sib) { followers.push(sib); sib = sib.nextElementSibling; }
+      var foot = block.querySelector('.card__foot'), willHide = !remaining.length;
+      var nodes = willHide ? followers : remaining.concat(foot ? [foot] : []).concat(followers);
+      flipY(nodes, function () {
+        rows.forEach(function (r) { r.remove(); });
+        if (willHide) block.hidden = true;
+        if (focusIdx >= 0) { var nxt = remaining[Math.min(focusIdx, remaining.length - 1)]; if (nxt && nxt.focus) nxt.focus({ preventScroll: true }); }
+      }, 240);
+      self.later(done, 260);
+    }, 200);
+  };
+  Dashboard.prototype.renderInvites = function () {
+    if (!this.alive() || this.invBusy) return;
+    var st = S(), me = st.me(), block = this.blocks.invites, self = this;
+    var all = st.myPendingInvites ? st.myPendingInvites(me.id) : [];
+    var list = all.slice(0, INVITES_MAX);
+    if (!list.length) { block.hidden = true; block.innerHTML = ''; this.invFocus = null; return; }
+    var focusId = this.invFocus || (document.activeElement && block.contains(document.activeElement) && document.activeElement.closest('.db-inv__row') ? document.activeElement.closest('.db-inv__row').dataset.inv : null);
+    this.invFocus = null;
+    block.hidden = false;
+    U.render(block, h`
+      <div class="card__head">
+        <div><div class="card__eyebrow">RSVP</div><h3 class="card__title">Lời mời chờ bạn phản hồi <span class="db-count faint">· ${all.length}</span></h3></div>
+        <span class="db-inv__hint muted">${raw(UI.kbd('↑'))}${raw(UI.kbd('↓'))} chọn · ${raw(UI.kbd('Y'))} dự · ${raw(UI.kbd('M'))} có thể · ${raw(UI.kbd('N'))} vắng</span>
+      </div>
+      <div class="db-inv__list" role="list">${list.map(function (ev) { return self.inviteRow(ev); })}</div>
+      ${all.length > list.length ? h`<div class="card__foot"><span>Còn ${all.length - list.length} lời mời khác</span><a class="link-btn" href="#/calendar?staff=${me.id}">Lịch của tôi →</a></div>` : ''}`);
+    if (focusId) { var again = block.querySelector('.db-inv__row[data-inv="' + focusId + '"]'); if (again) again.focus({ preventScroll: true }); }
+  };
+  Dashboard.prototype.inviteRow = function (ev) {
+    var st = S(), me = st.me(), owner = st.staff(ev.ownerId), Ed = E();
+    var when = dmw(ev.date) + ' · ' + (ev.allDay ? 'Cả ngày' : timeRange(ev.start, ev.end));
+    var rel = U.daysBetween(this.realISO, ev.date), relTxt = rel === 0 ? 'Hôm nay' : rel === 1 ? 'Ngày mai' : rel > 1 && rel < 7 ? U.weekdayLong(U.fromISO(ev.date)) : dmw(ev.date);
+    return h`
+      <article class="db-inv__row" role="listitem" tabindex="0" data-inv="${ev.id}" data-prio="${ev.priority || 2}" aria-label="Lời mời: ${ev.title}, ${when}${owner ? ', mời bởi ' + U.shortName(owner.name) : ''}. Nhấn Y để tham dự, M có thể, N vắng.">
+        <div class="db-inv__main">
+          ${raw(pill(ev, { tab: -1 }))}
+          <div class="db-inv__from">
+            ${owner ? h`${raw(UI.avatar(owner, { size: 'xs', title: false }))}<span><b>${U.shortName(owner.name)}</b> mời · ${relTxt}</span>` : h`<span>${relTxt}</span>`}
+            ${prioTag(ev)}${travelTag(ev)}
+          </div>
+        </div>
+        ${raw(Ed && Ed.rsvpBar ? Ed.rsvpBar(ev, me.id) : '')}
+      </article>`;
+  };
+  /** Sau khi trả lời: hàng rời đi, các hàng còn lại FLIP; hết lời mời thì khối tự ẩn. */
+  Dashboard.prototype.onRsvp = function (meta) {
+    var me = S().state.currentUserId, block = this.blocks.invites, self = this;
+    var row = meta && meta.staffId === me && meta.id ? block.querySelector('.db-inv__row[data-inv="' + meta.id + '"]') : null;
+    if (row && !this.invBusy) {
+      this.invBusy = true;
+      var all = U.qsa('.db-inv__row', block), i = all.indexOf(row), nxt = all[i + 1] || all[i - 1];
+      if (row.contains(document.activeElement) && nxt) this.invFocus = nxt.dataset.inv;
+      this.leaveRows(block, [row], '.db-inv__row', function () { self.invBusy = false; self.renderInvites(); });
+    } else this.renderInvites();
   };
 
   /* ------------------------------------------------------------- 8. KPI */
@@ -595,6 +732,81 @@
     pop.el.addEventListener('keydown', function (e) { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); pop.el.querySelector('[data-confirm]').click(); } });
   };
 
+  /* --------------------------------------------- 5b. Sắp diễn ra · cần nhắc */
+  Dashboard.prototype.attentionItems = function () {
+    var st = S(), me = st.me();
+    if (!st.needsAttention) return [];
+    return st.needsAttention(me.id, ATTENTION_HOURS).filter(function (n) { return n.canNudge || n.event.ownerId === me.id; });
+  };
+  Dashboard.prototype.renderAttention = function (opts) {
+    if (!this.alive() || this.attBusy) return;
+    opts = opts || {};
+    var st = S(), me = st.me(), block = this.blocks.attention, self = this;
+    var all = this.attentionItems(), list = all.slice(0, ATTENTION_MAX);
+    // Hàng vừa được xử lý xong (đủ RSVP / chuẩn bị xong) rời đi có chuyển động thay vì biến mất đột ngột
+    if (opts.animate && !block.hidden && !reduceMotion()) {
+      var ids = list.map(function (n) { return n.event.id; });
+      var gone = U.qsa('.db-att__row', block).filter(function (r) { return ids.indexOf(r.dataset.att) < 0; });
+      if (gone.length) { this.attBusy = true; this.leaveRows(block, gone, '.db-att__row', function () { self.attBusy = false; self.renderAttention(); }); return; }
+    }
+    if (!list.length) { block.hidden = true; block.innerHTML = ''; return; }
+    var ae = document.activeElement, focusSel = null;
+    if (ae && block.contains(ae)) focusSel = ae.dataset.nudge ? '[data-nudge="' + ae.dataset.nudge + '"]' : ae.dataset.prepToggle ? '[data-prep-toggle="' + ae.dataset.prepToggle + '"]' : ae.dataset.eventOpen ? '.db-att__row [data-event-open="' + ae.dataset.eventOpen + '"]' : ae.hasAttribute('data-nudge-all') ? '[data-nudge-all]' : null;
+    var nudgeable = all.filter(function (n) { return n.canNudge && n.reasons.some(function (r) { return r.kind === 'rsvp'; }); });
+    var totalPending = U.sum(nudgeable, function (n) { var rs = st.rsvpSummary(n.event); return rs.pending + rs.maybe; });
+    block.hidden = false;
+    U.render(block, h`
+      <div class="card__head">
+        <div><div class="card__eyebrow">${ATTENTION_HOURS} giờ tới</div><h3 class="card__title">Sắp diễn ra · cần nhắc <span class="db-count faint">· ${all.length}</span></h3></div>
+        ${nudgeable.length > 1 ? h`<button type="button" class="btn btn--sm btn--secondary db-att__all" data-nudge-all aria-label="Nhắc tất cả ${totalPending} người chưa xác nhận ở ${nudgeable.length} sự kiện">${icon('bell', 14)}<span>Nhắc tất cả</span><span class="badge tnum">${totalPending}</span></button>` : ''}
+      </div>
+      <div class="db-att__list">${list.map(function (n) { return self.attentionRow(n); })}</div>
+      ${all.length > list.length ? h`<div class="card__foot"><span>Còn ${all.length - list.length} sự kiện khác trong ${ATTENTION_HOURS} giờ tới</span><a class="link-btn" href="#/calendar?staff=${me.id}">Lịch của tôi →</a></div>` : ''}`);
+    if (focusSel) { var again = block.querySelector(focusSel); if (again) again.focus({ preventScroll: true }); }
+  };
+  Dashboard.prototype.attentionRow = function (n) {
+    var st = S(), me = st.me(), ev = n.event, tl = timeLeft(n.hoursLeft), see = st.canSee(ev, me.id);
+    var p = see && ev.projectId ? st.project(ev.projectId) : null, ps = st.prepStatus(ev), rs = st.rsvpSummary(ev), pendCount = rs.pending + rs.maybe;
+    var rsvpR = n.reasons.some(function (r) { return r.kind === 'rsvp'; }), prepR = n.reasons.some(function (r) { return r.kind === 'prep'; });
+    var myPrep = (ev.prep || []).filter(function (x) { return x.ownerId === me.id; });
+    var lastNudge = ev.nudges && ev.nudges.length ? ev.nudges[ev.nudges.length - 1] : null;
+    var title = st.displayTitle(ev, me.id), when = dmw(ev.date) + ' · ' + (ev.allDay ? 'Cả ngày' : timeRange(ev.start, ev.end));
+    return h`
+      <article class="db-att__row" data-att="${ev.id}" data-prio="${ev.priority || 2}" data-type="${ev.type}"${p ? raw(' style="--ev:' + p.color + '"') : ''} aria-label="${title}, ${when}, ${tl.text}">
+        <span class="db-att__left mono-sm tnum${tl.cls ? ' ' + tl.cls : ''}" data-left>${tl.text}</span>
+        <div class="db-att__body">
+          <div class="db-att__title"><button type="button" class="db-att__name" data-event-open="${ev.id}">${title}</button>${prioTag(ev)}${travelTag(ev)}</div>
+          <div class="db-att__meta tnum">${when}${see && ev.location ? h` · ${ev.location}` : ''}${p ? h` · <b>${p.client}</b>` : ''}</div>
+          <div class="db-att__reasons">
+            ${rsvpR ? h`<span class="db-att__reason" title="${rs.pending} chưa phản hồi${rs.maybe ? ', ' + rs.maybe + ' có thể' : ''}"><i class="rsvp-dot" data-rsvp="pending"></i>${pendCount} chưa xác nhận</span>` : ''}
+            ${prepR ? h`<span class="db-att__reason${ps.overdue ? ' is-overdue' : ''}">${icon('check-square', 12)}${ps.open}/${ps.total} việc chuẩn bị</span>` : ''}
+            ${rsvpR && rs.yes ? h`<span class="db-att__reason is-quiet"><i class="rsvp-dot" data-rsvp="yes"></i>${rs.yes} tham dự</span>` : ''}
+          </div>
+          ${myPrep.length ? h`<div class="db-att__prep prep" role="group" aria-label="Việc chuẩn bị của bạn cho ${title}">${myPrep.map(function (x) { return h`<div class="prep__item${x.done ? ' is-done' : ''}"><button type="button" class="prep__check" data-prep-toggle="${x.id}" data-prep-ev="${ev.id}" aria-pressed="${x.done ? 'true' : 'false'}" aria-label="${x.done ? 'Bỏ đánh dấu' : 'Đánh dấu xong'}: ${x.text}">${icon('check', 12)}</button><span class="prep__text">${x.text}</span><span class="prep__owner">bạn</span></div>`; })}</div>` : ''}
+        </div>
+        <div class="db-att__actions">
+          ${rsvpR && n.canNudge ? h`<button type="button" class="btn btn--sm btn--soft" data-nudge="${ev.id}" aria-label="Nhắc ${pendCount} người xác nhận: ${title}">${icon('bell', 14)}<span>Nhắc</span></button>` : ''}
+          <button type="button" class="btn btn--sm btn--ghost" data-event-open="${ev.id}" aria-label="Mở chi tiết: ${title}">${icon('external-link', 14)}<span>Mở</span></button>
+          ${lastNudge ? h`<small class="db-att__nudged faint">Đã nhắc ${U.timeAgo(lastNudge.at)}</small>` : ''}
+        </div>
+      </article>`;
+  };
+  Dashboard.prototype.doNudge = function (evId) {
+    var st = S(), me = st.state.currentUserId, ev = st.event(evId); if (!ev) return;
+    var n = st.nudge(evId, me);
+    UI.toast(n ? 'Đã nhắc ' + n + ' người xác nhận' : 'Mọi người đã xác nhận rồi', { kind: n ? 'brand' : 'info', title: n ? st.displayTitle(ev, me) : undefined, action: n ? { label: 'Mở', onClick: function () { E().eventDetail(evId); } } : undefined });
+  };
+  Dashboard.prototype.nudgeAll = function () {
+    var st = S(), me = st.state.currentUserId;
+    var items = this.attentionItems().filter(function (n) { return n.canNudge && n.reasons.some(function (r) { return r.kind === 'rsvp'; }); });
+    var total = 0, evs = 0;
+    this.nudgeBatch = true;
+    try { items.forEach(function (n) { var c = st.nudge(n.event.id, me); if (c) { total += c; evs++; } }); }
+    finally { this.nudgeBatch = false; }
+    this.renderAttention(); this.renderUpcoming(); this.renderExec();
+    UI.toast(total ? 'Đã nhắc ' + total + ' người xác nhận ở ' + evs + ' sự kiện' : 'Mọi người đã xác nhận rồi', { kind: total ? 'brand' : 'info' });
+  };
+
   /* ---------------------------------------------------------- 6. Sắp tới */
   Dashboard.prototype.renderUpcoming = function () {
     var st = S(), me = st.me(), block = this.blocks.upcoming, self = this;
@@ -604,22 +816,26 @@
       <div class="card__head"><div><div class="card__eyebrow">Lịch của bạn</div><h3 class="card__title">Sắp tới của bạn</h3></div><a class="link-btn" href="#/calendar?staff=${me.id}">Lịch của tôi →</a></div>
       ${list.length ? h`<div class="db-up__list">${Object.keys(groups).map(function (iso) {
         return h`<div class="db-up__group"><div class="db-up__day eyebrow"><span>${dayLabel(iso, self.iso)}</span><span class="db-up__dayline"></span><span class="faint">${dmw(iso)}</span></div>${groups[iso].map(function (e) {
-          var cls = [];
-          if (e.ownerId === me.id) cls.push('is-mine');
+          var cls = [], mine = e.ownerId === me.id;
+          if (mine) cls.push('is-mine');
           if (isLive(e, real, now)) cls.push('is-live');
           if (e.type === 'deadline') { var mins = (U.daysBetween(real, e.date) * 1440) + U.timeToMin(e.start) - now; if (mins <= 1440) cls.push('is-urgent'); }
-          return raw(UI.eventPill(e, { cls: cls.join(' ') }));
+          var rs = st.rsvpSummary(e), pend = rs.pending + rs.maybe, lastNudge = e.nudges && e.nudges.length ? e.nudges[e.nudges.length - 1] : null;
+          var line = mine && pend > 0 && e.attendeeIds.length > 1 && e.type !== 'focus'
+            ? h`<div class="db-up__rsvp"><i class="rsvp-dot" data-rsvp="pending"></i><span>${pend} chưa xác nhận</span>${lastNudge ? h`<span class="faint">· đã nhắc ${U.timeAgo(lastNudge.at)}</span>` : ''}<span class="faint">·</span><button type="button" class="link-btn" data-nudge="${e.id}" aria-label="Nhắc ${pend} người xác nhận: ${e.title}">Nhắc</button></div>`
+            : '';
+          return h`<div class="db-up__item">${raw(pill(e, { cls: cls.join(' ') }))}${line}</div>`;
         })}</div>`;
       })}</div>` : h`<div class="empty empty--sm"><div class="empty__icon">${icon('coffee', 22)}</div><div class="empty__title">Lịch phía trước đang trống</div><div class="empty__body">Một khoảng thở hiếm có — hoặc là lúc tạo cuộc họp brief tiếp theo.</div><button type="button" class="btn btn--soft btn--sm" data-action="event">${icon('plus', 14)}Tạo sự kiện</button></div>`}`);
   };
 
   /* ------------------------------------------------------- 7. Deadline 7d */
   Dashboard.prototype.renderDeadlines = function () {
-    var st = S(), block = this.blocks.deadlines, iso = this.iso, to = U.toISO(U.addDays(this.date, 7));
+    var st = S(), block = this.blocks.deadlines, iso = this.iso, to = U.toISO(U.addDays(this.date, 7)), me = st.me();
     var rows = [];
     st.eventsBetween(iso, to).filter(function (e) { return e.type === 'deadline'; }).forEach(function (e) {
       var p = e.projectId ? st.project(e.projectId) : null;
-      rows.push({ kind: 'event', id: e.id, title: e.title, sub: p ? p.client + ' · ' + p.name : (st.eventType(e.type).label), color: p ? p.color : 'var(--ev-deadline)', date: e.date, time: e.allDay ? '' : e.start });
+      rows.push({ kind: 'event', id: e.id, title: st.displayTitle(e, me.id), sub: p ? p.client + ' · ' + p.name : (st.eventType(e.type).label), color: p ? p.color : 'var(--ev-deadline)', date: e.date, time: e.allDay ? '' : e.start });
     });
     st.state.projects.forEach(function (p) { if (p.status !== 'done' && p.end >= iso && p.end <= to) rows.push({ kind: 'project', id: p.id, title: 'Kết thúc dự án — ' + p.name, sub: p.client + ' · ' + p.progress + '% hoàn thành', color: p.color, date: p.end, time: '' }); });
     rows = U.sortBy(rows, function (r) { return r.date + ' ' + (r.time || '23:59'); });
@@ -629,6 +845,54 @@
         var n = U.daysBetween(iso, r.date), red = n <= 0, badge = n < 0 ? 'Quá hạn' : n === 0 ? 'Hôm nay' : 'D-' + n;
         return h`<button type="button" class="db-dl__row${red ? ' is-urgent' : ''}" ${raw(r.kind === 'event' ? 'data-event-open="' + r.id + '"' : 'data-project-open="' + r.id + '"')}><i class="db-dl__dot" style="background:${r.color}"></i><span class="db-dl__txt"><b class="truncate">${r.title}</b><small class="truncate">${r.sub}</small></span><span class="db-dl__date mono tnum"><span>${dmw(r.date)}</span>${r.time ? h`<small>${r.time}</small>` : ''}</span><span class="badge${red ? ' badge--red' : ''} tnum">${badge}</span></button>`;
       })}</div>` : h`<div class="empty empty--sm"><div class="empty__icon">${icon('flag', 22)}</div><div class="empty__title">Không có deadline nào trong 7 ngày tới</div><div class="empty__body">Một tuần dễ thở. Tận dụng để đi trước một bước.</div></div>`}`);
+  };
+
+  /* --------------------------------------- 7b. Ban điều hành: sức khoẻ lịch */
+  Dashboard.prototype.renderExec = function () {
+    if (!this.alive()) return;
+    var st = S(), me = st.me(), block = this.blocks.exec;
+    if (!me || me.teamId !== 'exec' || !st.weekHealth || !st.issuesFor) { block.hidden = true; block.innerHTML = ''; return; }
+    var ceo = st.state.staff.find(function (s) { return s.teamId === 'exec' && /ceo|giám đốc điều hành/i.test(s.role); }) || me;
+    var person = me.id === ceo.id ? me : ceo, isSelf = person.id === me.id;
+    var wh = st.weekHealth(person.id, this.iso), issues = st.issuesFor(person.id, this.iso).slice(0, 2);
+    var level = wh.score >= 80 ? 'ok' : wh.score >= 60 ? 'warn' : 'bad';
+    var ring = level === 'ok' ? 'var(--ok)' : level === 'warn' ? 'var(--warn)' : 'var(--red-ink)';
+    var animate = !this.execAnimated && !reduceMotion(); this.execAnimated = true;
+    var meetH = wh.meetingMin ? U.fmtDuration(wh.meetingMin) : '0g', focusH = wh.focusMin ? U.fmtDuration(wh.focusMin) : '—';
+    var tight = wh.backToBack + wh.travelIssues;
+    var todayISO = U.todayISO();
+    block.hidden = false;
+    block.dataset.level = level;
+    U.render(block, h`
+      <div class="card__head">
+        <div><div class="card__eyebrow">Tuần ${U.isoWeek(this.date)} · ${U.fmtDate(wh.from, 'dm')} – ${U.fmtDate(wh.to, 'dm')}</div><h3 class="card__title">${isSelf ? 'Lịch của bạn tuần này' : 'Lịch của sếp tuần này'}</h3></div>
+      </div>
+      <div class="db-exec__top" style="--ring:${ring}">
+        <div class="db-exec__ring" role="img" aria-label="Điểm sức khoẻ lịch ${wh.score} trên 100 · ${wh.label}">
+          <svg viewBox="0 0 72 72" aria-hidden="true"><circle class="db-exec__track" cx="36" cy="36" r="31"/><circle class="db-exec__arc" cx="36" cy="36" r="31" pathLength="100" style="stroke-dashoffset:${animate ? 100 : 100 - wh.score}"/></svg>
+          <span class="db-exec__score mono tnum">${wh.score}</span>
+        </div>
+        <div class="db-exec__who">
+          <div class="db-exec__person">${raw(UI.avatar(person, { size: 'sm', title: false }))}<span><b>${U.shortName(person.name)}</b><small>${person.role}</small></span></div>
+          <span class="db-exec__label" data-level="${level}">${wh.label}</span>
+          <small class="db-exec__sub">${wh.meetingPct}% tuần là họp${wh.daysOver6h ? ' · ' + wh.daysOver6h + ' ngày > 6g họp' : ''}</small>
+        </div>
+      </div>
+      <div class="db-exec__stats">
+        <div class="db-exec__stat"><span class="eyebrow">Giờ họp</span><b class="mono tnum">${meetH}</b><small>${wh.external} cuộc bên ngoài</small></div>
+        <div class="db-exec__stat${wh.focusMin < 240 ? ' is-warn' : ''}"><span class="eyebrow">Tập trung</span><b class="mono tnum">${focusH}</b><small>${wh.focusMin < 240 ? 'dưới 4g / tuần' : 'khối tập trung'}</small></div>
+        <div class="db-exec__stat${wh.conflicts ? ' is-bad' : ''}"><span class="eyebrow">Xung đột</span><b class="mono tnum">${wh.conflicts}</b><small>${tight ? '+' + tight + ' sát nhau' : 'không sát nhau'}</small></div>
+      </div>
+      ${issues.length ? h`<ul class="db-exec__issues" aria-label="Vấn đề cần xử lý">${issues.map(function (it) {
+        var ev = it.events && it.events[0], past = it.date < todayISO;
+        var inner = h`<i class="db-exec__sev" aria-hidden="true"></i><span class="db-exec__txt"><span class="clamp-2">${it.text}</span><small class="mono-sm">${dmw(it.date)}${it.date === todayISO ? ' · hôm nay' : ''}</small></span>`;
+        return ev ? h`<li><button type="button" class="db-exec__issue" data-sev="${it.severity}" data-event-open="${ev.id}" aria-label="${it.severity === 3 ? 'Nghiêm trọng' : it.severity === 2 ? 'Cần chú ý' : 'Gợi ý'}: ${it.text}, ${dmw(it.date)}">${inner}</button></li>` : h`<li><div class="db-exec__issue" data-sev="${it.severity}">${inner}</div></li>`;
+      })}</ul>` : h`<p class="db-exec__clear muted">${icon('check-circle', 14)}Không có vấn đề nào trong tuần — lịch đang gọn.</p>`}
+      <a class="btn btn--soft db-exec__cta" href="#/assistant?staff=${person.id}">${icon('sliders', 15)}<span>Mở Điều phối →</span></a>`);
+    if (animate) {
+      var arc = block.querySelector('.db-exec__arc');
+      requestAnimationFrame(function () { requestAnimationFrame(function () { if (arc && arc.isConnected) { arc.classList.add('is-anim'); arc.style.strokeDashoffset = String(100 - wh.score); } }); });
+    }
   };
 
   /* --------------------------------------------------- 9. Ai đang ở đâu */
@@ -767,12 +1031,21 @@
       else if (a === 'event') Ed.event(null, { date: isWorkday(self.iso) ? self.iso : nextWorkday(self.iso) });
       else if (a === 'remind') { S().notify({ kind: 'warning', title: 'Nhắc xếp ca', body: U.shortName(S().me().name) + ' chưa được xếp ca ' + dmw(self.iso) + '.', link: '#/roster/' + self.iso }); UI.toast('Đã nhắc quản lý xếp ca cho bạn', { kind: 'success' }); }
     });
+    on('click', '[data-jump]', function (e, el) { e.preventDefault(); var b = self.blocks[el.dataset.jump]; if (!b || b.hidden) return; b.scrollIntoView({ block: 'center', behavior: reduceMotion() ? 'auto' : 'smooth' }); var r = b.querySelector('[tabindex="0"]'); if (r) r.focus({ preventScroll: true }); });
     on('click', '[data-event-open]', function (e, el) { e.preventDefault(); E().eventDetail(el.dataset.eventOpen); });
     on('click', '[data-project-open]', function (e, el) { location.hash = '#/projects/' + el.dataset.projectOpen; });
     on('click', '[data-open-staff]', function (e, el) { E().staffProfile(el.dataset.openStaff); });
     on('click', '[data-checkin]', function (e, el) { if (el.disabled) return; self.doCheckin(el); });
     on('click', '[data-approve]', function (e, el) { self.approve(el.dataset.approve, el); });
     on('click', '[data-reject]', function (e, el) { self.reject(el.dataset.reject, el); });
+    on('click', '[data-nudge]', function (e, el) { e.preventDefault(); e.stopPropagation(); self.doNudge(el.dataset.nudge); });
+    on('click', '[data-nudge-all]', function (e) { e.preventDefault(); self.nudgeAll(); });
+    on('click', '[data-prep-toggle]', function (e, el) {
+      e.preventDefault(); e.stopPropagation();
+      var item = el.closest('.prep__item'), willDone = !item.classList.contains('is-done');
+      item.classList.toggle('is-done', willDone); el.setAttribute('aria-pressed', willDone ? 'true' : 'false'); // phản hồi tức thì, store sẽ vẽ lại
+      S().togglePrep(el.dataset.prepEv, el.dataset.prepToggle);
+    });
     on('keydown', '.db-req', function (e, el) {
       if (e.target !== el || e.metaKey || e.ctrlKey || e.altKey) return;
       var k = e.key.toLowerCase();
@@ -780,6 +1053,19 @@
       else if (k === 'x') { e.preventDefault(); var x = el.querySelector('[data-reject]'); if (x) self.reject(x.dataset.reject, x); }
       else if (k === 'arrowdown' || k === 'arrowup') { e.preventDefault(); var cards = U.qsa('.db-req', self.blocks.inbox), i = cards.indexOf(el); var n = cards[i + (k === 'arrowdown' ? 1 : -1)]; if (n) n.focus(); }
       else if (k === 'enter') { var w = S().request(el.dataset.id); if (w) E().staffProfile(w.staffId); }
+    });
+    // Lời mời: ↑/↓ đi giữa các hàng, Y / M / N trả lời, Enter mở chi tiết (chặn phím tắt toàn cục 'n' = tạo sự kiện)
+    on('keydown', '.db-inv__row', function (e, row) {
+      if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+      var k = e.key.toLowerCase(), map = { y: 'yes', m: 'maybe', n: 'no' };
+      if (k === 'arrowdown' || k === 'arrowup') {
+        e.preventDefault(); e.stopPropagation();
+        var rows = U.qsa('.db-inv__row', self.blocks.invites), i = rows.indexOf(row), nx = rows[i + (k === 'arrowdown' ? 1 : -1)];
+        if (nx) nx.focus();
+      } else if (map[k]) {
+        e.preventDefault(); e.stopPropagation();
+        var btn = row.querySelector('[data-rsvp="' + map[k] + '"]'); if (btn) btn.click();
+      } else if (k === 'enter' && e.target === row) { e.preventDefault(); E().eventDetail(row.dataset.inv); }
     });
     on('click', '[data-where]', function (e, el) {
       self.whereFilter = el.dataset.where; U.saveJSON(KEYS.where, self.whereFilter);
@@ -811,35 +1097,52 @@
   /* ----------------------------------------------------------- live tick */
   Dashboard.prototype.tick = function () {
     if (!this.alive()) return;
-    var now = U.nowMinutes(), real = U.todayISO();
+    var now = U.nowMinutes(), real = U.todayISO(), st = S();
     if (real !== this.realISO) { this.readRoute({ query: {} }); this.renderAll(false); return; }
     var line = this.blocks.timeline.querySelector('.db-tl__now');
     if (line) {
       if (now < TL_START || now > TL_END) line.remove();
       else { line.style.left = ((now - TL_START) / TL_SPAN * 100) + '%'; var lbl = line.querySelector('.db-tl__nowlbl'); if (lbl) lbl.textContent = U.minToTime(now); }
     } else if (this.tlISO === real && now >= TL_START && now <= TL_END) this.renderTimeline();
-    if (this.tlISO === real) U.qsa('.db-tl__ev[data-event-open]', this.blocks.timeline).forEach(function (b) { var e = S().event(b.dataset.eventOpen); if (!e) return; b.classList.toggle('is-live', isLive(e, real, now)); b.classList.toggle('is-past', !isLive(e, real, now) && U.timeToMin(e.end) <= now); });
+    if (this.tlISO === real) U.qsa('.db-tl__ev[data-event-open]', this.blocks.timeline).forEach(function (b) { var e = st.event(b.dataset.eventOpen); if (!e) return; b.classList.toggle('is-live', isLive(e, real, now)); b.classList.toggle('is-past', !isLive(e, real, now) && U.timeToMin(e.end) <= now); });
     var ci = this.checkinState();
     if (ci && this.isReal) {
-      var info = shiftInfo(S().me().id, this.iso), txt = this.blocks.hero.querySelector('.db-live__txt'), wrap = this.blocks.hero.querySelector('.db-checkin');
+      var info = shiftInfo(st.me().id, this.iso), txt = this.blocks.hero.querySelector('.db-live__txt'), wrap = this.blocks.hero.querySelector('.db-checkin');
       if (txt) txt.innerHTML = this.liveText(info, ci);
       if (wrap && !ci.out && now >= U.timeToMin(info.end) && wrap.dataset.phase !== 'after') this.renderHero();
     }
-    U.qsa('.ev-pill[data-event]', this.blocks.upcoming).forEach(function (p) { var e = S().event(p.dataset.event); if (e) p.classList.toggle('is-live', isLive(e, real, now)); });
+    // "Tiếp theo" trên hero: đếm lùi; đổi sự kiện khi cái cũ đã kết thúc
+    var nt = this.blocks.hero.querySelector('[data-next-time]');
+    if (nt && this.isReal && !this.friday) {
+      var nx = this.nextEvent(st.me().id, this.iso);
+      if (!nx || nx.ev.id !== nt.dataset.nextTime) this.renderHero();
+      else { nt.textContent = nextTimeText(nx); nt.classList.toggle('is-soon', nx.mins != null && nx.mins < 180 && !nx.live); nt.classList.toggle('is-live', !!nx.live); }
+    }
+    U.qsa('.ev-pill[data-event]', this.blocks.upcoming).forEach(function (p) { var e = st.event(p.dataset.event); if (e) p.classList.toggle('is-live', isLive(e, real, now)); });
+    // "Cần nhắc": cập nhật chip "còn Xg"; vẽ lại khi tập sự kiện thay đổi (đã qua / mới lọt vào cửa sổ 48g)
+    if (!this.attBusy) {
+      var rows = U.qsa('.db-att__row', this.blocks.attention), ids = this.attentionItems().slice(0, ATTENTION_MAX).map(function (n) { return n.event.id; });
+      var same = rows.length === ids.length && rows.every(function (r, i) { return r.dataset.att === ids[i]; });
+      if (!same) this.renderAttention();
+      else rows.forEach(function (r) { var e = st.event(r.dataset.att); if (!e) return; var tl = timeLeft(hoursLeftOf(e)), el = r.querySelector('[data-left]'); if (el) { el.textContent = tl.text; el.className = 'db-att__left mono-sm tnum' + (tl.cls ? ' ' + tl.cls : ''); } });
+    }
   };
 
   /* -------------------------------------------------------- store events */
   Dashboard.prototype.onStore = function (meta) {
     if (!this.alive()) return;
     var t = (meta && meta.type) || '';
-    if (!/^(request|shift|event|staff|project|reset)/.test(t)) return;
+    if (!/^(request|shift|event|staff|project|reset|user)/.test(t)) return;
     if (this.inboxBusy) { this.pendingRerender = true; return; }
-    if (t === 'reset' || t.indexOf('project') === 0) { this.renderAll(false); return; }
+    if (t === 'reset' || t === 'user' || t.indexOf('project') === 0) { this.renderAll(false); return; }
     this.renderHead();
+    if (t === 'event:rsvp') { this.onRsvp(meta); this.renderHero(); this.renderTimeline(); this.renderUpcoming(); this.renderAttention({ animate: true }); this.renderExec(); return; }
+    if (t === 'event:nudge') { if (!this.nudgeBatch) { this.renderAttention(); this.renderUpcoming(); this.renderExec(); } return; }
+    if (t === 'event:prep') { this.renderAttention({ animate: true }); this.renderExec(); return; }
     if (t.indexOf('request') === 0) { this.renderInbox(); this.renderKpis(false); if (t === 'request:status') { this.renderWhere(); this.renderPulse(); this.renderHero(); } return; }
-    if (t.indexOf('shift') === 0) { this.renderHero(); this.renderQuick(); this.renderKpis(false); this.renderWhere(); this.renderPulse(); return; }
-    if (t.indexOf('event') === 0) { this.renderHero(); this.renderTimeline(); this.renderUpcoming(); this.renderDeadlines(); this.renderKpis(false); this.renderPulse(); this.renderFun(); return; }
-    if (t.indexOf('staff') === 0) { this.renderHero(); this.renderWhere(); this.renderFun(); }
+    if (t.indexOf('shift') === 0) { this.renderHero(); this.renderQuick(); this.renderKpis(false); this.renderWhere(); this.renderPulse(); this.renderExec(); return; }
+    if (t.indexOf('event') === 0) { this.renderHero(); this.renderTimeline(); this.renderInvites(); this.renderUpcoming(); this.renderDeadlines(); this.renderKpis(false); this.renderAttention(); this.renderExec(); this.renderPulse(); this.renderFun(); return; }
+    if (t.indexOf('staff') === 0) { this.renderHero(); this.renderWhere(); this.renderFun(); this.renderExec(); }
   };
 
   /* --------------------------------------------------------- lifecycle */
@@ -850,13 +1153,16 @@
   };
   Dashboard.prototype.destroy = function () {
     this.destroyed = true;
-    if (this.unsub) this.unsub();
-    this.unregisterKeys.forEach(function (f) { f && f(); });
+    if (this.unsub) { this.unsub(); this.unsub = null; }
+    (this.unregisterKeys || []).forEach(function (f) { f && f(); });
+    this.unregisterKeys = [];
     this.unbinders.forEach(function (f) { f && f(); });
+    this.unbinders.length = 0;
     this.timers.forEach(function (t) { clearInterval(t); clearTimeout(t); });
-    if (this.pulseIO) { this.pulseIO.disconnect(); this.pulseIO = null; }
     this.timers.length = 0;
+    if (this.pulseIO) { this.pulseIO.disconnect(); this.pulseIO = null; }
     document.removeEventListener('visibilitychange', this.onVis);
+    this.invBusy = this.attBusy = this.inboxBusy = false;
   };
 
   Z15.views.dashboard = {

@@ -180,14 +180,17 @@
   UI.eventPill = function (ev, opts) {
     opts = opts || {};
     var S = Z15.store, type = S.eventType(ev.type), project = ev.projectId ? S.project(ev.projectId) : null;
+    var me = S.state ? S.state.currentUserId : null, see = S.canSee ? S.canSee(ev, me) : true;
+    var title = see ? ev.title : (S.displayTitle ? S.displayTitle(ev, me) : 'Bận');
     var time = ev.allDay ? 'Cả ngày' : U.fmtTimeRange(ev.start, ev.end);
-    var meta = [time, ev.location].filter(Boolean).join(' · ');
-    var attendees = (ev.attendeeIds || []).map(S.staff).filter(Boolean);
-    var style = project && opts.projectColor !== false ? ' style="--ev:' + project.color + '"' : '';
-    return '<div class="ev-pill' + (opts.compact ? ' ev-pill--compact' : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-type="' + ev.type + '" data-event="' + ev.id + '"' + style + ' tabindex="0" role="button" aria-label="' + U.escapeHtml(ev.title + ', ' + meta) + '">' +
+    var meta = see ? [time, ev.location].filter(Boolean).join(' · ') : time;
+    var attendees = see ? (ev.attendeeIds || []).map(S.staff).filter(Boolean) : [];
+    var style = see && project && opts.projectColor !== false ? ' style="--ev:' + project.color + '"' : '';
+    var prio = ev.priority || 2;
+    return '<div class="ev-pill' + (opts.compact ? ' ev-pill--compact' : '') + (see ? '' : ' is-private') + (opts.cls ? ' ' + opts.cls : '') + '" data-type="' + ev.type + '" data-event="' + ev.id + '" data-prio="' + prio + '"' + style + ' tabindex="' + (opts.tabindex == null ? 0 : opts.tabindex) + '" role="button" aria-label="' + U.escapeHtml(title + ', ' + meta + (prio === 1 ? ', ưu tiên P1' : '')) + '">' +
       '<span class="ev-pill__bar"></span>' +
-      '<span class="ev-pill__main"><span class="ev-pill__title">' + U.escapeHtml(ev.title) + '</span>' +
-      (opts.compact ? '' : '<span class="ev-pill__meta">' + U.escapeHtml(meta) + (project ? ' · <b>' + U.escapeHtml(project.client) + '</b>' : '') + '</span>') + '</span>' +
+      '<span class="ev-pill__main"><span class="ev-pill__title">' + (see ? '' : UI.icon('shield', 11) + ' ') + U.escapeHtml(title) + '</span>' +
+      (opts.compact ? '' : '<span class="ev-pill__meta">' + U.escapeHtml(meta) + (see && project ? ' · <b>' + U.escapeHtml(project.client) + '</b>' : '') + (see && ev.travelMinutes && !opts.compact ? ' · ~' + ev.travelMinutes + "' di chuyển" : '') + '</span>') + '</span>' +
       (opts.compact || !attendees.length ? '' : '<span class="ev-pill__people">' + UI.avatarStack(attendees, { max: 3, size: 'xs' }) + '</span>') +
       '</div>';
   };

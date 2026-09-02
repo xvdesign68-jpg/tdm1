@@ -16,7 +16,7 @@
   --bg-scrim: rgba(17, 20, 28, 0.32);
   --fg-primary: #11141C;
   --fg-secondary: #545866;
-  --fg-tertiary: #8A8E9A;
+  --fg-tertiary: #6B6F7C;
   --fg-disabled: #B8BBC4;
   --fg-on-brand: #FFFFFF;
   --border-hair: rgba(17, 20, 28, 0.08);
@@ -58,17 +58,17 @@
 
   /* ---- semantic ---- */
   --ok: #1F7A4D;      --ok-soft: #E8F3EC;
-  --warn: #A66B00;    --warn-soft: #FBF3E0;
+  --warn: #8A5A00;    --warn-soft: #FBF3E0;
   --danger: var(--red-700); --danger-soft: var(--red-50);
   --info: var(--blue-700);  --info-soft: var(--blue-50);
 
   /* ---- shift types (ink / soft) ---- */
-  --shift-morning-ink: #9A6700;   --shift-morning-soft: #FBF3DC;
+  --shift-morning-ink: #8A5C00;   --shift-morning-soft: #FBF3DC;
   --shift-afternoon-ink: #0E6E8C; --shift-afternoon-soft: #E0F1F7;
   --shift-full-ink: #3F4A7A;      --shift-full-soft: #E9EBF6;
   --shift-remote-ink: #5E6B7D;    --shift-remote-soft: #EEF1F5;
   --shift-onsite-ink: #7A3E9D;    --shift-onsite-soft: #F1E8F8;
-  --shift-leave-ink: #8A8E9A;     --shift-leave-soft: transparent;
+  --shift-leave-ink: #6B6F7C;     --shift-leave-soft: transparent;
   --shift-ot-ink: #8C4A0B;        --shift-ot-soft: #FBEBD9;
   --shift-off-ink: #B8BBC4;       --shift-off-soft: transparent;
   --hatch-ink: rgba(17, 20, 28, 0.06);
@@ -159,13 +159,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg-canvas: #0E1015; --bg-surface: #14171E; --bg-sunken: #0B0D12; --bg-hover: #1A1E27; --bg-pressed: #20242F; --bg-selected: #172040; --bg-scrim: rgba(0, 0, 0, 0.55);
-    --fg-primary: #ECEDF1; --fg-secondary: #A2A6B3; --fg-tertiary: #6E7280; --fg-disabled: #454955;
+    --fg-primary: #ECEDF1; --fg-secondary: #A2A6B3; --fg-tertiary: #858998; --fg-disabled: #454955;
     --border-hair: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.14);
-    --blue-100: #22306A; --blue-50: #172040; --blue-ring: rgba(91, 125, 255, 0.35);
-    --brand-blue: var(--blue-500); --action: var(--blue-500); --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
+    --blue-100: #22306A; --blue-50: #172040; --blue-200: #2E3F80; --blue-ring: rgba(91, 125, 255, 0.35);
+    --brand-blue: var(--blue-500); --action: #6F8DFF; --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
     --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300); --badge-red: var(--red-600);
     --ok: #4CC38A; --ok-soft: #10261B; --warn: #E5A83B; --warn-soft: #2A2110; --danger: var(--red-300); --info: var(--blue-500);
-    --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #6E7280; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
+    --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #858998; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
     --ev-meeting: #A3ADD9; --ev-shoot: #C39BE0; --ev-deadline: #E5A83B; --ev-pitch: #DC7FA8; --ev-review: #5BBFDD; --ev-task: #A5B0C0; --ev-training: #4FC3B6; --ev-event: #E3B54A;
     --heat-1: #1F2431; --heat-2: #2C3346; --heat-3: #46506C; --heat-4: #7A86AA;
     --grad-miracle: linear-gradient(135deg, #5B7DFF 0%, #8A73E8 55%, #FF5C61 100%); --grad-opacity: .85;
@@ -177,13 +177,13 @@
 }
 :root[data-theme="dark"] {
   --bg-canvas: #0E1015; --bg-surface: #14171E; --bg-sunken: #0B0D12; --bg-hover: #1A1E27; --bg-pressed: #20242F; --bg-selected: #172040; --bg-scrim: rgba(0, 0, 0, 0.55);
-  --fg-primary: #ECEDF1; --fg-secondary: #A2A6B3; --fg-tertiary: #6E7280; --fg-disabled: #454955;
+  --fg-primary: #ECEDF1; --fg-secondary: #A2A6B3; --fg-tertiary: #858998; --fg-disabled: #454955;
   --border-hair: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.14);
-  --blue-100: #22306A; --blue-50: #172040; --blue-ring: rgba(91, 125, 255, 0.35);
-  --brand-blue: var(--blue-500); --action: var(--blue-500); --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
+  --blue-100: #22306A; --blue-50: #172040; --blue-200: #2E3F80; --blue-ring: rgba(91, 125, 255, 0.35);
+  --brand-blue: var(--blue-500); --action: #6F8DFF; --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
   --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300); --badge-red: var(--red-600);
   --ok: #4CC38A; --ok-soft: #10261B; --warn: #E5A83B; --warn-soft: #2A2110; --danger: var(--red-300); --info: var(--blue-500);
-  --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #6E7280; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
+  --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #858998; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
   --ev-meeting: #A3ADD9; --ev-shoot: #C39BE0; --ev-deadline: #E5A83B; --ev-pitch: #DC7FA8; --ev-review: #5BBFDD; --ev-task: #A5B0C0; --ev-training: #4FC3B6; --ev-event: #E3B54A;
   --heat-1: #1F2431; --heat-2: #2C3346; --heat-3: #46506C; --heat-4: #7A86AA;
   --grad-miracle: linear-gradient(135deg, #5B7DFF 0%, #8A73E8 55%, #FF5C61 100%); --grad-opacity: .85;

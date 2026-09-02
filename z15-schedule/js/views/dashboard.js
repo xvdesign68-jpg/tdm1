@@ -531,15 +531,16 @@
   };
   /** Ảnh chụp ca liên quan để "Hoàn tác" khôi phục đúng. */
   Dashboard.prototype.snapshotShifts = function (r) {
-    var st = S(), out = {};
-    for (var d = U.fromISO(r.from); U.toISO(d) <= r.to; d = U.addDays(d, 1)) { var iso = U.toISO(d); out[iso] = (st.state.shifts[r.staffId] || {})[iso]; }
+    var st = S(), out = {}, ids = [r.staffId].concat(r.swapWithId ? [r.swapWithId] : []);
+    ids.forEach(function (sid) { out[sid] = {}; for (var d = U.fromISO(r.from); U.toISO(d) <= r.to; d = U.addDays(d, 1)) { var iso = U.toISO(d); out[sid][iso] = (st.state.shifts[sid] || {})[iso]; } });
     return out;
   };
   Dashboard.prototype.undoRequest = function (id, snap) {
     S().update(function (s) {
       var r = s.requests.find(function (x) { return x.id === id; }); if (!r) return;
       r.status = 'pending'; delete r.approverId; delete r.decidedAt; delete r.note;
-      if (snap) { var m = s.shifts[r.staffId] = s.shifts[r.staffId] || {}; Object.keys(snap).forEach(function (iso) { if (snap[iso] == null) delete m[iso]; else m[iso] = snap[iso]; }); }
+      if (snap) Object.keys(snap).forEach(function (sid) { var m = s.shifts[sid] = s.shifts[sid] || {}; Object.keys(snap[sid]).forEach(function (iso) { if (snap[sid][iso] == null) delete m[iso]; else m[iso] = snap[sid][iso]; }); });
+      s.notifications = s.notifications.filter(function (n) { return n.requestId !== id; });
     }, { type: 'request:status', id: id, status: 'pending' });
     UI.toast('Đã hoàn tác — yêu cầu quay về trạng thái chờ', { kind: 'info' });
   };
@@ -562,7 +563,6 @@
     var self = this, card = btn.closest('.db-req'), who = st.staff(r.staffId), snap = this.snapshotShifts(r);
     this.inboxBusy = true;
     st.setRequestStatus(id, 'approved');
-    st.notify({ kind: 'success', title: 'Đã duyệt: ' + E().requestType(r.type).label + ' của ' + U.shortName(who.name), body: U.fmtRange(r.from, r.to) + ' · ' + r.reason, link: '#/requests' });
     UI.toast('Đã duyệt ' + E().requestType(r.type).label.toLowerCase() + ' của ' + U.shortName(who.name), { kind: 'success', action: { label: 'Hoàn tác', onClick: function () { self.undoRequest(id, snap); } } });
     if (reduceMotion()) { this.inboxBusy = false; this.renderInbox(); return; }
     var stamp = btn.closest('.db-stamp'), actions = card.querySelector('.db-req__actions');

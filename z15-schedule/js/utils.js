@@ -23,6 +23,7 @@
     var p = String(iso).slice(0, 10).split('-').map(Number);
     return new Date(p[0], p[1] - 1, p[2]);
   };
+  U.validISO = function (s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || '') && U.toISO(U.fromISO(s)) === s; };
   U.today = function () { var d = new Date(); d.setHours(0, 0, 0, 0); return d; };
   U.todayISO = function () { return U.toISO(U.today()); };
   U.addDays = function (d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; };

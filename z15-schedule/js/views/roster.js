@@ -23,7 +23,7 @@
   /* ------------------------------------------------------------ helpers */
   var esc = U.escapeHtml;
   function reduce() { return U.prefersReducedMotion() || document.body.classList.contains('reduce-motion'); }
-  function validISO(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(U.fromISO(s).getTime()); }
+  function validISO(s) { return U.validISO(s); }
   function isTyping(e) { var t = e.target; return !!(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)); }
   function hasLayer() { return !!document.querySelector('.modal-overlay, .drawer-overlay, .palette-overlay, .popover'); }
   function hoursLabel(h) { var r = Math.round(h * 10) / 10; return (r % 1 ? r.toFixed(1).replace('.', ',') : String(r)) + 'g'; }
@@ -556,7 +556,7 @@
     U.qsa('[data-loc]', bar).forEach(function (b) { var on = b.dataset.loc === V.loc; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     var inp = bar.querySelector('.ro-search__in'); if (inp.value !== V.q && document.activeElement !== inp) inp.value = V.q;
     bar.querySelector('.ro-today').classList.toggle('is-current', cx.days.some(function (d) { return d.today; }));
-    if (V.seg) { U.qsa('.segmented__btn', V.seg).forEach(function (b) { var on = b.dataset.value === String(V.range); b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); }); V.seg.refresh(); }
+    if (V.seg) { if (V.seg.setValue) V.seg.setValue(String(V.range)); else { U.qsa('.segmented__btn', V.seg).forEach(function (b) { var on = b.dataset.value === String(V.range); b.classList.toggle('is-active', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); }); V.seg.refresh(); } }
     var ps = publishState(cx), stEl = bar.querySelector('.ro-status');
     stEl.hidden = false; stEl.className = 'ro-status chip chip--' + ps.tone; stEl.innerHTML = (ps.icon ? UI.icon(ps.icon, 12) : '') + '<span>' + esc(ps.label) + '</span>';
     var pub = bar.querySelector('.ro-publish'); pub.classList.toggle('btn--soft', ps.state !== 'published'); pub.classList.toggle('btn--secondary', ps.state === 'published');

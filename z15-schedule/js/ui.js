@@ -210,7 +210,9 @@
     t.querySelector('.toast__close').addEventListener('click', close);
     if (opts.action) t.querySelector('.toast__action').addEventListener('click', function () { opts.action.onClick(); close(); });
     t.addEventListener('mouseenter', function () { clearTimeout(timer); t.classList.add('is-paused'); });
-    t.addEventListener('mouseleave', function () { t.classList.remove('is-paused'); timer = setTimeout(close, 1500); });
+    t.addEventListener('mouseleave', function () { if (t.contains(document.activeElement)) return; t.classList.remove('is-paused'); timer = setTimeout(close, 1500); });
+    t.addEventListener('focusin', function () { clearTimeout(timer); t.classList.add('is-paused'); });
+    t.addEventListener('focusout', function (e) { if (t.contains(e.relatedTarget)) return; t.classList.remove('is-paused'); timer = setTimeout(close, 1500); });
     requestAnimationFrame(function () { t.classList.add('is-in'); });
     timer = setTimeout(close, dur);
     while (root.children.length > 4) root.firstChild.remove();
@@ -225,6 +227,8 @@
   function pushLayer(l) { layerStack.push(l); document.body.classList.toggle('has-layer', layerStack.some(function (x) { return x.lock; })); }
   function popLayer(l) { layerStack = layerStack.filter(function (x) { return x !== l; }); document.body.classList.toggle('has-layer', layerStack.some(function (x) { return x.lock; })); }
   UI.closeTopLayer = function () { if (layerStack.length) layerStack[layerStack.length - 1].close(); };
+  // Đổi trang: đóng popover/menu (lớp không khoá) để không bị 'mồ côi'
+  window.addEventListener('hashchange', function () { layerStack.filter(function (l) { return !l.lock; }).forEach(function (l) { l.close(); }); });
   UI.closeAllLayers = function () { layerStack.slice().reverse().forEach(function (l) { l.close(); }); };
 
   /* ---------------------------------------------------------------- modal */
@@ -255,6 +259,8 @@
     U.append(dlg, [head, body, foot]);
     overlay.appendChild(dlg);
     document.body.appendChild(overlay);
+    var openedAt = Date.now(); // nuốt click 'thừa' của double-click mở hộp thoại
+    dlg.addEventListener('click', function (e) { if (Date.now() - openedAt < 250) { e.stopPropagation(); e.preventDefault(); } }, true);
     var release = U.focusTrap(dlg);
     var closed = false;
     var api = {
@@ -269,7 +275,7 @@
     var layer = { close: function () { api.close(); }, lock: true };
     pushLayer(layer);
     if (opts.dismissible !== false) overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) api.close(); });
-    requestAnimationFrame(function () { requestAnimationFrame(function () { overlay.classList.add('is-open'); var f = dlg.querySelector('[autofocus], input, select, textarea, button.btn--primary, .modal__foot button, button'); (f || dlg).focus({ preventScroll: true }); }); });
+    requestAnimationFrame(function () { requestAnimationFrame(function () { overlay.classList.add('is-open'); var order = [opts.initialFocus, '[autofocus]', '.modal__body input:not([type=hidden]), .modal__body select, .modal__body textarea', '.modal__foot .btn--primary', '.modal__foot .btn', 'button:not(.modal__close)'], f = null; for (var i = 0; i < order.length && !f; i++) if (order[i]) f = dlg.querySelector(order[i]); (f || dlg).focus({ preventScroll: true }); }); });
     return api;
   };
   UI.confirm = function (opts) {
@@ -277,7 +283,7 @@
     return new Promise(function (resolve) {
       var done = false;
       UI.modal({
-        size: 'sm', title: opts.title || 'Xác nhận', content: '<p class="modal__text">' + U.escapeHtml(opts.message || 'Bạn có chắc không?') + '</p>',
+        size: 'sm', title: opts.title || 'Xác nhận', initialFocus: opts.danger ? '.modal__foot .btn--ghost' : null, content: '<p class="modal__text">' + U.escapeHtml(opts.message || 'Bạn có chắc không?') + '</p>',
         actions: [{ label: opts.cancelLabel || 'Huỷ', kind: 'ghost' }, { label: opts.confirmLabel || 'Đồng ý', kind: opts.danger ? 'danger' : 'primary', icon: opts.icon, onClick: function () { done = true; resolve(true); } }],
         onClose: function () { if (!done) resolve(false); }
       });
@@ -295,6 +301,8 @@
     if (opts.content instanceof Node) body.appendChild(opts.content); else U.render(body, opts.content || '');
     U.append(panel, [head, body]);
     overlay.appendChild(panel); document.body.appendChild(overlay);
+    var openedAt = Date.now();
+    panel.addEventListener('click', function (e) { if (Date.now() - openedAt < 250) { e.stopPropagation(); e.preventDefault(); } }, true);
     var release = U.focusTrap(panel), closed = false;
     var api = {
       el: panel, body: body, overlay: overlay,
@@ -327,7 +335,7 @@
     opts = opts || {};
     if (anchor.__pop) { var prev = anchor.__pop; prev.close(); return prev; } // bấm lại anchor = đóng
     var prevFocus = document.activeElement;
-    var node = U.el('div', { class: 'popover' + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', tabindex: '-1' });
+    var node = U.el('div', { class: 'popover' + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', tabindex: '-1', 'aria-label': opts.ariaLabel || anchor.getAttribute('aria-label') || anchor.getAttribute('data-tip') || (anchor.textContent || '').trim().slice(0, 60) || 'Bảng chọn' });
     if (opts.width) node.style.width = typeof opts.width === 'number' ? opts.width + 'px' : opts.width;
     if (content instanceof Node) node.appendChild(content); else U.render(node, content || '');
     document.body.appendChild(node);
@@ -356,12 +364,13 @@
   /** menu(anchor, [{label, icon, onClick, danger, disabled, divider, hint, checked}], {placement}) */
   UI.menu = function (anchor, items, opts) {
     opts = opts || {};
-    var html = '<div class="menu" role="menu">' + items.map(function (it, i) {
+    var mlabel = opts.ariaLabel || anchor.getAttribute('aria-label') || (anchor.textContent || '').trim().slice(0, 60) || 'Menu';
+    var html = '<div class="menu" role="menu" aria-label="' + U.escapeHtml(mlabel) + '">' + items.map(function (it, i) {
       if (it.divider) return '<div class="menu__divider" role="separator"></div>';
       if (it.heading) return '<div class="menu__heading">' + U.escapeHtml(it.heading) + '</div>';
       return '<button class="menu__item' + (it.danger ? ' is-danger' : '') + (it.checked ? ' is-checked' : '') + '" role="menuitem" data-i="' + i + '"' + (it.disabled ? ' disabled' : '') + '>' + (it.icon ? UI.icon(it.icon, 16) : '<span class="menu__spacer"></span>') + '<span class="menu__label">' + U.escapeHtml(it.label) + '</span>' + (it.hint ? '<span class="menu__hint">' + U.escapeHtml(it.hint) + '</span>' : '') + (it.checked ? UI.icon('check', 14) : '') + '</button>';
     }).join('') + '</div>';
-    var pop = UI.popover(anchor, html, { placement: opts.placement || 'bottom-end', cls: 'popover--menu' });
+    var pop = UI.popover(anchor, html, { placement: opts.placement || 'bottom-end', cls: 'popover--menu', ariaLabel: mlabel });
     pop.el.addEventListener('click', function (e) { var b = e.target.closest('.menu__item'); if (!b) return; var it = items[+b.dataset.i]; pop.close(); if (it && it.onClick) it.onClick(); });
     pop.el.addEventListener('keydown', function (e) {
       var btns = U.qsa('.menu__item:not([disabled])', pop.el), i = btns.indexOf(document.activeElement);
@@ -375,6 +384,7 @@
   (function () {
     var tip, timer, current;
     function show(target) {
+      if (!target.isConnected) return;
       var text = target.getAttribute('data-tip'); if (!text) return;
       if (!tip) { tip = U.el('div', { class: 'tooltip', role: 'tooltip' }); document.body.appendChild(tip); }
       tip.textContent = text; current = target;
@@ -384,7 +394,7 @@
     function hide() { clearTimeout(timer); if (tip) tip.classList.remove('is-open'); current = null; }
     document.addEventListener('mouseover', function (e) {
       var t = e.target.closest && e.target.closest('[data-tip]'); if (!t || t === current) return;
-      clearTimeout(timer); timer = setTimeout(function () { show(t); }, 350);
+      clearTimeout(timer); timer = setTimeout(function () { if (t.isConnected) show(t); else hide(); }, 350);
     });
     document.addEventListener('mouseout', function (e) { var t = e.target.closest && e.target.closest('[data-tip]'); if (t && (!e.relatedTarget || !t.contains(e.relatedTarget))) hide(); });
     document.addEventListener('focusin', function (e) { var t = e.target.closest && e.target.closest('[data-tip]'); if (t) show(t); });
@@ -411,8 +421,9 @@
       if (s) { e.preventDefault(); s.fn(e); }
       return;
     }
-    if (isTyping(e) || layerStack.some(function (l) { return l.lock; })) return;
+    if (isTyping(e) || layerStack.length) return;
     if (e.altKey) return;
+    if (Z15.store && Z15.store.state && Z15.store.state.settings && Z15.store.state.settings.keyShortcuts === false) return;
     var single = e.key === '?' ? '?' : ((e.shiftKey && e.key.length === 1) ? 'shift+' : '') + key;
     clearTimeout(seqTimer);
     if (seq) {
@@ -547,8 +558,9 @@
       var btns = U.qsa('.segmented__btn', wrap), i = btns.indexOf(document.activeElement); if (i < 0) return;
       e.preventDefault(); var n = btns[(i + (e.key === 'ArrowRight' ? 1 : btns.length - 1)) % btns.length]; n.focus(); n.click();
     });
-    function moveInd() { var a = wrap.querySelector('.segmented__btn.is-active'); if (!a) return; ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + (a.offsetLeft) + 'px)'; }
+    function moveInd() { var a = wrap.querySelector('.segmented__btn.is-active'); U.qsa('.segmented__btn', wrap).forEach(function (x) { x.setAttribute('aria-checked', x === a ? 'true' : 'false'); }); if (!a) return; ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + (a.offsetLeft) + 'px)'; }
     wrap.refresh = moveInd;
+    wrap.setValue = function (v) { U.qsa('.segmented__btn', wrap).forEach(function (x) { x.classList.toggle('is-active', x.dataset.value === String(v)); }); moveInd(); };
     requestAnimationFrame(moveInd); setTimeout(moveInd, 60);
     return wrap;
   };

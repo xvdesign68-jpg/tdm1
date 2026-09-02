@@ -87,7 +87,7 @@
 .ro-dh.is-holiday .ro-dh__wd { color: var(--red-ink); }
 .ro-cov { display: block; width: 100%; height: 4px; margin-top: auto; border-radius: var(--r-full); background: var(--bg-sunken); overflow: hidden; }
 .ro-dh.is-weekend .ro-cov, .ro-dh.is-today .ro-cov { background: color-mix(in srgb, var(--fg-primary) 8%, transparent); }
-.ro-cov__bar { display: block; height: 100%; width: 100%; border-radius: inherit; background: var(--fg-secondary); transform-origin: left center; transform: scaleX(0); transition: transform 600ms var(--ease-out); }
+.ro-cov__bar { display: block; height: 100%; width: 100%; border-radius: inherit; background: var(--fg-secondary); transform-origin: left center; transform: scaleX(0); transition: transform var(--dur-reveal) var(--ease-out); }
 .ro-dh.is-low .ro-cov__bar { background: var(--warn); }
 .ro-cov__n { color: var(--fg-tertiary); font-size: 10.5px; margin-top: 2px; }
 .ro-dh.is-low .ro-cov__n { color: var(--warn); font-weight: 600; }

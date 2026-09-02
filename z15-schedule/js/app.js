@@ -38,12 +38,13 @@
   };
 
   var els = {};
-  var currentView = null, currentName = null, transitioning = false;
+  var currentView = null, currentName = null, transitioning = false, pendingSwap = null;
 
   function mountView(route, opts) {
     opts = opts || {};
     var name = route.view, def = Z15.views[name];
     var container = els.view;
+    if (pendingSwap) { clearTimeout(pendingSwap); pendingSwap = null; container.classList.remove('is-leaving'); transitioning = false; }
     var sameView = currentName === name && currentView && typeof currentView.update === 'function';
     R.current = route;
     setActiveNav(name);
@@ -65,12 +66,13 @@
     }
     if (currentName && !reduce && !opts.immediate) {
       transitioning = true; container.classList.add('is-leaving');
-      setTimeout(swap, 130);
+      pendingSwap = setTimeout(function () { pendingSwap = null; swap(); }, 130);
     } else swap();
   }
 
   var lastHash = null;
   function onRoute() {
+    if (location.hash && location.hash.indexOf('#/') !== 0) return; // neo trong trang (vd. #view) không đổi màn hình
     var route = R.parse();
     // Bỏ qua hashchange "rỗng" (vd. location.replace lúc boot) nhưng vẫn cho phép bấm lại menu để về mặc định của view
     var same = location.hash === lastHash && R.current && R.current.path === route.path && JSON.stringify(R.current.query) === JSON.stringify(route.query);
@@ -151,8 +153,8 @@
   function openNotifications() {
     var list = S.state.notifications;
     var html = '<div class="notif"><div class="notif__head"><b>Thông báo</b>' + (S.unreadCount() ? '<button class="link-btn" data-all>Đánh dấu đã đọc tất cả</button>' : '') + '</div><div class="notif__list">' +
-      (list.length ? list.slice(0, 12).map(function (n) { return '<button class="notif__item' + (n.read ? '' : ' is-unread') + '" data-id="' + n.id + '" data-kind="' + n.kind + '"><span class="notif__icon">' + UI.icon(KIND_ICON[n.kind] || 'info', 16) + '</span><span class="notif__txt"><b>' + U.escapeHtml(n.title) + '</b><small>' + U.escapeHtml(n.body) + '</small><time>' + U.timeAgo(n.time) + '</time></span><i class="notif__dot"></i></button>'; }).join('') : UI.empty({ icon: 'bell', title: 'Không có thông báo' })) + '</div></div>';
-    var pop = UI.popover(els.bell, html, { placement: 'bottom-end', cls: 'popover--notif', width: 380 });
+      (list.length ? list.slice(0, 12).map(function (n) { return '<button class="notif__item' + (n.read ? '' : ' is-unread') + '" data-id="' + n.id + '" data-kind="' + n.kind + '"><span class="notif__icon">' + UI.icon(KIND_ICON[n.kind] || 'info', 16) + '</span><span class="notif__txt">' + (n.read ? '' : '<span class="sr-only">Chưa đọc · </span>') + '<b>' + U.escapeHtml(n.title) + '</b><small>' + U.escapeHtml(n.body) + '</small><time datetime="' + U.escapeHtml(n.time) + '">' + U.timeAgo(n.time) + '</time></span><i class="notif__dot"></i></button>'; }).join('') : UI.empty({ icon: 'bell', title: 'Không có thông báo' })) + '</div></div>';
+    var pop = UI.popover(els.bell, html, { placement: 'bottom-end', cls: 'popover--notif', width: 380, ariaLabel: 'Thông báo' });
     pop.el.addEventListener('click', function (e) {
       if (e.target.closest('[data-all]')) { S.markAllRead(); pop.close(); UI.toast('Đã đánh dấu tất cả là đã đọc', { kind: 'success' }); return; }
       var it = e.target.closest('.notif__item'); if (!it) return;
@@ -169,6 +171,7 @@
     content.innerHTML = '<div class="settings__row"><div><b>Giao diện</b><small>Sáng, tối hoặc theo hệ thống</small></div><div class="slot-theme"></div></div>' +
       '<div class="settings__row"><div><b>Mật độ hiển thị</b><small>Thoải mái hay gọn gàng</small></div><div class="slot-density"></div></div>' +
       '<div class="settings__row"><div><b>Giảm chuyển động</b><small>Tắt animation trang trí</small></div><label class="switch"><input type="checkbox" class="rm" aria-label="Giảm chuyển động"' + (s.reduceMotion ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
+      '<div class="settings__row"><div><b>Phím tắt một ký tự</b><small>n, t, j/k, 1/2/3, e/x… (Ctrl+K và Esc luôn hoạt động)</small></div><label class="switch"><input type="checkbox" class="ks" aria-label="Phím tắt một ký tự"' + (s.keyShortcuts === false ? '' : ' checked') + '><span class="switch__track"></span></label></div>' +
       '<div class="settings__row"><div><b>Hiển thị cuối tuần</b><small>Trong lịch tuần & bảng ca</small></div><label class="switch"><input type="checkbox" class="wk" aria-label="Hiển thị cuối tuần"' + (s.showWeekend !== false ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
       '<div class="settings__row settings__row--danger"><div><b>Dữ liệu mẫu</b><small>Đặt lại toàn bộ dữ liệu về trạng thái ban đầu</small></div><button class="btn btn--ghost-danger btn--sm reset">' + UI.icon('refresh', 15) + 'Đặt lại</button></div>' +
       '<div class="settings__foot muted">Dữ liệu được lưu cục bộ trên trình duyệt này (localStorage). Phiên bản 1.0 · Z15 Miracle Việt Nam</div>';
@@ -176,6 +179,7 @@
     content.querySelector('.slot-density').appendChild(UI.segmented([{ value: 'comfortable', label: 'Thoải mái' }, { value: 'compact', label: 'Gọn' }], s.density || 'comfortable', function (v) { S.setSetting('density', v); applyTheme(); }, { label: 'Mật độ hiển thị' }));
     content.querySelector('.rm').addEventListener('change', function (e) { S.setSetting('reduceMotion', e.target.checked); applyTheme(); });
     content.querySelector('.wk').addEventListener('change', function (e) { S.setSetting('showWeekend', e.target.checked); });
+    content.querySelector('.ks').addEventListener('change', function (e) { S.setSetting('keyShortcuts', e.target.checked); });
     content.querySelector('.reset').addEventListener('click', function () {
       UI.confirm({ title: 'Đặt lại dữ liệu mẫu?', message: 'Mọi thay đổi bạn đã tạo (sự kiện, ca, yêu cầu…) sẽ bị xoá và thay bằng dữ liệu mẫu mới.', confirmLabel: 'Đặt lại', danger: true, icon: 'refresh' }).then(function (ok) {
         if (!ok) return; S.reset(); UI.closeAllLayers(); applyTheme(); mountView(R.parse(), { immediate: true }); updateBadges(); UI.toast('Đã đặt lại dữ liệu mẫu', { kind: 'brand' });
@@ -251,6 +255,7 @@
     if (navigator.platform.indexOf('Mac') < 0) { var kb = els.search.querySelector('.search-btn__kbd'); if (kb) kb.innerHTML = UI.kbd('Ctrl K'); }
     registerCommands();
 
+    var skip = U.qs('.skip-link'); if (skip) skip.addEventListener('click', function (e) { e.preventDefault(); els.view.focus({ preventScroll: false }); els.view.scrollIntoView(); });
     els.collapse.addEventListener('click', function () { setCollapsed(!document.body.classList.contains('sidebar-collapsed'), true); });
     els.menuBtn.addEventListener('click', function () { document.body.classList.contains('nav-open') ? closeMobileNav() : openMobileNav(); });
     els.scrim.addEventListener('click', closeMobileNav);

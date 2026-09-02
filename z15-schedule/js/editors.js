@@ -38,9 +38,11 @@
   function workdays(from, to) { var n = 0; for (var d = U.fromISO(from); U.toISO(d) <= to; d = U.addDays(d, 1)) if (!U.isWeekend(d) && !D.holidayName(U.toISO(d))) n++; return n; }
   E.workdays = workdays;
   /** Số ngày phép đã dùng trong năm (đơn nghỉ phép đã duyệt). Định mức 12 ngày/năm. */
+  var LEAVE_USED_BASE = 3.5; // số ngày phép đã dùng trước khi có hệ thống (dữ liệu mẫu)
+  E.LEAVE_USED_BASE = LEAVE_USED_BASE;
   E.leaveBalance = function (staffId) {
     var y = String(new Date().getFullYear());
-    var used = U.sum(S().state.requests.filter(function (r) { return r.staffId === staffId && r.type === 'leave' && r.status === 'approved' && r.from.slice(0, 4) === y; }), function (r) { return workdays(r.from, r.to); });
+    var used = LEAVE_USED_BASE + U.sum(S().state.requests.filter(function (r) { return r.staffId === staffId && r.type === 'leave' && r.status === 'approved' && r.from.slice(0, 4) === y; }), function (r) { return workdays(r.from, r.to); });
     var pending = U.sum(S().state.requests.filter(function (r) { return r.staffId === staffId && r.type === 'leave' && r.status === 'pending' && r.from.slice(0, 4) === y; }), function (r) { return workdays(r.from, r.to); });
     return { total: 12, used: used, pending: pending, left: Math.max(0, 12 - used) };
   };
@@ -208,7 +210,7 @@
       if (!f || !t || t < f) { summary.textContent = ''; return; }
       var n = workdays(f, t);
       var bal = E.leaveBalance(content.querySelector('#' + id + '-staff').value);
-      summary.innerHTML = UI.icon('info', 14) + ' ' + n + ' ngày làm việc · ' + U.escapeHtml(U.fmtRange(f, t)) + (data.type === 'leave' ? ' · Phép năm còn lại sau khi duyệt: <b>' + Math.max(0, bal.left - n) + '/' + bal.total + ' ngày</b>' : '');
+      summary.innerHTML = UI.icon('info', 14) + ' ' + n + ' ngày làm việc · ' + U.escapeHtml(U.fmtRange(f, t)) + (data.type === 'leave' ? ' · Phép năm còn lại sau khi duyệt: <b>' + U.fmtNumber(Math.max(0, bal.left - n)) + '/' + bal.total + ' ngày</b>' : '');
     }
     typeEl.addEventListener('click', function (e) { var b = e.target.closest('.type-opt'); if (!b) return; U.qsa('.type-opt', typeEl).forEach(function (x) { x.classList.remove('is-on'); x.setAttribute('aria-checked', 'false'); }); b.classList.add('is-on'); b.setAttribute('aria-checked', 'true'); data.type = b.dataset.type; swapSlot.hidden = data.type !== 'swap'; updateSummary(); });
     content.querySelector('#' + id + '-from').addEventListener('change', function (e) { var to = content.querySelector('#' + id + '-to'); if (to.value < e.target.value) to.value = e.target.value; updateSummary(); });
@@ -246,9 +248,14 @@
     opts = opts || {};
     var st = S(), staff = st.staff(staffId), current = st.shiftOf(staffId, iso);
     var html = '<div class="shift-picker"><div class="shift-picker__head">' + UI.avatar(staff, { size: 'xs', title: false }) + '<div><b>' + U.escapeHtml(U.shortName(staff.name)) + '</b><small>' + U.escapeHtml(U.fmtDate(iso, 'long')) + '</small></div></div>' +
-      '<div class="shift-picker__list" role="listbox">' + D.SHIFT_TYPES.map(function (t) { return '<button type="button" class="shift-picker__opt' + (t.id === current ? ' is-on' : '') + '" data-shift="' + t.id + '" role="option" aria-selected="' + (t.id === current) + '"><span class="shift shift--dot" data-shift="' + t.id + '"><span class="shift__short">' + t.short + '</span></span><span class="shift-picker__txt"><b>' + t.label + '</b><small>' + t.hours + '</small></span>' + (t.id === current ? UI.icon('check', 14) : '') + '</button>'; }).join('') + '</div>' +
+      '<div class="shift-picker__list" role="listbox" aria-label="Loại ca">' + D.SHIFT_TYPES.map(function (t) { return '<button type="button" class="shift-picker__opt' + (t.id === current ? ' is-on' : '') + '" data-shift="' + t.id + '" role="option" aria-selected="' + (t.id === current) + '" tabindex="' + (t.id === current ? '0' : '-1') + '"><span class="shift shift--dot" data-shift="' + t.id + '"><span class="shift__short">' + t.short + '</span></span><span class="shift-picker__txt"><b>' + t.label + '</b><small>' + t.hours + '</small></span>' + (t.id === current ? UI.icon('check', 14) : '') + '</button>'; }).join('') + '</div>' +
       '<label class="switch switch--sm shift-picker__week"><input type="checkbox" class="apply-week"><span class="switch__track"></span><span class="switch__label">Áp dụng cả tuần (T2–T6)</span></label></div>';
-    var pop = UI.popover(anchor, html, { placement: opts.placement || 'bottom-start', cls: 'popover--shift', width: 280 });
+    var pop = UI.popover(anchor, html, { placement: opts.placement || 'bottom-start', cls: 'popover--shift', width: 280, ariaLabel: 'Đổi ca ' + U.shortName(staff.name) + ' · ' + U.fmtDate(iso, 'shortWeekday') });
+    pop.el.addEventListener('keydown', function (e) {
+      var os = U.qsa('.shift-picker__opt', pop.el), i = os.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); var n = e.key === 'ArrowDown' ? (os[i + 1] || os[0]) : (os[i - 1] || os[os.length - 1]); os.forEach(function (o) { o.tabIndex = -1; }); n.tabIndex = 0; n.focus(); }
+      else if (e.key === 'Home') { e.preventDefault(); os[0].focus(); } else if (e.key === 'End') { e.preventDefault(); os[os.length - 1].focus(); }
+    });
     pop.el.addEventListener('click', function (e) {
       var b = e.target.closest('.shift-picker__opt'); if (!b) return;
       var type = b.dataset.shift, week = pop.el.querySelector('.apply-week').checked;
@@ -302,7 +309,7 @@
       if (e.target.closest('.profile__close')) return drawer.close();
       if ((t = e.target.closest('.status-opt'))) { st.setStaffStatus(s.id, t.dataset.status); UI.toast('Trạng thái của ' + U.shortName(s.name) + ': ' + UI.statusLabel(t.dataset.status), { kind: 'success' }); return; }
       if ((t = e.target.closest('[data-copy]'))) { U.copyToClipboard(t.dataset.copy); UI.toast('Đã sao chép ' + t.dataset.copy, { kind: 'info' }); return; }
-      if ((t = e.target.closest('.week-strip__day'))) { E.shiftPicker(t, s.id, t.dataset.iso, { placement: 'bottom-center' }); return; }
+      if ((t = e.target.closest('.week-strip__day'))) { E.shiftPicker(t, s.id, t.dataset.iso, { placement: 'bottom-center', onPick: function (type, ctx) { setTimeout(function () { var b = drawer.body.querySelector('.week-strip__day[data-iso="' + ctx.date + '"]'); (b || drawer.el).focus({ preventScroll: true }); }, 0); } }); return; }
       if ((t = e.target.closest('[data-act]'))) {
         var act = t.dataset.act;
         if (act === 'meet') { drawer.close(); setTimeout(function () { E.event(null, { attendeeIds: U.uniq([st.state.currentUserId, s.id]), title: 'Họp với ' + U.shortName(s.name) }); }, 120); }

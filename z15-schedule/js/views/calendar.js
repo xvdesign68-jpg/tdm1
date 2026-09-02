@@ -28,7 +28,7 @@
   function evEnd(e) { return Math.max(U.timeToMin(e.end), U.timeToMin(e.start)); }
   function snap(m) { return Math.round(m / SNAP) * SNAP; }
   function floorSnap(m) { return Math.floor(m / SNAP) * SNAP; }
-  function validISO(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(U.fromISO(s).getTime()); }
+  function validISO(s) { return U.validISO(s); }
   function nextWorkday(iso) {
     var d = U.addDays(U.fromISO(iso), 1);
     for (var i = 0; i < 14; i++, d = U.addDays(d, 1)) { var k = U.toISO(d); if (!U.isWeekend(d) && !S().holidayName(k)) return k; }

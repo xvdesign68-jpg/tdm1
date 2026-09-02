@@ -128,7 +128,9 @@
     },
 
     /* ---------------------------------------------------------- requests */
-    pendingRequests: function () { return state.requests.filter(function (r) { return r.status === 'pending'; }); },
+    /** Đơn đang chờ TÔI duyệt (không tính đơn của chính mình). */
+    pendingRequests: function () { return state.requests.filter(function (r) { return r.status === 'pending' && r.staffId !== state.currentUserId; }); },
+    myRequests: function () { return state.requests.filter(function (r) { return r.staffId === state.currentUserId; }); },
     addRequest: function (data) {
       var r = Object.assign({ id: U.uid('rq'), staffId: state.currentUserId, type: 'leave', from: U.todayISO(), to: U.todayISO(), reason: '', status: 'pending', createdAt: new Date().toISOString() }, data);
       S.update(function (s) { s.requests.unshift(r); }, { type: 'request:add', id: r.id });
@@ -142,6 +144,19 @@
           var m = s.shifts[r.staffId] = s.shifts[r.staffId] || {};
           var t = r.type === 'leave' ? 'leave' : r.type === 'remote' ? 'remote' : 'ot';
           for (var d = U.fromISO(r.from); U.toISO(d) <= r.to; d = U.addDays(d, 1)) if (!U.isWeekend(d) && !D.holidayName(U.toISO(d))) m[U.toISO(d)] = t;
+        }
+        if (status === 'approved' && r.type === 'swap' && r.swapWithId) {
+          var A = s.shifts[r.staffId] = s.shifts[r.staffId] || {}, B = s.shifts[r.swapWithId] = s.shifts[r.swapWithId] || {};
+          for (var d2 = U.fromISO(r.from); U.toISO(d2) <= r.to; d2 = U.addDays(d2, 1)) {
+            var k = U.toISO(d2); if (U.isWeekend(d2) || D.holidayName(k)) continue;
+            var a = S.shiftOf(r.staffId, k), b = S.shiftOf(r.swapWithId, k); A[k] = b; B[k] = a;
+          }
+        }
+        // Thông báo cho người gửi đơn; hoàn tác (về 'pending') sẽ gỡ thông báo này
+        s.notifications = s.notifications.filter(function (n) { return n.requestId !== r.id; });
+        if (status === 'approved' || status === 'rejected') {
+          var who = S.staff(r.staffId), typeLabel = { leave: 'Nghỉ phép', remote: 'Remote', ot: 'Tăng ca', swap: 'Đổi ca' }[r.type] || 'Yêu cầu';
+          s.notifications.unshift({ id: U.uid('nt'), kind: status === 'approved' ? 'success' : 'info', title: (status === 'approved' ? 'Đã duyệt: ' : 'Đã từ chối: ') + typeLabel + ' · ' + (who ? U.shortName(who.name) : ''), body: U.fmtRange(r.from, r.to) + (note ? ' · ' + note : ''), time: new Date().toISOString(), read: true, link: '#/requests?tab=history', requestId: r.id });
         }
       }, { type: 'request:status', id: id, status: status });
       return r;
@@ -185,7 +200,7 @@
       var out = [];
       state.staff.forEach(function (s) { var sc = Math.max(U.fuzzyMatch(q, s.name), U.fuzzyMatch(q, s.role)); if (sc) out.push({ kind: 'staff', score: sc, id: s.id, title: s.name, sub: s.role, item: s }); });
       state.projects.forEach(function (p) { var sc = Math.max(U.fuzzyMatch(q, p.name), U.fuzzyMatch(q, p.client)); if (sc) out.push({ kind: 'project', score: sc, id: p.id, title: p.client + ' — ' + p.name, sub: 'Dự án', item: p }); });
-      state.events.forEach(function (e) { var sc = U.fuzzyMatch(q, e.title); if (sc) out.push({ kind: 'event', score: sc, id: e.id, title: e.title, sub: U.fmtDate(e.date, 'shortWeekday') + ' · ' + e.start, item: e }); });
+      state.events.forEach(function (e) { var sc = U.fuzzyMatch(q, e.title); if (sc) out.push({ kind: 'event', score: sc, id: e.id, title: e.title, sub: U.fmtDate(e.date, 'shortWeekday') + ' · ' + (e.allDay ? 'Cả ngày' : e.start), item: e }); });
       return U.sortBy(out, 'score', true).slice(0, 12);
     }
   };

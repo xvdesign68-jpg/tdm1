@@ -80,7 +80,7 @@
 .cal-stage { position: relative; height: calc(var(--cal-hours, 12) * var(--hour-h)); }
 .cal-gutter { position: absolute; left: 0; top: 0; bottom: 0; width: var(--cal-gutter); }
 .cal-hour { position: absolute; right: 8px; transform: translateY(-50%); font: var(--t-mono-sm); color: var(--fg-tertiary); letter-spacing: .01em; }
-.cal-now-label { position: absolute; right: 6px; top: 0; padding: 0 4px; border-radius: 3px; font: var(--t-mono-sm); font-size: 10.5px; line-height: 16px; color: var(--fg-on-brand); background: var(--now); z-index: 3; transition: transform 600ms var(--ease-out); pointer-events: none; }
+.cal-now-label { position: absolute; right: 6px; top: 0; padding: 0 4px; border-radius: 3px; font: var(--t-mono-sm); font-size: 10.5px; line-height: 16px; color: var(--fg-on-brand); background: var(--now); z-index: 3; transition: transform var(--dur-reveal) var(--ease-out); pointer-events: none; }
 .cal-layers { position: absolute; left: var(--cal-gutter); right: 0; top: 0; bottom: 0; overflow: hidden; }
 .cal-layer { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr)); }
 .cal-layer.is-leaving { pointer-events: none; }
@@ -134,7 +134,7 @@ body.cal-dragging .ev-pill { pointer-events: none; }
 @container (max-width: 150px) { .cal-more__w { display: none; } }
 
 /* now-line */
-.cal-now { position: absolute; left: 0; right: 0; top: 0; height: 0; z-index: 4; pointer-events: none; transition: transform 600ms var(--ease-out); }
+.cal-now { position: absolute; left: 0; right: 0; top: 0; height: 0; z-index: 4; pointer-events: none; transition: transform var(--dur-reveal) var(--ease-out); }
 .cal-now .now-line { top: 0; transition: none; }
 .cal-now .now-line.is-grow { transform-origin: 0 50%; animation: cal-now-grow 320ms var(--ease-out) both; }
 @keyframes cal-now-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }

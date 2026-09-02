@@ -48,7 +48,10 @@
 }
 .icon-btn:hover { background: var(--bg-hover); color: var(--fg-primary); }
 .icon-btn:active { transform: scale(.94); }
-.icon-btn--sm { width: 28px; height: 28px; }
+.icon-btn--sm { width: 28px; height: 28px; position: relative; }
+/* vùng chạm ≥ 40px cho các nút nhỏ (giữ kích thước nhìn thấy) */
+.icon-btn--sm::after, .chip__x::after, .toast__close::after, .chip--btn::after, .segmented__btn::after { content: ""; position: absolute; inset: -6px; }
+.chip__x, .chip--btn { position: relative; }
 .icon-btn--sm .icon { width: 15px; height: 15px; }
 
 /* ---------------------------------------------------------------- chips */
@@ -113,7 +116,9 @@
 .avatar__status[data-status="onsite"], .status-dot[data-status="onsite"] { background: var(--shift-onsite-ink); }
 .avatar__status[data-status="off"], .status-dot[data-status="off"] { background: var(--fg-disabled); }
 .avatar-stack { display: inline-flex; align-items: center; }
-.avatar-stack .avatar { margin-left: -7px; box-shadow: 0 0 0 2px var(--bg-surface); transition: transform var(--dur-base) var(--ease-spring); }
+.avatar-stack .avatar { margin-left: -6px; box-shadow: 0 0 0 2px var(--bg-surface); transition: transform var(--dur-base) var(--ease-spring); }
+.avatar-stack .avatar--xs { margin-left: -4px; box-shadow: 0 0 0 1.5px var(--bg-surface); }
+.avatar-stack .avatar--sm { margin-left: -5px; box-shadow: 0 0 0 1.5px var(--bg-surface); }
 .avatar-stack .avatar:first-child { margin-left: 0; }
 .avatar-stack:hover .avatar { transform: translateX(calc(var(--k, 0) * 0px)); }
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--fg-tertiary); flex: 0 0 auto; }
@@ -152,11 +157,11 @@
 .progress { --bar: var(--fg-secondary); display: block; position: relative; width: 100%; height: 4px; border-radius: var(--r-full); background: var(--bg-sunken); overflow: hidden; }
 .progress--lg { height: 6px; }
 .progress--xs { height: 2px; }
-.progress__bar { display: block; height: 100%; background: var(--bar); border-radius: inherit; transition: width 600ms var(--ease-out); }
+.progress__bar { display: block; height: 100%; background: var(--bar); border-radius: inherit; transition: width var(--dur-reveal) var(--ease-out); }
 .progress--grad .progress__bar { background: var(--grad-miracle); }
 .workload { display: flex; align-items: center; gap: 10px; }
 .workload__bar { flex: 1; height: 4px; background: var(--bg-sunken); border-radius: var(--r-full); overflow: hidden; }
-.workload__bar > span { display: block; height: 100%; background: var(--fg-secondary); border-radius: inherit; transition: width 600ms var(--ease-out); }
+.workload__bar > span { display: block; height: 100%; background: var(--fg-secondary); border-radius: inherit; transition: width var(--dur-reveal) var(--ease-out); }
 .workload[data-level="low"] .workload__bar > span { background: var(--fg-tertiary); }
 .workload[data-level="high"] .workload__bar > span { background: var(--warn); }
 .workload[data-level="over"] .workload__bar > span { background: var(--red-ink); background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(255, 255, 255, .35) 3px 5px); }
@@ -222,7 +227,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .switch--sm .switch__track::after { width: 13px; height: 13px; }
 .switch--sm input:checked + .switch__track::after { transform: translateX(13px); }
 .checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; }
-.checkbox input { width: 16px; height: 16px; accent-color: var(--primary-fill); margin: 0; }
+.checkbox input { width: 18px; height: 18px; accent-color: var(--primary-fill); margin: 0; }
 .form__error { font-size: 13px; color: var(--red-ink); background: var(--red-50); border-left: 2px solid var(--red-ink); padding: 8px 12px; border-radius: 0 var(--r-sm) var(--r-sm) 0; }
 .type-picker { display: flex; flex-wrap: wrap; gap: 6px; }
 .type-opt { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: var(--r-sm); border: 1px solid var(--border-hair); background: var(--bg-surface); color: var(--fg-secondary); font-size: 13px; font-weight: 500; transition: background-color var(--dur-instant), color var(--dur-instant), border-color var(--dur-instant), transform var(--dur-instant); }
@@ -367,7 +372,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .toast__body strong { font-weight: 600; }
 .toast__action { flex: 0 0 auto; font-weight: 600; font-size: 13px; color: var(--action); padding: 2px 6px; border-radius: var(--r-xs); }
 .toast__action:hover { background: var(--blue-50); }
-.toast__close { flex: 0 0 auto; color: var(--fg-tertiary); width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-xs); }
+.toast__close { flex: 0 0 auto; color: var(--fg-tertiary); width: 28px; height: 28px; margin: -3px -4px -3px 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-xs); }
 .toast__close:hover { background: var(--bg-hover); color: var(--fg-primary); }
 .toast__bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--border-strong); transform-origin: left; animation: toast-bar var(--dur, 4s) linear forwards; }
 .toast.is-paused .toast__bar { animation-play-state: paused; }
@@ -579,7 +584,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .heat[data-level="1"] { background: var(--heat-1); } .heat[data-level="2"] { background: var(--heat-2); } .heat[data-level="3"] { background: var(--heat-3); } .heat[data-level="4"] { background: var(--heat-4); }
 .heat[data-level="5"] { background: var(--heat-4); background-image: repeating-linear-gradient(45deg, transparent 0 3px, var(--red-hatch) 3px 5px); box-shadow: inset 0 0 0 1px var(--brand-red); }
 .heat:hover { transform: translateY(-2px) scale(1.06); }
-.now-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--now); pointer-events: none; z-index: 3; transition: transform 600ms var(--ease-out); }
+.now-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--now); pointer-events: none; z-index: 3; transition: transform var(--dur-reveal) var(--ease-out); }
 .now-line::before { content: ""; position: absolute; left: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--now); }
 .now-line.ping::after { content: ""; position: absolute; left: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--now); animation: ping 900ms var(--ease-out) forwards; }
 .drag-layer { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-drag); }

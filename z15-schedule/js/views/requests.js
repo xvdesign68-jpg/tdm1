@@ -35,7 +35,7 @@
   function eachDay(from, to, fn) { for (var d = U.fromISO(from); U.toISO(d) <= to; d = U.addDays(d, 1)) fn(U.toISO(d), d); }
   function typeOf(id) { return E().requestType(id); }
   function normalizeQ(q) { return String(q || '').replace(/\s+/g, ' ').trim().slice(0, 60); }
-  function validISO(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || ''); }
+  function validISO(s) { return U.validISO(s); }
   function monthOf(iso) { return String(iso || '').slice(0, 7); }
   function names(list) { return list.map(function (s) { return U.firstName(s.name); }).join(', '); }
   function rangeText(r) { return r.from === r.to ? dmw(r.from) : dmw(r.from) + ' – ' + dmw(r.to); }
@@ -186,12 +186,8 @@
     return null;
   };
   RequestsView.prototype.leaveBalance = function () {
-    var st = S(), me = st.state.currentUserId, year = this.todayISO.slice(0, 4), used = LEAVE_USED_BASE, pending = 0;
-    st.state.requests.forEach(function (r) {
-      if (r.staffId !== me || r.type !== 'leave' || r.from.slice(0, 4) !== year) return;
-      if (r.status === 'approved') used += workdays(r.from, r.to); else if (r.status === 'pending') pending += workdays(r.from, r.to);
-    });
-    return { total: LEAVE_TOTAL, used: used, pending: pending, remaining: Math.max(0, LEAVE_TOTAL - used) };
+    var b = Z15.editors.leaveBalance(S().state.currentUserId); // một nguồn sự thật với form gửi yêu cầu
+    return { total: b.total, used: b.used, pending: b.pending, remaining: b.left };
   };
 
   /* ------------------------------------------------------------------ shell */
@@ -407,6 +403,7 @@
       snaps.forEach(function (snap) {
         var r = s.requests.find(function (x) { return x.id === snap.id; }); if (!r) return;
         r.status = 'pending'; delete r.approverId; delete r.decidedAt; delete r.note;
+        s.notifications = s.notifications.filter(function (n) { return n.requestId !== r.id; });
         Object.keys(snap.shifts).forEach(function (sid) { var m = s.shifts[sid] = s.shifts[sid] || {}, o = snap.shifts[sid]; Object.keys(o).forEach(function (iso) { if (o[iso] == null) delete m[iso]; else m[iso] = o[iso]; }); });
       });
     }, { type: 'request:status', id: ids[0], status: 'pending', ids: ids });
@@ -419,7 +416,7 @@
     if (!items.length) return;
     var snaps = items.map(function (r) { return self.snapshot(r); });
     this.suppress = true;
-    try { items.forEach(function (r) { st.setRequestStatus(r.id, status, note); if (status === 'approved' && r.type === 'swap') self.swapShifts(r); }); }
+    try { items.forEach(function (r) { st.setRequestStatus(r.id, status, note); }); }
     finally { this.suppress = false; }
     ids.forEach(function (id) { delete self.selected[id]; });
     this.refreshChrome();

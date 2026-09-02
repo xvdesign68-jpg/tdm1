@@ -26,7 +26,7 @@
 .st-team__lead { color: var(--fg-tertiary); }
 .st-team__part { white-space: nowrap; }
 .st-team__bar { display: block; height: 4px; border-radius: var(--r-full); background: var(--bg-sunken); overflow: hidden; }
-.st-team__bar > i { display: block; height: 100%; background: var(--team); border-radius: inherit; transition: width 600ms var(--ease-out); }
+.st-team__bar > i { display: block; height: 100%; background: var(--team); border-radius: inherit; transition: width var(--dur-reveal) var(--ease-out); }
 
 /* ----------------------------------------------------------- ai đang rảnh */
 .st-free { padding: 14px 20px 14px; display: flex; flex-direction: column; gap: 10px; }

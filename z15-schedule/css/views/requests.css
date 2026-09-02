@@ -5,6 +5,7 @@
 
 .rq { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--sp-6); align-items: start; }
 .rq-main { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.rq-panel { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
 .rq-side { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
 
 /* ------------------------------------------------------------ head: tabs */
@@ -57,10 +58,11 @@
 .rq-list.has-check .rq-item__check { display: inline-flex; }
 .rq-check { width: 16px; height: 16px; margin: 0; accent-color: var(--primary-fill); cursor: pointer; }
 .rq-item__type { --t: var(--fg-secondary); flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: var(--t); background: color-mix(in srgb, var(--t) 12%, var(--bg-surface)); margin-top: -4px; }
-.rq-item__type[data-type="leave"] { --t: var(--ev-training); }
+/* Màu huy hiệu = token của loại ca mà đơn tác động (không mượn teal "Đào tạo" hay tím "On-site" của lịch). */
+.rq-item__type[data-type="leave"] { --t: var(--shift-leave-ink); }
 .rq-item__type[data-type="remote"] { --t: var(--shift-remote-ink); }
 .rq-item__type[data-type="ot"] { --t: var(--shift-ot-ink); }
-.rq-item__type[data-type="swap"] { --t: var(--shift-onsite-ink); }
+.rq-item__type[data-type="swap"] { --t: var(--shift-full-ink); }
 .rq-item__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
 .rq-item__top { display: flex; align-items: flex-start; gap: 10px 14px; flex-wrap: wrap; }
 .rq-item__who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 260px; }
@@ -110,10 +112,11 @@
 .rq-stamp--bulk .rq-stamp__chip { justify-self: end; }
 
 /* ---------------------------------------------------------------- empty */
-.rq-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: var(--sp-10) var(--sp-6); color: var(--fg-secondary); }
+/* Dùng chung giải phẫu .empty (components.css): huy hiệu 48px + tiêu đề + phụ đề + nút mềm. */
+.rq-empty { padding: var(--sp-10) var(--sp-6); }
+.rq-empty .empty__body { max-width: 42ch; line-height: 1.5; margin: 0; }
+.rq-empty .empty__title { margin: 0; }
 .rq-empty__mark { display: grid; place-items: center; margin-bottom: 8px; opacity: .12; filter: grayscale(1); }
-.rq-empty__title { font: var(--t-h3); color: var(--fg-primary); }
-.rq-empty__body { font-size: 13px; max-width: 42ch; line-height: 1.5; }
 .rq-empty .btn, .rq-empty .link-btn { margin-top: 8px; }
 
 /* ----------------------------------------------------------- popovers */
@@ -164,7 +167,7 @@
 .rq-cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .rq-cal__d { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px 5px; border-radius: var(--r-sm); border: 1px solid var(--border-hair); color: var(--fg-primary); transition: background-color var(--dur-instant), border-color var(--dur-instant); min-height: 52px; }
 .rq-cal__d:hover { background: var(--bg-hover); border-color: var(--border-strong); }
-.rq-cal__d small { font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-tertiary); }
+.rq-cal__d small { font: var(--t-mono-sm); font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-secondary); }
 .rq-cal__d b { font-size: 13px; font-weight: 600; line-height: 16px; }
 .rq-cal__d.is-weekend { background: var(--bg-sunken); border-color: transparent; color: var(--fg-tertiary); }
 .rq-cal__d.is-holiday { background-image: repeating-linear-gradient(45deg, transparent 0 4px, var(--hatch-ink) 4px 5px); color: var(--fg-tertiary); }
@@ -172,7 +175,7 @@
 .rq-cal__d.is-today b { color: var(--action); }
 .rq-cal__dots { display: flex; align-items: center; justify-content: center; gap: 2px; height: 8px; }
 .rq-cal__dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--team, var(--fg-tertiary)); flex: 0 0 auto; }
-.rq-cal__dots em { font-style: normal; font-size: 9px; line-height: 8px; color: var(--fg-tertiary); font-variant-numeric: tabular-nums; }
+.rq-cal__dots em { font-style: normal; font-size: 10px; line-height: 8px; color: var(--fg-secondary); font-variant-numeric: tabular-nums; }
 .rq-cal__d.is-pulse::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--ok-soft); animation: rq-pulse 320ms var(--ease-out) forwards; pointer-events: none; }
 @keyframes rq-pulse { from { transform: scale(.6); opacity: .9; } to { transform: scale(1.35); opacity: 0; } }
 .rq-policy__list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

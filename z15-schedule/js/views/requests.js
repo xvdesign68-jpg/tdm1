@@ -203,8 +203,11 @@
             <div class="rq-tabs-wrap"><div class="tabs rq-tabs" role="tablist" aria-label="Nhóm yêu cầu"></div></div>
             <div class="rq-filters"></div>
           </section>
-          <div class="rq-listbar reveal" style="--i:1" data-block="listbar"></div>
-          <div class="rq-list" role="list" aria-live="polite" aria-busy="false" data-block="list"></div>
+          <div class="rq-panel" id="rqList" role="tabpanel" aria-labelledby="rqTab-${this.F.tab}">
+            <div class="rq-listbar reveal" style="--i:1" data-block="listbar"></div>
+            <span class="sr-only rq-live" aria-live="polite" aria-atomic="true"></span>
+            <div class="rq-list" role="list" aria-busy="false" data-block="list"></div>
+          </div>
         </div>
         <aside class="rq-side" aria-label="Tổng quan phép & lịch nghỉ">
           <section class="card rq-balance reveal" style="--i:2" data-block="balance"></section>
@@ -215,6 +218,7 @@
       </div>`);
     this.els = {
       root: this.container.querySelector('.rq'), tabs: this.container.querySelector('.rq-tabs'), filters: this.container.querySelector('.rq-filters'),
+      panel: this.container.querySelector('.rq-panel'), live: this.container.querySelector('.rq-live'),
       listbar: this.container.querySelector('[data-block="listbar"]'), list: this.container.querySelector('[data-block="list"]'),
       balance: this.container.querySelector('[data-block="balance"]'), stats: this.container.querySelector('[data-block="stats"]'), cal: this.container.querySelector('[data-block="cal"]'), policy: this.container.querySelector('[data-block="policy"]')
     };
@@ -225,7 +229,7 @@
     var self = this, c = this.counts();
     U.render(this.els.tabs, h`${TABS.map(function (t) {
       var on = t.id === self.F.tab, n = c[t.id];
-      return h`<button type="button" class="tab${on ? ' is-active' : ''}" role="tab" data-tab="${t.id}" aria-selected="${on ? 'true' : 'false'}" aria-label="${t.label}, ${n} đơn">${icon(t.icon, 15)}<span>${t.label}</span><span class="badge rq-badge${t.id === 'pending' && n ? ' badge--red' : ''}" aria-hidden="true"><span class="rq-badge__n">${n}</span></span></button>`;
+      return h`<button type="button" class="tab${on ? ' is-active' : ''}" role="tab" id="rqTab-${t.id}" data-tab="${t.id}" aria-selected="${on ? 'true' : 'false'}" aria-controls="rqList" tabindex="${on ? '0' : '-1'}" aria-label="${t.label}, ${n} đơn">${icon(t.icon, 15)}<span>${t.label}</span><span class="badge rq-badge${t.id === 'pending' && n ? ' badge--red' : ''}" aria-hidden="true"><span class="rq-badge__n">${n}</span></span></button>`;
     })}<span class="rq-tabs__ind" aria-hidden="true"></span>`);
     this.moveTabInd();
   };
@@ -233,12 +237,23 @@
     var self = this, c = this.counts();
     U.qsa('.tab', this.els.tabs).forEach(function (b) {
       var on = b.dataset.tab === self.F.tab, n = c[b.dataset.tab];
-      b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); b.setAttribute('tabindex', on ? '0' : '-1');
       b.setAttribute('aria-label', TABS.filter(function (t) { return t.id === b.dataset.tab; })[0].label + ', ' + n + ' đơn');
       var badge = b.querySelector('.rq-badge'); flipBadge(badge, n);
       badge.classList.toggle('badge--red', b.dataset.tab === 'pending' && n > 0);
     });
+    if (this.els.panel) this.els.panel.setAttribute('aria-labelledby', 'rqTab-' + this.F.tab);
     this.moveTabInd();
+  };
+  /** ←/→/Home/End trên tablist: đổi tab rồi trả focus về tab đang chọn (mẫu roving tabindex). */
+  RequestsView.prototype.tabKey = function (e) {
+    var keys = { ArrowRight: 1, ArrowLeft: -1, Home: 'first', End: 'last' }; if (!(e.key in keys)) return;
+    var self = this, i = TAB_IDS.indexOf(this.F.tab), k = keys[e.key];
+    var n = k === 'first' ? 0 : k === 'last' ? TAB_IDS.length - 1 : (i + k + TAB_IDS.length) % TAB_IDS.length;
+    e.preventDefault();
+    if (TAB_IDS[n] === this.F.tab) { var cur = this.els.tabs.querySelector('.tab.is-active'); if (cur) cur.focus(); return; }
+    this.setTab(TAB_IDS[n]);
+    setTimeout(function () { var b = self.els.tabs.querySelector('.tab.is-active'); if (b) b.focus(); }, 30);
   };
   RequestsView.prototype.moveTabInd = function () {
     var ind = this.els.tabs.querySelector('.rq-tabs__ind'), a = this.els.tabs.querySelector('.tab.is-active');
@@ -289,7 +304,6 @@
   RequestsView.prototype.cardHtml = function (r, i, first) {
     var st = S(), who = st.staff(r.staffId), team = st.team(who.teamId), t = typeOf(r.type), me = st.state.currentUserId;
     var mine = r.staffId === me, decide = this.canDecide(r), cancel = this.canCancel(r), im = this.impact(r);
-    var approver = r.approverId ? st.staff(r.approverId) : null, other = r.swapWithId ? st.staff(r.swapWithId) : null;
     var diff = U.daysBetween(this.todayISO, r.from), urgent = r.status === 'pending' && diff <= 1 && diff >= -30;
     var soon = r.status === 'pending' && diff >= 0 && diff <= 6 ? U.fmtRelativeDay(r.from) : '';
     var cls = ['card', 'rq-item'];
@@ -306,12 +320,7 @@
         <div class="rq-item__when mono tnum"><span class="rq-item__type-lbl">${t.label}</span><span class="rq-item__dates">${rangeText(r)}</span><span class="faint">· ${dayCount(r)}</span>${soon && !urgent ? h`<span class="faint">· ${soon}</span>` : ''}</div>
         <p class="rq-item__reason clamp-2">${r.reason}</p>
         ${im ? h`<div class="rq-item__impact is-${im.level}">${icon(im.icon, 13)}<span>${im.text}${im.swap ? h`<span class="rq-item__swap">${im.swap.who} ${raw(UI.shiftBadge(im.swap.a))}<i>↔</i>${im.swap.other} ${raw(UI.shiftBadge(im.swap.b))}</span>${im.same ? h` <span class="faint">· cùng loại ca</span>` : ''}` : ''}</span></div>` : ''}
-        <div class="rq-item__meta">
-          <span>${icon('send', 11)} Gửi ${U.timeAgo(r.createdAt)}</span>
-          ${r.status !== 'pending' && approver ? h`<span>${icon(r.status === 'approved' ? 'check-circle' : 'x-circle', 11)} ${r.status === 'approved' ? 'Duyệt' : 'Từ chối'} bởi ${U.shortName(approver.name)} · ${U.timeAgo(r.decidedAt)}</span>` : ''}
-          ${r.askedAt && r.status === 'pending' ? h`<span>${icon('message', 11)} Đã hỏi lại · ${U.timeAgo(r.askedAt)}</span>` : ''}
-          ${r.type === 'swap' && other && r.status !== 'pending' ? h`<span>${icon('repeat', 11)} với ${U.shortName(other.name)}</span>` : ''}
-        </div>
+        <div class="rq-item__meta">${this.metaHtml(r)}</div>
         ${r.note && r.status === 'rejected' ? h`<div class="rq-item__note"><span class="eyebrow">Lý do từ chối</span>${r.note}</div>` : ''}
         ${decide ? h`<div class="rq-item__foot">
           <button type="button" class="btn btn--ghost btn--sm" data-act="ask" aria-label="Hỏi lại ${U.shortName(who.name)}">${icon('message', 14)}<span>Hỏi lại</span></button>
@@ -322,13 +331,22 @@
       </div>
     </article>`;
   };
+  /** Dòng meta "Gửi x phút trước · Duyệt bởi …" — tách riêng để tick() chỉ làm mới phần này. */
+  RequestsView.prototype.metaHtml = function (r) {
+    var st = S(), approver = r.approverId ? st.staff(r.approverId) : null, other = r.swapWithId ? st.staff(r.swapWithId) : null;
+    return h`<span>${icon('send', 11)} Gửi ${U.timeAgo(r.createdAt)}</span>${r.status !== 'pending' && approver ? h`<span>${icon(r.status === 'approved' ? 'check-circle' : 'x-circle', 11)} ${r.status === 'approved' ? 'Duyệt' : 'Từ chối'} bởi ${U.shortName(approver.name)} · ${U.timeAgo(r.decidedAt)}</span>` : ''}${r.askedAt && r.status === 'pending' ? h`<span>${icon('message', 11)} Đã hỏi lại · ${U.timeAgo(r.askedAt)}</span>` : ''}${r.type === 'swap' && other && r.status !== 'pending' ? h`<span>${icon('repeat', 11)} với ${U.shortName(other.name)}</span>` : ''}`;
+  };
+  /** Trạng thái rỗng theo đúng giải phẫu .empty dùng chung (huy hiệu icon 48px + tiêu đề + phụ đề + nút mềm). */
+  function emptyBox(iconName, title, body, action) {
+    return h`<div class="card empty rq-empty"><div class="empty__icon">${icon(iconName, 26)}</div><p class="empty__title">${title}</p>${body ? h`<p class="empty__body">${body}</p>` : ''}${action ? h`<button type="button" class="btn btn--soft btn--sm" data-act="${action.act}">${icon(action.icon, 14)}<span>${action.label}</span></button>` : ''}</div>`;
+  }
   RequestsView.prototype.emptyHtml = function () {
     var F = this.F;
-    if (this.hasFilter()) return h`<div class="card rq-empty"><p class="rq-empty__title">Không có đơn nào khớp bộ lọc.</p><p class="rq-empty__body">Thử bỏ dấu, đổi team hoặc chọn loại khác.</p><button type="button" class="btn btn--soft btn--sm" data-act="clear">${icon('x', 14)}<span>Xoá bộ lọc</span></button></div>`;
-    if (F.tab === 'pending') return h`<div class="card rq-empty rq-empty--calm"><span class="rq-empty__mark">${raw(UI.logoMark(64))}</span><p class="rq-empty__title">Không có đơn nào chờ. Đội đang ổn.</p><p class="rq-empty__body">Đơn mới sẽ xuất hiện ở đây kèm tác động tới team để bạn duyệt trong 5 giây.</p><button type="button" class="link-btn" data-tab="history">Xem lịch sử quyết định →</button></div>`;
-    if (F.tab === 'mine') return h`<div class="card rq-empty"><p class="rq-empty__title">Bạn chưa gửi yêu cầu nào.</p><p class="rq-empty__body">Nghỉ phép, remote, tăng ca hay đổi ca — gửi trong 20 giây, quản lý duyệt trong 5 giây.</p><button type="button" class="btn btn--soft btn--sm" data-act="new">${icon('send', 14)}<span>Gửi yêu cầu</span></button></div>`;
-    if (F.tab === 'history') return h`<div class="card rq-empty"><p class="rq-empty__title">Chưa có quyết định nào được ghi lại.</p><p class="rq-empty__body">Đơn đã duyệt hoặc từ chối sẽ nằm ở đây, mới nhất lên đầu.</p></div>`;
-    return h`<div class="card rq-empty"><p class="rq-empty__title">Chưa có yêu cầu nào.</p><button type="button" class="btn btn--soft btn--sm" data-act="new">${icon('send', 14)}<span>Gửi yêu cầu</span></button></div>`;
+    if (this.hasFilter()) return emptyBox('search', 'Không có đơn nào khớp bộ lọc.', 'Thử bỏ dấu, đổi team hoặc chọn loại khác.', { act: 'clear', icon: 'x', label: 'Xoá bộ lọc' });
+    if (F.tab === 'pending') return h`<div class="card empty rq-empty rq-empty--calm"><span class="rq-empty__mark">${raw(UI.logoMark(64))}</span><p class="empty__title">Không có đơn nào chờ. Đội đang ổn.</p><p class="empty__body">Đơn mới sẽ xuất hiện ở đây kèm tác động tới team để bạn duyệt trong 5 giây.</p><button type="button" class="link-btn" data-tab="history">Xem lịch sử quyết định →</button></div>`;
+    if (F.tab === 'mine') return emptyBox('inbox', 'Bạn chưa gửi yêu cầu nào.', 'Nghỉ phép, remote, tăng ca hay đổi ca — gửi trong 20 giây, quản lý duyệt trong 5 giây.', { act: 'new', icon: 'send', label: 'Gửi yêu cầu' });
+    if (F.tab === 'history') return emptyBox('history', 'Chưa có quyết định nào được ghi lại.', 'Đơn đã duyệt hoặc từ chối sẽ nằm ở đây, mới nhất lên đầu.');
+    return emptyBox('inbox', 'Chưa có yêu cầu nào.', '', { act: 'new', icon: 'send', label: 'Gửi yêu cầu' });
   };
   /** Vẽ lại danh sách tại chỗ (giữ cuộn, giữ focus theo id). */
   RequestsView.prototype.renderList = function (opts) {
@@ -360,6 +378,12 @@
       return;
     }
     U.render(bar, h`<span class="rq-listbar__count"><b class="tnum">${items.length}</b> đơn <span class="faint">· sắp xếp ${sortLbl}</span></span><span class="grow"></span>${decidable.length > 1 ? h`<label class="checkbox rq-listbar__all"><input type="checkbox" class="rq-check-all" aria-label="Chọn tất cả đơn chờ duyệt"><span>Chọn tất cả</span></label>` : ''}`);
+    this.announce(items.length ? items.length + ' đơn' : (this.els.list.querySelector('.empty__title') || {}).textContent || 'Không có đơn nào');
+  };
+  /** Vùng live bền (không bị innerHTML thay thế) chỉ đọc số đơn — thay vì đọc lại cả danh sách sau mỗi phím gõ. */
+  RequestsView.prototype.announce = function (text) {
+    var live = this.els.live; if (!live || live.textContent === text) return;
+    live.textContent = text;
   };
   RequestsView.prototype.focusedCard = function () { var a = document.activeElement; return a && this.els.list.contains(a) ? a.closest('.rq-item') : null; };
 
@@ -569,6 +593,7 @@
   RequestsView.prototype.bind = function () {
     var self = this, root = this.container;
     this.unbinders.push(U.delegate(root, 'click', '.rq-tabs .tab', function (e, el) { self.setTab(el.dataset.tab); }));
+    this.unbinders.push(U.delegate(root, 'keydown', '.rq-tabs', function (e) { self.tabKey(e); }));
     this.unbinders.push(U.delegate(root, 'click', '.rq-fchip', function (e, el) { self.setFilter({ type: el.dataset.type }); }));
     this.unbinders.push(U.delegate(root, 'change', '.rq-team', function (e, el) { self.setFilter({ team: el.value }); }));
     this.unbinders.push(U.delegate(root, 'input', '.rq-search', U.debounce(function (e, el) { self.setFilter({ q: normalizeQ(el.value) }); }, 120)));
@@ -633,9 +658,14 @@
   RequestsView.prototype.tick = function () {
     if (this.dateOverride) return;
     var real = U.todayISO();
-    if (real !== this.todayISO) { this.todayISO = real; this.refreshChrome(); this.renderList({ keepScroll: true }); return; }
-    // cập nhật nhãn "x phút trước"
-    U.qsa('.rq-item__meta', this.els.list).length && this.renderList({ keepScroll: true });
+    if (real !== this.todayISO) { this.todayISO = real; this.refreshChrome(); if (this.busy) { this.dirty = true; return; } this.renderList({ keepScroll: true }); return; }
+    if (this.busy) return; // đang chạy choreography duyệt/từ chối — đừng chen ngang
+    // chỉ làm mới nhãn "x phút trước" tại chỗ: không vẽ lại thẻ, không mất popover / lý do đang mở / ô đã tick
+    var self = this;
+    U.qsa('.rq-item', this.els.list).forEach(function (card) {
+      var r = S().request(card.dataset.id), m = card.querySelector('.rq-item__meta'); if (!r || !m) return;
+      var next = self.metaHtml(r).s; if (m.innerHTML !== next) m.innerHTML = next;
+    });
   };
 
   /* ------------------------------------------------------------- lifecycle */

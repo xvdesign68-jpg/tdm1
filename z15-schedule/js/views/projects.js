@@ -22,7 +22,7 @@
   var SORTS = [{ id: 'deadline', label: 'Deadline gần nhất' }, { id: 'risk', label: 'Rủi ro' }, { id: 'progress', label: 'Tiến độ' }, { id: 'name', label: 'Tên' }];
   var PHASES = [{ label: 'Brief', range: '0–15%' }, { label: 'Ý tưởng', range: '15–40%' }, { label: 'Sản xuất', range: '40–70%' }, { label: 'Media', range: '70–90%' }, { label: 'Báo cáo', range: '90–100%' }];
   var PHASE_CUTS = [15, 40, 70, 90];
-  var STATUS_TONE = { planning: '', active: 'blue', review: 'warn', done: 'ok' };
+  var STATUS_TONE = { planning: '', active: 'type', review: 'warn', done: 'ok' };
   var HEALTH_ICON = { ok: 'check-circle', watch: 'alert-circle', risk: 'alert-triangle', planning: 'clock', done: 'check-circle' };
   var BANNER_TONE = { ok: 'ok', watch: 'warn', risk: 'danger', planning: '', done: 'ok' };
   var LEVEL_ORDER = { risk: 0, watch: 1, ok: 2, planning: 3, done: 4 };
@@ -114,8 +114,8 @@
   function tableRow(p, todayISO) {
     var st = S(), hl = st.projectHealth(p), lead = st.staff(p.leadId), ppl = members(p);
     var days = U.daysBetween(todayISO, p.end), done = p.status === 'done', urgent = !done && days <= 0;
-    return h`<tr class="pj-row" data-id="${p.id}" tabindex="0" role="link" style="--pc:${p.color}">
-      <td><span class="pj-row__id"><span class="pj-mono pj-mono--sm" aria-hidden="true">${monogram(p.client)}</span><span class="pj-row__txt"><b>${p.client}</b><small>${p.name}</small></span></span></td>
+    return h`<tr class="pj-row" data-id="${p.id}" tabindex="0" aria-label="${p.client} — ${p.name}" style="--pc:${p.color}">
+      <td><a class="pj-row__id" href="#/projects/${p.id}" tabindex="-1"><span class="pj-mono pj-mono--sm" aria-hidden="true">${monogram(p.client)}</span><span class="pj-row__txt"><b>${p.client}</b><small>${p.name}</small></span></a></td>
       <td>${statusChip(p)}</td>
       <td>${healthTag(hl)}</td>
       <td class="pj-row__prog">${progressBar(p, hl)}</td>
@@ -164,7 +164,10 @@
 
   /* -------------------------------------------------------------- list */
   ProjectsView.prototype.readFilters = function (query) {
-    var st = S(), pr = this.prefs, ids = E().PROJECT_STATUS.map(function (s) { return s.id; });
+    var st = S(), ids = E().PROJECT_STATUS.map(function (s) { return s.id; });
+    // Link chia sẻ mang bộ lọc tường minh → không trộn với bộ lọc đã lưu của người xem (sort/mode vẫn lấy từ prefs).
+    var explicit = ['status', 'mine', 'client', 'q'].some(function (k) { return k in query; });
+    var pr = explicit ? Object.assign({}, DEFAULT_PREFS, { sort: this.prefs.sort, mode: this.prefs.mode }) : this.prefs;
     var status = query.status !== undefined ? query.status : pr.status; if (ids.indexOf(status) < 0) status = '';
     var mine = query.mine !== undefined ? (query.mine === '1' || query.mine === 'true') : !!pr.mine;
     var client = query.client !== undefined ? query.client : pr.client; if (client && !st.state.projects.some(function (p) { return p.client === client; })) client = '';
@@ -243,15 +246,17 @@
     var tiles = [
       { key: 'active', label: 'Đang chạy', icon: 'activity', value: s.active.length, delta: s.mineActive ? 'Bạn tham gia ' + s.mineActive + '/' + s.active.length : 'Bạn chưa tham gia dự án nào', status: 'active' },
       { key: 'review', label: 'Chờ duyệt KH', icon: 'eye', value: s.review.length, delta: s.review.length ? s.review.map(function (p) { return p.client; }).join(', ') : 'Không có dự án chờ duyệt', status: 'review' },
-      { key: 'dl', label: 'Deadline trong 7 ngày', icon: 'flag', value: s.deadlines.length, delta: near ? 'Gần nhất: ' + near.title + ' · ' + U.fmtRelativeDay(near.date) + (near.start ? ' ' + near.start : '') : 'Tuần tới chưa có deadline', urgent: !!near && near.date === this.todayISO },
-      { key: 'all', label: 'Danh mục', icon: 'briefcase', value: s.total, unit: 'dự án', delta: s.clients.length + ' khách hàng · ' + s.people.length + ' nhân sự đang tham gia' }
+      { key: 'dl', label: 'Deadline trong 7 ngày', icon: 'flag', value: s.deadlines.length, delta: near ? U.fmtRelativeDay(near.date) + (near.start ? ' ' + near.start : '') + ' · ' + near.title : 'Tuần tới chưa có deadline', lead: near ? U.fmtRelativeDay(near.date) + (near.start ? ' ' + near.start : '') : '', tail: near ? near.title : '', urgent: !!near && near.date === this.todayISO },
+      { key: 'all', label: 'Danh mục', icon: 'briefcase', value: s.total, unit: 'dự án', delta: s.clients.length + ' khách hàng · ' + s.people.length + ' nhân sự' }
     ];
     this.els.kpis.innerHTML = tiles.map(function (t, i) {
       var tag = t.status ? 'button' : 'div', pressed = t.status ? ' aria-pressed="' + (F.status === t.status) + '" data-kpi-status="' + t.status + '" type="button"' : '';
       return '<' + tag + ' class="card kpi pj-kpi' + (t.status ? ' pj-kpi--btn' : '') + (fresh ? ' reveal' : '') + '" style="--i:' + i + '"' + pressed + '>' +
         '<div class="kpi__label">' + UI.icon(t.icon, 13) + t.label + '</div>' +
         '<div class="kpi__value"><span class="tnum" data-count="' + t.value + '" data-key="' + t.key + '">' + t.value + '</span>' + (t.unit ? '<small>' + t.unit + '</small>' : '') + '</div>' +
-        '<div class="kpi__delta' + (t.urgent ? ' pj-urgent' : '') + '"><span class="truncate" title="' + U.escapeHtml(t.delta) + '">' + U.escapeHtml(t.delta) + '</span></div></' + tag + '>';
+        '<div class="kpi__delta' + (t.urgent ? ' pj-urgent' : '') + '">' + (t.lead
+          ? '<span class="pj-kpi__near" title="' + U.escapeHtml(t.delta) + '"><b class="pj-kpi__when">' + U.escapeHtml(t.lead) + '</b><span class="pj-kpi__sep" aria-hidden="true">·</span><span class="truncate">' + U.escapeHtml(t.tail) + '</span></span>'
+          : '<span class="truncate" title="' + U.escapeHtml(t.delta) + '">' + U.escapeHtml(t.delta) + '</span>') + '</div></' + tag + '>';
     }).join('');
     var reduce = reduceMotion();
     U.qsa('[data-count]', this.els.kpis).forEach(function (el) {
@@ -500,7 +505,7 @@
         <tbody>${rows.map(function (r) {
           return h`<tr><td class="pj-alloc__who"><span class="pj-alloc__person">${raw(UI.avatar(r.s, { size: 'sm', title: false }))}<span><b>${U.shortName(r.s.name)}${r.s.id === p.leadId ? raw(' <span class="chip chip--blue chip--xs">Lead</span>') : ''}</b><small>${r.s.role}</small></span></span></td>${r.cells.map(function (c, i) {
             var w = weeks[i], tip = U.shortName(r.s.name) + ' · T' + w.num + ' (' + U.fmtDate(w.start, 'dm') + ' – ' + U.fmtDate(w.endISO, 'dm') + ') · ' + (c.n ? fmtH(c.h) + 'g · ' + c.n + ' sự kiện' + (c.level === 5 ? ' · vượt 10g' : '') : 'không có sự kiện');
-            return h`<td class="pj-alloc__cell"><span class="heat pj-heat" data-level="${c.level}" data-tip="${tip}" tabindex="0" aria-label="${tip}">${c.n ? fmtH(c.h) : '·'}</span></td>`;
+            return h`<td class="pj-alloc__cell"><span class="heat pj-heat" data-level="${c.level}" data-tip="${tip}">${c.n ? h`${fmtH(c.h)}<span class="sr-only">g · ${c.n} sự kiện${c.level === 5 ? ' · vượt 10g' : ''}</span>` : h`<span aria-hidden="true">·</span><span class="sr-only">không có sự kiện</span>`}</span></td>`;
           })}<td class="num pj-alloc__tot">${r.n ? fmtH(r.total) + 'g' : '·'}</td></tr>`;
         })}</tbody>
         <tfoot><tr><td class="pj-alloc__who"><b>Tổng</b></td>${colTotals.map(function (t) { return h`<td class="num">${t ? fmtH(t) + 'g' : '·'}</td>`; })}<td class="num"><b>${fmtH(grand)}g</b></td></tr></tfoot></table></div>
@@ -651,7 +656,13 @@
       if (k === 'progress') { this.renderHead(); this.setDetailTitle(); }
       return;
     }
-    if (this.mode === 'list') { this.renderKpis(false); this.renderClientOptions(); this.renderStatusChips(); this.renderResults(''); this.setListTitle(); return; }
+    if (this.mode === 'list') {
+      if (t === 'project:add' && meta.id) {
+        var np = S().project(meta.id);
+        if (np && this.filtered(false).indexOf(np) < 0) { this.F.q = ''; this.setFilter({ status: '', mine: false, client: '' }); UI.toast('Đã bỏ bộ lọc để hiện dự án vừa tạo.', { kind: 'info' }); return; }
+      }
+      this.renderKpis(false); this.renderClientOptions(); this.renderStatusChips(); this.renderResults(''); this.setListTitle(); return;
+    }
     if (this.mode === 'detail') {
       if (isProj && meta.id && meta.id !== this.id) return;
       var p = S().project(this.id);
@@ -675,8 +686,8 @@
       U.delegate(r, 'change', '.pj-bar__sort select', function (e, el) { self.setFilter({ sort: el.value }); }),
       U.delegate(r, 'input', '.pj-bar__search input', U.debounce(function (e, el) { if (self.mode !== 'list') return; self.F.q = el.value.slice(0, 60); self.renderStatusChips(); self.renderResults(''); }, 160)),
       U.delegate(r, 'keydown', '.pj-bar__search input', function (e, el) { if (e.key === 'Escape' && el.value) { el.value = ''; self.F.q = ''; self.renderStatusChips(); self.renderResults(''); } }),
-      U.delegate(r, 'click', '.pj-row', function (e, el) { if (e.target.closest('.avatar[data-staff]')) return; go(el.dataset.id); }),
-      U.delegate(r, 'keydown', '.pj-row', function (e, el) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(el.dataset.id); } }),
+      U.delegate(r, 'click', '.pj-row', function (e, el) { if (e.target.closest('.avatar[data-staff], a.pj-row__id')) return; go(el.dataset.id); }),
+      U.delegate(r, 'keydown', '.pj-row', function (e, el) { if (e.target !== el) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(el.dataset.id); } }),
       U.delegate(r, 'click', '.pj-tab', function (e, el) { self.goTab(el.dataset.tab); }),
       U.delegate(r, 'keydown', '.pj-tabs', function (e) { if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return; var i = TABS.findIndex(function (t) { return t.id === self.tab; }); var n = (i + (e.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length; e.preventDefault(); self.goTab(TABS[n].id); setTimeout(function () { var b = r.querySelector('.pj-tab.is-active'); if (b) b.focus(); }, 30); }),
       U.delegate(r, 'click', '.pj-member', function (e, el) { if (e.target.closest('.avatar[data-staff]')) return; E().staffProfile(el.dataset.staff); }),
@@ -687,8 +698,7 @@
       U.delegate(r, 'blur', '.pj-notes__ta', function () { self.flushNotes(); }),
       U.delegate(r, 'submit', '.pj-check__add', function (e, el) { e.preventDefault(); self.addCheck(el); }),
       U.delegate(r, 'click', '.pj-ci__box', function (e, el) { self.toggleCheck(+el.closest('.pj-ci').dataset.i); }),
-      U.delegate(r, 'click', '.pj-ci__rm', function (e, el) { self.removeCheck(+el.closest('.pj-ci').dataset.i); }),
-      U.delegate(r, 'keydown', '.pj-heat', function (e, el) { if (e.key === 'Enter') { UI.toast(el.getAttribute('aria-label'), { kind: 'info' }); } })
+      U.delegate(r, 'click', '.pj-ci__rm', function (e, el) { self.removeCheck(+el.closest('.pj-ci').dataset.i); })
     );
   };
 

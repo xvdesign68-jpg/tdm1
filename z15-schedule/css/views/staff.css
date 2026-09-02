@@ -41,6 +41,7 @@
 .st-free__count { margin-left: auto; font-size: 13px; color: var(--fg-secondary); font-variant-numeric: tabular-nums; }
 .st-free__count b { color: var(--fg-primary); font-weight: 600; }
 .st-free__list { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-free__li { display: flex; min-width: 0; max-width: 100%; }
 .st-free__p {
   --team: transparent;
   display: inline-flex; align-items: center; gap: 7px; height: 34px; max-width: 100%; padding: 0 11px 0 4px;
@@ -86,7 +87,7 @@
 }
 .st-person:hover, .st-person:focus-within { transform: translateY(-1px); border-color: var(--border-strong); }
 .st-person.is-me { border-color: var(--blue-100); }
-.st-person.is-me:hover, .st-person.is-me:focus-within { border-color: var(--blue-200); }
+.st-person.is-me:hover, .st-person.is-me:focus-within { border-color: color-mix(in srgb, var(--action) 45%, transparent); }
 .st-person__top { display: flex; align-items: flex-start; gap: 12px; }
 .st-person__top .avatar--ring { margin: 4px 4px 0 4px; }
 .st-person__id { flex: 1 1 auto; min-width: 0; padding-top: 1px; }
@@ -147,6 +148,9 @@ th[aria-sort="descending"] .st-th__caret { transform: rotate(180deg); }
 .st-pulse__main { min-width: 0; }
 .st-pulse__scroll { overflow-x: auto; overscroll-behavior-x: contain; padding: 14px 20px 10px 0; }
 .st-pulse__grid { --cell: 26px; display: grid; grid-template-columns: 184px repeat(7, var(--cell)) 8px repeat(7, var(--cell)) 68px 68px; gap: 4px; align-items: center; width: max-content; position: relative; }
+/* hàng ARIA (role=row) không tạo hộp — ô vẫn là con trực tiếp của lưới CSS */
+.st-pulse__row { display: contents; }
+.st-pulse__cell { display: block; width: var(--cell); height: var(--cell); }
 .st-pulse__sticky { position: sticky; left: 0; z-index: 2; background: var(--bg-surface); box-shadow: 4px 0 0 0 var(--bg-surface); }
 .st-pulse__corner { display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; align-self: end; height: 40px; padding: 0 8px 4px 20px; }
 .st-pulse__hint { font-size: 11px; }
@@ -220,8 +224,11 @@ th[aria-sort="descending"] .st-th__caret { transform: rotate(180deg); }
   .st-pulse { grid-template-columns: minmax(0, 1fr); }
   .st-pulse__side { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+@media (max-width: 1200px) {
+  /* dưới 1200px: dải team xuống dòng (4 + 3) thay vì cuộn ngang ẩn */
+  .st-teams { grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: visible; scroll-snap-type: none; }
+}
 @media (max-width: 1024px) {
-  .st-teams { grid-template-columns: repeat(7, 156px); }
   .st-bar__seg { margin-left: 0; }
 }
 @media (max-width: 768px) {
@@ -232,6 +239,7 @@ th[aria-sort="descending"] .st-th__caret { transform: rotate(180deg); }
   .st-pulse__summary { margin-left: 0; }
 }
 @media (max-width: 560px) {
+  .st-teams { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .st-grid { grid-template-columns: minmax(0, 1fr); }
   .st-person__day small { display: none; }
 }

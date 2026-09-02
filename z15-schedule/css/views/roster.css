@@ -23,7 +23,7 @@
 .ro-today.is-current { color: var(--action); border-color: var(--blue-100); }
 .ro-title { margin-left: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ro-status { text-transform: none; letter-spacing: 0; flex: 0 0 auto; margin-left: 4px; }
-.ro-status .icon { width: 11px; height: 11px; }
+.ro-status .icon { width: 12px; height: 12px; flex: 0 0 auto; }
 .ro-bar__seg { flex: 0 0 auto; }
 .ro-bar__actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .ro-bar__filters { gap: 8px; }

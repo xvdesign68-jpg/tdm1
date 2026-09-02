@@ -17,6 +17,7 @@
   var MODES = ['day', 'week', 'month'];
   var LAYERS = ['mine', 'team', 'all'];
   var SNAP = 15;
+  var MAX_SLOTS = 3, MIN_SLOT_W = 44; // cột chồng giờ: tối đa 3 ô (2 sự kiện + “+N nữa”) khi mỗi ô < 44px
   var NARROW_MQ = '(max-width: 768px)';
 
   /* ------------------------------------------------------------ helpers */
@@ -172,7 +173,7 @@
       cl.forEach(function (it) {
         var c = -1; for (var i = 0; i < ends.length; i++) if (ends[i] <= it.s) { c = i; break; }
         if (c < 0) { c = ends.length; ends.push(0); }
-        ends[c] = it.e; it.col = c;
+        ends[c] = it.e; it.col = c; it.cl = cl;
       });
       cl.forEach(function (it) {
         it.cols = ends.length; it.span = 1;
@@ -223,6 +224,8 @@
     var total = 0, mine = 0, anyAllDay = false, firstStart = null;
     var daysHtml = '', adHtml = '', colsHtml = '';
     var wide = days.length <= 3;
+    var bodyW = V && V.body ? V.body.clientWidth : 0, gutterW = parseFloat(getComputedStyle(document.body).getPropertyValue('--cal-gutter')) || 56;
+    var colW = bodyW > 0 ? Math.max(0, bodyW - gutterW - (days.length === 1 ? 336 : 0)) / days.length : 150;
     days.forEach(function (iso) {
       var d = U.fromISO(iso), isToday = iso === cx.today, weekend = U.isWeekend(d), hol = st.holidayName(iso), selected = iso === V.iso;
       var de = dayEvents(iso, F, cx);
@@ -238,8 +241,21 @@
       allday.forEach(function (e) { ad.push(UI.eventPill(e, { compact: true, cls: pillClasses(e, cx, de.conflicts) + ' cal-adpill' })); });
       if (ad.length) anyAllDay = true;
       adHtml += '<div class="cal-ad' + (isToday ? ' is-today' : '') + (weekend ? ' is-weekend' : '') + '" data-day="' + iso + '">' + ad.join('') + '</div>';
-      var items = layoutDay(timed);
-      var evHtml = items.map(function (it) {
+      var items = layoutDay(timed), moreHtml = '', capped = [];
+      items.forEach(function (it) {
+        // Cụm ≥4 cột trong cột hẹp: chỉ hiện 2 cột + nút “+N nữa” (mở chế độ ngày)
+        if (it.cols <= MAX_SLOTS || colW / it.cols >= MIN_SLOT_W || capped.indexOf(it.cl) >= 0) return;
+        var cl = it.cl, hidden = cl.filter(function (o) { return o.col >= MAX_SLOTS - 1; });
+        if (!hidden.length) return;
+        capped.push(cl);
+        var hs = Infinity, he = -Infinity;
+        hidden.forEach(function (o) { o.hidden = true; hs = Math.min(hs, o.s); he = Math.max(he, o.e); });
+        cl.forEach(function (o) { if (!o.hidden) { o.cols = MAX_SLOTS; o.span = Math.min(o.span, MAX_SLOTS - 1 - o.col); } });
+        var mtop = (hs - range.start) * pxm, mh = Math.max((he - hs) * pxm, 20);
+        var mlbl = '+' + hidden.length + ' sự kiện khác, ' + U.minToTime(hs) + ' – ' + U.minToTime(he) + ' — xem theo ngày';
+        moreHtml += '<button type="button" class="cal-more" data-go-day="' + iso + '" aria-label="' + U.escapeHtml(mlbl) + '" data-tip="' + U.escapeHtml(mlbl) + '" style="top:' + mtop.toFixed(1) + 'px;height:' + mh.toFixed(1) + 'px;left:calc(' + ((MAX_SLOTS - 1) / MAX_SLOTS * 100).toFixed(3) + '% + 2px);width:calc(' + (1 / MAX_SLOTS * 100).toFixed(3) + '% - 4px)"><span>+' + hidden.length + '</span><span class="cal-more__w">&nbsp;nữa</span></button>';
+      });
+      var evHtml = items.filter(function (it) { return !it.hidden; }).map(function (it) {
         var top = (it.s - range.start) * pxm, h = Math.max((it.e - it.s) * pxm, 20), dur = evEnd(it.ev) - evStart(it.ev);
         var short = dur < 30, tall = dur >= 90;
         var cls = pillClasses(it.ev, cx, de.conflicts) + (short ? ' cal-pill--short' : tall ? ' cal-pill--tall' : '') + (dur === 0 ? ' cal-pill--point' : '');
@@ -250,7 +266,7 @@
         var show = cx.now >= range.start && cx.now <= range.end;
         nowHtml = '<div class="cal-now" style="transform:translateY(' + ((cx.now - range.start) * pxm).toFixed(1) + 'px)"' + (show ? '' : ' hidden') + '><div class="now-line' + (opts.grow === false ? '' : ' is-grow') + '"></div></div>';
       }
-      colsHtml += '<div class="cal-col' + (isToday ? ' is-today' : '') + (weekend ? ' is-weekend' : '') + (hol ? ' is-holiday' : '') + '" data-day="' + iso + '">' + evHtml + nowHtml + '</div>';
+      colsHtml += '<div class="cal-col' + (isToday ? ' is-today' : '') + (weekend ? ' is-weekend' : '') + (hol ? ' is-holiday' : '') + '" data-day="' + iso + '">' + evHtml + moreHtml + nowHtml + '</div>';
     });
     head.innerHTML = '<div class="cal-hd__row cal-hd__days"><div class="cal-hd__gutter"></div>' + daysHtml + '</div>' +
       (anyAllDay ? '<div class="cal-hd__row cal-hd__allday"><div class="cal-hd__gutter"><span class="eyebrow">Cả ngày</span></div>' + adHtml + '</div>' : '');
@@ -322,7 +338,7 @@
     var nw = nextWorkday(iso);
     var opts = (isToday ? '<option value="now"' + (slot === 'now' ? ' selected' : '') + '>Bây giờ</option>' : '');
     for (var h = 7; h <= 19; h++) { var v = U.minToTime(h * 60); opts += '<option value="' + v + '"' + (slot === v ? ' selected' : '') + '>' + v + ' – ' + U.minToTime(h * 60 + 60) + '</option>'; }
-    var freeTitle = slot === 'now' ? 'Ai đang rảnh lúc này' : 'Ai rảnh';
+    var freeTitle = slot === 'now' ? 'Ai đang rảnh' : 'Ai rảnh';
     side.innerHTML =
       '<section class="cal-side__sec cal-side__sec--date"><div class="eyebrow">' + U.escapeHtml(U.fmtRelativeDay(d)) + '</div><h3 class="cal-side__date">' + U.escapeHtml(U.fmtDate(d, 'long')) + '</h3>' +
       (hol ? '<p class="cal-side__hol">' + UI.icon('flag', 14) + '<span>Nghỉ lễ <b>' + U.escapeHtml(hol) + '</b> — cả công ty nghỉ. Ngày làm việc tiếp theo: <button type="button" class="link-btn" data-go-day="' + nw + '">' + U.escapeHtml(U.fmtDate(nw, 'shortWeekday')) + '</button></span></p>' : '<p class="cal-side__stats tnum">' + U.escapeHtml(statsTxt) + '</p>') + '</section>' +
@@ -521,7 +537,7 @@
     if (person) staffWrap.innerHTML = '<span class="eyebrow cal-fgroup__lbl">Lịch của</span><span class="chip chip--person">' + UI.avatar(person, { size: 'xs', title: false }) + '<span>' + U.escapeHtml(U.shortName(person.name)) + '</span><button type="button" class="chip__x" data-act="clear-staff" aria-label="Bỏ lọc theo nhân sự">' + UI.icon('x', 12) + '</button></span>';
     else staffWrap.innerHTML = '';
     bar.querySelector('.cal-clear').hidden = !hasFilter(F);
-    if (V.seg) { U.qsa('.segmented__btn', V.seg).forEach(function (b) { var on = b.dataset.value === V.mode; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); }); V.seg.refresh(); }
+    if (V.seg) { U.qsa('.segmented__btn', V.seg).forEach(function (b) { var on = b.dataset.value === V.mode; b.classList.toggle('is-active', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); b.removeAttribute('aria-selected'); }); V.seg.refresh(); }
     var inPeriod = V.days.indexOf(cx.today) >= 0;
     bar.querySelector('.cal-todaybtn').classList.toggle('is-current', inPeriod);
     // Ghi chú ngày lễ hôm nay (tuần / tháng)
@@ -683,7 +699,7 @@
       if (e.button !== 0 || e.pointerType === 'touch' || d) return;
       if (V.slide || V.morph) return;
       var col = e.target.closest('.cal-col'); if (!col) return;
-      if (e.target.closest('.cal-empty')) return;
+      if (e.target.closest('.cal-empty, .cal-more')) return;
       var wrap = e.target.closest('.cal-ev'), layer = col.closest('.cal-layer');
       if (!layer || layer.classList.contains('is-leaving')) return;
       d = { mode: wrap ? 'move' : 'draw', wrap: wrap, col: col, layer: layer, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, id: e.pointerId, active: false };
@@ -740,7 +756,7 @@
     });
     root.addEventListener('dblclick', function (e) {
       var col = e.target.closest('.cal-col');
-      if (col && !e.target.closest('.cal-ev, .cal-empty')) {
+      if (col && !e.target.closest('.cal-ev, .cal-empty, .cal-more')) {
         var range = V.view._range; if (!range) return;
         var lr = col.getBoundingClientRect(), min = U.clamp(floorSnap(range.start + (e.clientY - lr.top) / (hourH() / 60)), range.start, range.end - 60);
         openNew(col.dataset.day, min, min + 60); return;
@@ -753,7 +769,7 @@
       V.freeSlot = sel.value;
       var cx = ctx(), wrap = root.querySelector('.cal-side__free'), ttl = root.querySelector('.cal-side__free-title');
       if (wrap) wrap.innerHTML = freeListHtml(V.iso, sel.value, cx);
-      if (ttl) ttl.textContent = sel.value === 'now' ? 'Ai đang rảnh lúc này' : 'Ai rảnh';
+      if (ttl) ttl.textContent = sel.value === 'now' ? 'Ai đang rảnh' : 'Ai rảnh';
     });
     root.addEventListener('keydown', function (e) {
       var dh = e.target.closest && e.target.closest('.cal-mc__num, .cal-dh');

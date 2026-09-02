@@ -26,6 +26,14 @@
   function icon(name, size) { return raw(UI.icon(name, size)); }
   function isWorkday(iso) { return !U.isWeekend(iso) && !S().holidayName(iso); }
   function nextWorkday(iso) { var d = U.addDays(U.fromISO(iso), 1); for (var i = 0; i < 30 && !isWorkday(U.toISO(d)); i++) d = U.addDays(d, 1); return U.toISO(d); }
+  function workdays(from, to) { var n = 0; for (var d = U.fromISO(from); U.toISO(d) <= to; d = U.addDays(d, 1)) if (isWorkday(U.toISO(d))) n++; return n; }
+  /** Cùng quy tắc với trang Yêu cầu: đếm ngày làm việc (bỏ cuối tuần/lễ); đổi ca = 1 ca. */
+  function dayCount(r) {
+    if (r.type === 'swap') return '1 ca';
+    var n = workdays(r.from, r.to);
+    if (!n) { var allHol = true; for (var d = U.fromISO(r.from); U.toISO(d) <= r.to; d = U.addDays(d, 1)) if (!S().holidayName(U.toISO(d))) allHol = false; return (U.daysBetween(r.from, r.to) + 1) + ' ngày · ' + (allHol ? 'nghỉ lễ' : 'cuối tuần'); }
+    return n + ' ngày làm việc';
+  }
   function parseHours(str) { var m = /(\d{2}:\d{2})\s*[–-]\s*(\d{2}:\d{2})/.exec(str || ''); return m ? { start: m[1], end: m[2] } : null; }
   function dmw(iso) { return U.fmtDate(iso, 'shortWeekday'); }
   function dayLabel(iso, base) {
@@ -107,6 +115,7 @@
     this.container = container;
     this.timers = [];
     this.unbinders = [];
+    this.destroyed = false;
     this.inboxBusy = false;
     this.pendingRerender = false;
     this.readRoute(route);
@@ -129,6 +138,10 @@
     this.onVis = function () { if (!document.hidden) self.tick(); };
     document.addEventListener('visibilitychange', this.onVis);
   }
+
+  /** View còn sống? (app tái dùng container nên phải kiểm tra block đã bị gỡ chưa) */
+  Dashboard.prototype.alive = function () { return !this.destroyed && !!(this.blocks && this.blocks.head && this.blocks.head.isConnected); };
+  Dashboard.prototype.later = function (fn, ms) { var self = this; var id = setTimeout(function () { if (self.alive()) fn(); }, ms); this.timers.push(id); return id; };
 
   Dashboard.prototype.readRoute = function (route) {
     var q = (route && route.query) || {};
@@ -176,6 +189,7 @@
   };
 
   Dashboard.prototype.renderAll = function (first) {
+    if (!this.alive()) return;
     this.setTitle();
     this.renderHead(); this.renderHero(); this.renderTimeline(); this.renderQuick(); this.renderKpis(first);
     this.renderInbox(); this.renderUpcoming(); this.renderDeadlines(); this.renderWhere(); this.renderPulse(); this.renderFun();
@@ -215,6 +229,7 @@
     return c && c.date === this.iso ? c : null;
   };
   Dashboard.prototype.renderHero = function () {
+    if (!this.alive()) return;
     var st = S(), me = st.me(), iso = this.iso, block = this.blocks.hero;
     block.classList.remove('db-hero--recap');
     if (this.friday) return this.renderRecap();
@@ -309,7 +324,7 @@
     else {
       wrap.classList.add('is-in');
       requestAnimationFrame(function () { live.classList.add('is-sweep'); });
-      setTimeout(function () { dot.classList.add('is-live-dot'); wrap.classList.add('is-settled'); }, 620);
+      this.later(function () { dot.classList.add('is-live-dot'); wrap.classList.add('is-settled'); }, 620);
     }
     UI.toast('Check-in lúc ' + nowStr + ' · ' + info.t.label + (info.location ? ' · ' + info.location : ''), { kind: 'brand', title: 'Chúc bạn một ngày hiệu quả' });
   };
@@ -435,10 +450,11 @@
     var animate = false;
     if (first && !this.kpiAnimated) { var last = U.loadJSON(KEYS.reveal, null); animate = last !== this.realISO && !reduceMotion(); U.saveJSON(KEYS.reveal, this.realISO); this.kpiAnimated = true; }
     var leavePct = LEAVE_LEFT / LEAVE_TOTAL * 100, hoursPct = U.clamp(hours / (me.capacity || 40) * 100, 0, 100);
-    var over = hours > 48 || wl.percent > 100;
+    var over = hours > 48; // đỏ chỉ khi thật sự vượt trần giờ; tải sự kiện cao dùng tông cảnh báo + banner bên dưới
+    var barColor = over ? 'var(--red-ink)' : (hoursPct >= 90 || wl.percent > 100) ? 'var(--warn)' : 'var(--action)';
     U.render(block, h`
       <div class="db-kpis__grid">
-        <div class="card kpi db-kpi"><span class="kpi__label">${icon('clock', 13)}Giờ theo ca tuần này</span><span class="kpi__value"><span data-kpi="${hours}" data-dec="1">${animate ? '0' : fmtNum(hours)}</span><small>/ ${me.capacity || 40}g</small></span>${raw(UI.progress(animate ? 0 : hoursPct, { size: 'xs', color: over ? 'var(--red-ink)' : hoursPct >= 90 ? 'var(--warn)' : 'var(--action)' }))}<span class="kpi__delta${over ? ' is-warn' : ''}">${over ? raw(UI.icon('alert-triangle', 13) + ' Vượt ngưỡng an toàn') : hours >= 36 ? 'Tuần đủ nhịp' : 'Còn dư sức tuần này'}</span></div>
+        <div class="card kpi db-kpi"><span class="kpi__label">${icon('clock', 13)}Giờ theo ca tuần này</span><span class="kpi__value"><span data-kpi="${hours}" data-dec="1">${animate ? '0' : fmtNum(hours)}</span><small>/ ${me.capacity || 40}g</small></span>${raw(UI.progress(animate ? 0 : hoursPct, { size: 'xs', color: barColor }))}<span class="kpi__delta${over ? ' is-warn' : ''}">${over ? raw(UI.icon('alert-triangle', 13) + ' Vượt trần 48g') : wl.percent > 100 ? 'Ca trong quota · sự kiện dày' : hours >= 36 ? 'Tuần đủ nhịp' : 'Còn dư sức tuần này'}</span></div>
         <div class="card kpi db-kpi"><span class="kpi__label">${icon('calendar', 13)}Sự kiện tuần này</span><span class="kpi__value"><span data-kpi="${events}" data-dec="0">${animate ? '0' : events}</span></span><span class="kpi__delta">${st.eventsFor(me.id, this.iso).length} vào ${this.isReal ? 'hôm nay' : dmw(this.iso)}</span></div>
         <div class="card kpi db-kpi db-kpi--leave"><span class="kpi__label">${icon('umbrella', 13)}Ngày phép còn lại</span><div class="db-kpi__row"><span class="kpi__value"><span data-kpi="${LEAVE_LEFT}" data-dec="1">${animate ? '0' : fmtNum(LEAVE_LEFT)}</span><small>/ ${LEAVE_TOTAL}</small></span><span class="db-arc" role="img" aria-label="Còn ${fmtNum(LEAVE_LEFT)} trên ${LEAVE_TOTAL} ngày phép"><svg viewBox="0 0 40 40" aria-hidden="true"><circle class="db-arc__track" cx="20" cy="20" r="17"/><circle class="db-arc__fill" cx="20" cy="20" r="17" pathLength="100" style="stroke-dashoffset:${animate ? 100 : 100 - leavePct}"/></svg></span></div><span class="kpi__delta">Hết hạn 31/12 · dùng dần nhé</span></div>
         <div class="card kpi db-kpi"><span class="kpi__label">${icon('inbox', 13)}Yêu cầu chờ duyệt</span><span class="kpi__value"><span data-kpi="${pending}" data-dec="0">${animate ? '0' : pending}</span></span><span class="kpi__delta">${pending ? h`<a href="#/requests">Xử lý ngay →</a>` : 'Hộp thư sạch. Tuyệt.'}</span></div>
@@ -469,7 +485,7 @@
       return { icon: 'building', text: 'Team ' + team.name + ' còn ' + inOffice + '/' + n + ' người tại văn phòng', over: false };
     }
     if (r.type === 'ot') {
-      var wd = 0; for (var d = U.fromISO(r.from); U.toISO(d) <= r.to; d = U.addDays(d, 1)) if (!U.isWeekend(d)) wd++;
+      var wd = workdays(r.from, r.to);
       var total = st.weekHours(who.id, r.from) + wd * 3;
       return { icon: 'hourglass', text: 'Tuần đó ' + U.firstName(who.name) + ' lên ~' + fmtHours(total) + (total > 48 ? ' · vượt trần 48g' : ' · trong trần 48g'), over: total > 48 };
     }
@@ -480,6 +496,7 @@
     return { text: '', over: false };
   };
   Dashboard.prototype.renderInbox = function () {
+    if (!this.alive()) return;
     var st = S(), me = st.me(), block = this.blocks.inbox, self = this;
     var all = st.pendingRequests().filter(function (r) { return r.staffId !== me.id; });
     var list = U.sortBy(all, 'from').slice(0, 4);
@@ -495,14 +512,14 @@
   };
   Dashboard.prototype.requestCard = function (r) {
     var st = S(), who = st.staff(r.staffId), team = st.team(who.teamId), type = E().requestType(r.type);
-    var multi = r.from !== r.to, days = U.daysBetween(r.from, r.to) + 1;
+    var multi = r.from !== r.to, count = dayCount(r);
     var impact = this.impactLine(r);
     return h`
       <article class="db-req" tabindex="0" data-id="${r.id}" aria-label="${type.label} của ${who.name}">
         <span class="db-req__icon" data-type="${r.type}">${icon(type.icon, 16)}</span>
         <div class="db-req__body">
           <div class="db-req__top">${raw(UI.avatar(who, { size: 'sm', title: false }))}<span class="db-req__name"><b>${who.name}</b><small>${who.role}${team ? ' · ' + team.name : ''}</small></span><span class="chip chip--xs chip--type">${type.label}</span></div>
-          <div class="db-req__when mono tnum">${dmw(r.from)}${multi ? h` <span class="db-req__arrow">→</span> ${dmw(r.to)} <span class="faint">· ${days} ngày</span>` : ''}</div>
+          <div class="db-req__when mono tnum">${dmw(r.from)}${multi ? h` <span class="db-req__arrow">→</span> ${dmw(r.to)}` : ''} <span class="faint">· ${count}</span></div>
           <p class="db-req__reason clamp-2">${r.reason}</p>
           ${impact.text ? h`<div class="db-req__impact${impact.over ? ' is-over' : ''}">${icon(impact.over ? 'alert-triangle' : impact.icon || 'info', 13)}<span>${impact.text}</span></div>` : ''}
         </div>
@@ -529,15 +546,16 @@
   Dashboard.prototype.removeCard = function (card, exitCls, exitMs, done) {
     var self = this, block = this.blocks.inbox, main = block.parentElement;
     var finish = function () {
+      if (!self.alive()) return;
       var remaining = U.qsa('.db-req', block).filter(function (c) { return c !== card; });
       var followers = []; var sib = block.nextElementSibling; while (sib) { followers.push(sib); sib = sib.nextElementSibling; }
       var foot = block.querySelector('.card__foot');
       flipY(remaining.concat([foot]).concat(followers), function () { card.remove(); }, 240);
-      setTimeout(function () { self.inboxBusy = false; self.renderInbox(); if (self.pendingRerender) { self.pendingRerender = false; self.renderAll(false); } if (done) done(); }, 260);
+      self.later(function () { self.inboxBusy = false; self.renderInbox(); if (self.pendingRerender) { self.pendingRerender = false; self.renderAll(false); } if (done) done(); }, 260);
     };
     if (reduceMotion()) { self.inboxBusy = false; self.renderInbox(); if (done) done(); return; }
     card.classList.add(exitCls);
-    setTimeout(finish, exitMs);
+    self.later(finish, exitMs);
   };
   Dashboard.prototype.approve = function (id, btn) {
     var st = S(), r = st.request(id); if (!r || r.status !== 'pending') return;
@@ -550,8 +568,8 @@
     var stamp = btn.closest('.db-stamp'), actions = card.querySelector('.db-req__actions');
     actions.classList.add('is-deciding');
     stamp.classList.add('is-stamping');
-    setTimeout(function () { stamp.classList.add('is-done'); }, 320);
-    setTimeout(function () { self.removeCard(card, 'is-leaving', 220); }, 720);
+    this.later(function () { stamp.classList.add('is-done'); }, 320);
+    this.later(function () { self.removeCard(card, 'is-leaving', 220); }, 720);
   };
   Dashboard.prototype.reject = function (id, btn) {
     var st = S(), r = st.request(id); if (!r || r.status !== 'pending') return;
@@ -629,9 +647,9 @@
     U.render(block, h`
       <div class="card__head"><div><div class="card__eyebrow">${this.isReal ? 'Hôm nay' : dmw(iso)}</div><h3 class="card__title">Ai đang ở đâu</h3></div><a class="link-btn" href="#/roster/${iso}">Bảng ca →</a></div>
       <p class="db-where__counts">${parts.join(' · ')}</p>
-      <div class="db-where__filters chips" role="tablist" aria-label="Lọc theo team">
-        <button type="button" class="chip chip--btn${this.whereFilter === 'all' ? ' is-active' : ''}" role="tab" aria-selected="${this.whereFilter === 'all'}" data-where="all">Tất cả</button>
-        ${st.state.teams.map(function (t) { return h`<button type="button" class="chip chip--btn chip--color${self.whereFilter === t.id ? ' is-active' : ''}" role="tab" aria-selected="${self.whereFilter === t.id}" style="--chip:${t.color}" data-where="${t.id}"><i class="chip__dot"></i><span>${t.short}</span></button>`; })}
+      <div class="db-where__filters chips" role="group" aria-label="Lọc theo team">
+        <button type="button" class="chip chip--btn${this.whereFilter === 'all' ? ' is-active' : ''}" aria-pressed="${this.whereFilter === 'all' ? 'true' : 'false'}" data-where="all">Tất cả</button>
+        ${st.state.teams.map(function (t) { return h`<button type="button" class="chip chip--btn chip--color${self.whereFilter === t.id ? ' is-active' : ''}" aria-pressed="${self.whereFilter === t.id ? 'true' : 'false'}" style="--chip:${t.color}" data-where="${t.id}"><i class="chip__dot"></i><span>${t.short}</span></button>`; })}
       </div>
       <div class="db-where__grid"></div>`);
     this.renderWhereGrid();
@@ -655,6 +673,7 @@
 
   /* --------------------------------------------------------- 10. Nhịp đội */
   Dashboard.prototype.renderPulse = function () {
+    if (!this.alive()) return;
     var st = S(), block = this.blocks.pulse, days = U.weekDays(this.date), real = U.todayISO(), self = this;
     var teams = st.state.teams;
     U.render(block, h`
@@ -669,7 +688,7 @@
             var avg = loads.length ? Math.round(U.sum(loads) / loads.length) : null, lvl = heatLevel(avg);
             if (avg != null && loads.length / members.length < 0.5 && lvl > 1) lvl = Math.max(1, lvl - 1);
             var tip = t.name + ' · ' + dmw(iso) + ' · ' + loads.length + '/' + members.length + ' người' + (avg != null ? ' · ' + avg + '%' : ' · nghỉ');
-            return h`<span class="heat${lvl === 5 ? ' is-overload' : ''}" role="cell" tabindex="0" data-level="${lvl}" data-tip="${tip}" aria-label="${tip}" style="--i:${i};--j:${j}"></span>`;
+            return h`<span class="heat${lvl === 5 ? ' is-overload' : ''}" role="cell" tabindex="${i === 0 && j === 0 ? '0' : '-1'}" data-i="${i}" data-j="${j}" data-level="${lvl}" data-tip="${tip}" aria-label="${tip}" style="--i:${i};--j:${j}"></span>`;
           })}`;
         })}
       </div>
@@ -679,13 +698,14 @@
     if (reduceMotion() || !('IntersectionObserver' in window)) { grid.classList.add('is-live', 'is-settled'); return; }
     this.pulseIO = new IntersectionObserver(function (entries) {
       if (!entries.some(function (en) { return en.isIntersecting; })) return;
-      self.pulseIO.disconnect(); self.pulseIO = null;
+      if (self.pulseIO) { self.pulseIO.disconnect(); self.pulseIO = null; }
+      if (!self.alive()) return;
       grid.classList.add('is-live');
-      setTimeout(function () { grid.classList.add('is-settled'); }, 800);
+      self.later(function () { grid.classList.add('is-settled'); }, 800);
     }, { threshold: 0.2 });
     this.pulseIO.observe(grid);
     // Dự phòng: nếu observer không bắn (in ấn, iframe ẩn…) vẫn hiện sau 5s
-    this.timers.push(setTimeout(function () { if (!grid.classList.contains('is-live')) { grid.classList.add('is-live'); setTimeout(function () { grid.classList.add('is-settled'); }, 800); } }, 5000));
+    this.later(function () { if (!grid.classList.contains('is-live')) { grid.classList.add('is-live'); self.later(function () { grid.classList.add('is-settled'); }, 800); } }, 5000);
   };
 
   /* --------------------------------------------------------- 11. Có gì vui */
@@ -704,6 +724,7 @@
     return U.sortBy(items, 'date').slice(0, 6);
   };
   Dashboard.prototype.renderFun = function () {
+    if (!this.alive()) return;
     var block = this.blocks.fun, items = this.funItems(), sent = U.loadJSON(KEYS.kudos, {}), open = this.funOpen;
     block.classList.toggle('is-collapsed', !open);
     U.render(block, h`
@@ -728,9 +749,9 @@
     var sent = U.loadJSON(KEYS.kudos, {}); sent[key] = new Date().toISOString(); U.saveJSON(KEYS.kudos, sent);
     var chip = U.frag(h`<span class="chip chip--ok chip--xs">${icon('check', 11)}<span>Đã chúc</span></span>`);
     btn.replaceWith(chip);
-    if (!reduceMotion()) { card.classList.remove('celebrate'); void card.offsetWidth; card.classList.add('celebrate'); setTimeout(function () { card.classList.remove('celebrate'); }, 720); }
+    if (!reduceMotion()) { card.classList.remove('celebrate'); void card.offsetWidth; card.classList.add('celebrate'); this.later(function () { card.classList.remove('celebrate'); }, 720); }
     UI.toast('Đã gửi lời chúc tới ' + name, { kind: 'brand', title: 'Lời chúc đã bay đi 🎉' });
-    setTimeout(function () { self.renderFun(); }, 800);
+    this.later(function () { self.renderFun(); }, 800);
   };
 
   /* --------------------------------------------------------- interactions */
@@ -762,7 +783,7 @@
     });
     on('click', '[data-where]', function (e, el) {
       self.whereFilter = el.dataset.where; U.saveJSON(KEYS.where, self.whereFilter);
-      U.qsa('[data-where]', self.blocks.where).forEach(function (b) { var onb = b === el; b.classList.toggle('is-active', onb); b.setAttribute('aria-selected', onb); });
+      U.qsa('[data-where]', self.blocks.where).forEach(function (b) { var onb = b === el; b.classList.toggle('is-active', onb); b.setAttribute('aria-pressed', onb ? 'true' : 'false'); });
       self.renderWhereGrid();
     });
     on('click', '[data-fun-toggle]', function (e, el) {
@@ -771,11 +792,25 @@
       el.setAttribute('aria-expanded', self.funOpen); body.hidden = !self.funOpen; self.blocks.fun.classList.toggle('is-collapsed', !self.funOpen);
     });
     on('click', '[data-kudos]', function (e, el) { self.sendKudos(el); });
-    on('keydown', '.heat[data-tip]', function (e, el) { if (e.key === 'Enter') location.hash = '#/staff?view=pulse'; });
+    // Nhịp đội: roving tabindex — 1 tab stop cho cả lưới, mũi tên đi giữa các ô
+    on('keydown', '.db-pulse__grid .heat', function (e, el) {
+      var k = e.key;
+      if (k === 'Enter' || k === ' ') { e.preventDefault(); location.hash = '#/staff?view=pulse'; return; }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var grid = el.closest('.db-pulse__grid'), i = +el.dataset.i, j = +el.dataset.j;
+      if (k === 'ArrowRight') i++; else if (k === 'ArrowLeft') i--; else if (k === 'ArrowDown') j++; else if (k === 'ArrowUp') j--;
+      else if (k === 'Home') i = 0; else if (k === 'End') i = 6;
+      else return;
+      var next = grid.querySelector('.heat[data-i="' + i + '"][data-j="' + j + '"]');
+      e.preventDefault();
+      if (!next || next === el) return;
+      el.setAttribute('tabindex', '-1'); next.setAttribute('tabindex', '0'); next.focus();
+    });
   };
 
   /* ----------------------------------------------------------- live tick */
   Dashboard.prototype.tick = function () {
+    if (!this.alive()) return;
     var now = U.nowMinutes(), real = U.todayISO();
     if (real !== this.realISO) { this.readRoute({ query: {} }); this.renderAll(false); return; }
     var line = this.blocks.timeline.querySelector('.db-tl__now');
@@ -795,6 +830,7 @@
 
   /* -------------------------------------------------------- store events */
   Dashboard.prototype.onStore = function (meta) {
+    if (!this.alive()) return;
     var t = (meta && meta.type) || '';
     if (!/^(request|shift|event|staff|project|reset)/.test(t)) return;
     if (this.inboxBusy) { this.pendingRerender = true; return; }
@@ -813,11 +849,13 @@
     if (prevISO !== this.iso || prevFri !== this.friday) this.renderAll(false); else this.setTitle();
   };
   Dashboard.prototype.destroy = function () {
+    this.destroyed = true;
     if (this.unsub) this.unsub();
     this.unregisterKeys.forEach(function (f) { f && f(); });
     this.unbinders.forEach(function (f) { f && f(); });
     this.timers.forEach(function (t) { clearInterval(t); clearTimeout(t); });
-    if (this.pulseIO) this.pulseIO.disconnect();
+    if (this.pulseIO) { this.pulseIO.disconnect(); this.pulseIO = null; }
+    this.timers.length = 0;
     document.removeEventListener('visibilitychange', this.onVis);
   };
 

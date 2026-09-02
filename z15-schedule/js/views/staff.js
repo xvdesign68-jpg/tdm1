@@ -251,12 +251,15 @@
     count.innerHTML = h`<b class="tnum">${free.length}</b> người rảnh · ${when}${outside ? h` <span class="faint">· ngoài giờ hành chính</span>` : ''}`.s;
     if (!free.length) {
       var why = hol ? 'Nghỉ lễ ' + hol + ' — thử ' + dmw(nextWorkday(slot.iso)) + '.' : U.isWeekend(slot.iso) ? 'Cuối tuần — thử ngày làm việc kế tiếp.' : outside ? 'Ngoài giờ làm — thử trong khung 09:00 – 18:00.' : 'Ai cũng có lịch khung này — thử giờ khác.';
+      list.removeAttribute('role'); // đoạn văn không phải mục danh sách
       U.render(list, h`<p class="st-free__empty muted">${why}</p>`);
       return;
     }
+    list.setAttribute('role', 'list');
+    // Mỗi nút nằm trong một listitem riêng để giữ nguyên ngữ nghĩa "nút" cho trình đọc màn hình
     U.render(list, h`${free.map(function (x) {
       var team = st.team(x.s.teamId), sh = st.shiftType(x.type);
-      return h`<button type="button" class="st-free__p" role="listitem" data-open="${x.s.id}" data-no-profile aria-label="${x.s.name} · ${x.s.role} · ${sh.label}" style="--team:${team ? team.color : 'transparent'}">${raw(UI.avatar(x.s, { size: 'sm', title: false }))}<span class="st-free__name">${U.shortName(x.s.name)}</span><small class="mono-sm">${team ? team.short : ''}${x.type === 'remote' ? ' · WFH' : x.type === 'onsite' ? ' · Q' : ''}</small></button>`;
+      return h`<span class="st-free__li" role="listitem"><button type="button" class="st-free__p" data-open="${x.s.id}" data-no-profile aria-label="${x.s.name} · ${x.s.role} · ${sh.label}" style="--team:${team ? team.color : 'transparent'}">${raw(UI.avatar(x.s, { size: 'sm', title: false }))}<span class="st-free__name">${U.shortName(x.s.name)}</span><small class="mono-sm">${team ? team.short : ''}${x.type === 'remote' ? ' · WFH' : x.type === 'onsite' ? ' · Q' : ''}</small></button></span>`;
     })}`);
   };
 
@@ -298,7 +301,7 @@
   };
   StaffView.prototype.syncSegmented = function () {
     var F = this.F; if (!this.seg) return;
-    U.qsa('.segmented__btn', this.seg).forEach(function (b) { var on = b.dataset.value === F.view; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    U.qsa('.segmented__btn', this.seg).forEach(function (b) { var on = b.dataset.value === F.view; b.classList.toggle('is-active', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
     if (this.seg.refresh) this.seg.refresh();
   };
   StaffView.prototype.renderCount = function (n, total) {
@@ -465,26 +468,32 @@
     };
     var overDayList = Object.keys(overDays).sort();
     var rosterLink = function (iso, teamId) { return '#/roster/' + iso + (teamId ? '?team=' + teamId : ''); };
+    // Roving tabindex: chỉ một ô heat nằm trong thứ tự Tab (hàng đầu, cột hôm nay); mũi tên di chuyển trong lưới.
+    var tabC = Math.max(0, days.indexOf(this.todayISO)), tabR = 0;
     U.render(this.els.results, h`<div class="st-pulse${first ? ' reveal' : ''}" style="--i:3">
       <div class="card card--flush st-pulse__main">
         <div class="st-pulse__scroll">
-          <div class="st-pulse__grid" role="table" aria-label="Tải công việc theo người và ngày, 14 ngày từ ${dmw(days[0])}">
-            <div class="st-pulse__corner st-pulse__sticky" role="columnheader"><span class="eyebrow">Tuần ${w1} – ${w2}</span><span class="st-pulse__hint faint">Bấm ô để mở bảng ca</span></div>
-            ${days.slice(0, 7).map(dayHead)}<div class="st-pulse__gap" aria-hidden="true"></div>${days.slice(7).map(function (iso, i) { return dayHead(iso, i + 7); })}
-            <div class="st-pulse__h st-pulse__h--num" role="columnheader"><span class="eyebrow">Tuần ${w1}</span></div>
-            <div class="st-pulse__h" role="columnheader"><span class="eyebrow">7 ngày</span></div>
+          <div class="st-pulse__grid" role="grid" aria-label="Tải công việc theo người và ngày, 14 ngày từ ${dmw(days[0])}" aria-rowcount="${rows.length + teams.length + 1}" aria-colcount="${days.length + 3}">
+            <div class="st-pulse__row" role="row">
+              <div class="st-pulse__corner st-pulse__sticky" role="columnheader"><span class="eyebrow">Tuần ${w1} – ${w2}</span><span class="st-pulse__hint faint">Bấm ô để mở bảng ca · mũi tên để di chuyển</span></div>
+              ${days.slice(0, 7).map(dayHead)}<div class="st-pulse__gap" aria-hidden="true"></div>${days.slice(7).map(function (iso, i) { return dayHead(iso, i + 7); })}
+              <div class="st-pulse__h st-pulse__h--num" role="columnheader"><span class="eyebrow">Tuần ${w1}</span></div>
+              <div class="st-pulse__h" role="columnheader"><span class="eyebrow">7 ngày</span></div>
+            </div>
             ${teams.map(function (t) {
               var trs = rows.filter(function (row) { return row.team.id === t.id; });
-              return h`<div class="st-pulse__team" role="rowheader" style="--chip:${t.color}"><i class="chip__dot"></i>${t.name}<small class="mono-sm">${trs.length}</small></div>${trs.map(function (row) {
+              return h`<div class="st-pulse__row" role="row"><div class="st-pulse__team" role="rowheader" aria-colspan="${days.length + 3}" style="--chip:${t.color}"><i class="chip__dot"></i>${t.name}<small class="mono-sm">${trs.length}</small></div></div>${trs.map(function (row) {
                 var s = row.s, isMe = s.id === me;
-                return h`<div class="st-pulse__name st-pulse__sticky${isMe ? ' is-me' : ''}" role="rowheader" data-r="${row.r}" title="${s.name} · ${s.role}">${raw(UI.avatar(s, { size: 'xs', title: false }))}<span class="truncate">${U.shortName(s.name)}</span></div>
+                return h`<div class="st-pulse__row" role="row">
+                  <div class="st-pulse__name st-pulse__sticky${isMe ? ' is-me' : ''}" role="rowheader" data-r="${row.r}" title="${s.name} · ${s.role}">${raw(UI.avatar(s, { size: 'xs', title: false }))}<span class="truncate">${U.shortName(s.name)}</span></div>
                   ${row.cells.map(function (c, i) {
-                    var tip = cellTip(s, c);
-                    var cell = h`<button type="button" class="heat${c.level === 5 ? ' is-overload' : ''}" role="cell" data-level="${c.level}" data-r="${row.r}" data-c="${i}" data-iso="${c.iso}" data-team="${t.id}" data-sid="${s.id}" data-shift="${c.shiftMin}" data-outside="${c.outsideMin}" aria-label="${tip}" style="--i:${i};--j:${row.r}"></button>`;
+                    var tip = cellTip(s, c), inTab = row.r === tabR && i === tabC;
+                    var cell = h`<div class="st-pulse__cell" role="gridcell"><button type="button" class="heat${c.level === 5 ? ' is-overload' : ''}" tabindex="${inTab ? '0' : '-1'}" data-level="${c.level}" data-r="${row.r}" data-c="${i}" data-iso="${c.iso}" data-team="${t.id}" data-sid="${s.id}" data-shift="${c.shiftMin}" data-outside="${c.outsideMin}" aria-label="${tip}" style="--i:${i};--j:${row.r}"></button></div>`;
                     return i === 7 ? h`<div class="st-pulse__gap" aria-hidden="true"></div>${cell}` : cell;
                   })}
-                  <div class="st-pulse__hours mono${row.weekMin > OVER_WEEK_MIN ? ' is-over' : ''}" role="cell" data-r="${row.r}" title="${row.weekMin > OVER_WEEK_MIN ? 'Trên 48 giờ tuần này' : 'Giờ làm tuần này'}">${row.weekMin > OVER_WEEK_MIN ? icon('alert-triangle', 11) : ''}${fmtH(row.weekMin)}</div>
-                  <div class="st-pulse__spark" role="cell" data-r="${row.r}" aria-label="Tải 7 ngày tuần này">${row.cells.slice(0, 7).map(function (c) { return h`<i data-level="${c.level}" style="--v:${Math.max(0, Math.min(1, c.totalMin / maxMin)).toFixed(2)}"></i>`; })}</div>`;
+                  <div class="st-pulse__hours mono${row.weekMin > OVER_WEEK_MIN ? ' is-over' : ''}" role="gridcell" data-r="${row.r}" title="${row.weekMin > OVER_WEEK_MIN ? 'Trên 48 giờ tuần này' : 'Giờ làm tuần này'}">${row.weekMin > OVER_WEEK_MIN ? icon('alert-triangle', 11) : ''}${fmtH(row.weekMin)}</div>
+                  <div class="st-pulse__spark" role="gridcell" data-r="${row.r}" aria-label="Tải 7 ngày tuần này">${row.cells.slice(0, 7).map(function (c) { return h`<i data-level="${c.level}" style="--v:${Math.max(0, Math.min(1, c.totalMin / maxMin)).toFixed(2)}"></i>`; })}</div>
+                </div>`;
               })}`;
             })}
           </div>
@@ -528,6 +537,12 @@
     if (r == null) { this.pulseHi = null; grid.classList.remove('has-hi'); return; }
     (this.pulseRows[r] || []).forEach(function (n) { n.classList.add('is-hi'); }); (this.pulseCols[c] || []).forEach(function (n) { n.classList.add('is-hi'); });
     this.pulseHi = { r: r, c: c }; grid.classList.add('has-hi');
+  };
+  /** Roving tabindex: ô vừa nhận focus trở thành điểm dừng Tab duy nhất của lưới. */
+  StaffView.prototype.pulseRove = function (cell) {
+    var grid = this.pulseGrid; if (!grid || !cell || cell.tabIndex === 0) return;
+    U.qsa('.heat[tabindex="0"]', grid).forEach(function (n) { if (n !== cell) n.tabIndex = -1; });
+    cell.tabIndex = 0;
   };
   StaffView.prototype.showTip = function (cell) {
     var tip = this.els.tip; if (!tip) return;
@@ -600,16 +615,21 @@
     // Nhịp đội
     var hover = U.rafThrottle(function (cell) { if (!cell || !cell.isConnected) return; self.pulseHighlight(+cell.dataset.r, +cell.dataset.c); self.showTip(cell); });
     on('mouseover', '.st-pulse__grid .heat', function (e, el) { hover(el); });
-    on('focusin', '.st-pulse__grid .heat', function (e, el) { hover(el); });
+    on('focusin', '.st-pulse__grid .heat', function (e, el) { self.pulseRove(el); hover(el); });
     on('focusout', '.st-pulse__grid .heat', function () { self.pulseHighlight(null); self.hideTip(); });
     var leave = function (e) { var g = self.pulseGrid; if (!g) return; if (!e.relatedTarget || !g.contains(e.relatedTarget) || !e.relatedTarget.closest('.heat')) { self.pulseHighlight(null); self.hideTip(); } };
     on('mouseout', '.st-pulse__grid .heat', leave);
     on('click', '.st-pulse__grid .heat', function (e, el) { location.hash = '#/roster/' + el.dataset.iso + (el.dataset.team ? '?team=' + el.dataset.team : ''); });
     on('keydown', '.st-pulse__grid .heat', function (e, el) {
-      var dr = 0, dc = 0;
-      if (e.key === 'ArrowRight') dc = 1; else if (e.key === 'ArrowLeft') dc = -1; else if (e.key === 'ArrowDown') dr = 1; else if (e.key === 'ArrowUp') dr = -1; else return;
+      var g = self.pulseGrid; if (!g) return;
+      var r = +el.dataset.r, c = +el.dataset.c, k = e.key, next = null;
+      var at = function (rr, cc) { return g.querySelector('.heat[data-r="' + rr + '"][data-c="' + cc + '"]'); };
+      if (k === 'ArrowRight') next = at(r, c + 1); else if (k === 'ArrowLeft') next = at(r, c - 1);
+      else if (k === 'ArrowDown') next = at(r + 1, c); else if (k === 'ArrowUp') next = at(r - 1, c);
+      else if (k === 'Home') next = e.ctrlKey ? at(0, 0) : at(r, 0);
+      else if (k === 'End') { var last = U.qsa('.heat[data-r="' + (e.ctrlKey ? self.pulseRows.length - 1 : r) + '"]', g); next = last[last.length - 1] || null; }
+      else return;
       e.preventDefault();
-      var next = self.pulseGrid && self.pulseGrid.querySelector('.heat[data-r="' + (+el.dataset.r + dr) + '"][data-c="' + (+el.dataset.c + dc) + '"]');
       if (next) next.focus();
     });
     this.onScroll = function () { if (self.els.tip && self.els.tip.classList.contains('is-open')) self.hideTip(); };

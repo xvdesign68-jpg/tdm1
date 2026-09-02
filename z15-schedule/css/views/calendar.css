@@ -126,6 +126,13 @@ body.cal-dragging .ev-pill { pointer-events: none; }
   .cal-ev .ev-pill { padding-left: 8px; padding-right: 6px; }
 }
 
+/* “+N nữa” khi quá nhiều sự kiện chồng giờ trong cột hẹp */
+.cal-more { position: absolute; z-index: 2; display: flex; align-items: flex-start; justify-content: center; gap: 0; padding: 4px 3px; border-radius: var(--r-sm); border: 1px dashed var(--border-strong); background: var(--bg-surface); color: var(--fg-secondary); font-size: 11px; font-weight: 600; line-height: 14px; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; transition: background-color var(--dur-instant), color var(--dur-instant), border-color var(--dur-instant); }
+.cal-more:hover { background: var(--bg-hover); color: var(--fg-primary); border-color: var(--fg-tertiary); }
+.cal-more:focus-visible { outline-offset: -2px; }
+.cal-more__w { font-weight: 500; }
+@container (max-width: 150px) { .cal-more__w { display: none; } }
+
 /* now-line */
 .cal-now { position: absolute; left: 0; right: 0; top: 0; height: 0; z-index: 4; pointer-events: none; transition: transform 600ms var(--ease-out); }
 .cal-now .now-line { top: 0; transition: none; }
@@ -151,7 +158,7 @@ body.cal-dragging .ev-pill { pointer-events: none; }
 /* ------------------------------------------------------------ month */
 .cal-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(6, minmax(100px, 1fr)); min-height: 100%; background: var(--bg-surface); }
 .cal-scroll--month { overflow: auto; }
-.cal-scroll--month .cal-layers { position: relative; height: 100%; min-height: 100%; }
+.cal-scroll--month .cal-layers { position: relative; left: 0; right: auto; width: 100%; height: 100%; min-height: 100%; }
 .cal-scroll--month .cal-layer { position: absolute; inset: 0; }
 .cal-month__wd { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--border-hair); }
 .cal-month__wd .eyebrow { padding: 10px 10px 8px; font-size: 11px; }

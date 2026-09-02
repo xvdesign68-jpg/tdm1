@@ -328,6 +328,12 @@
         var week = false; try { week = !!(pop && pop.el && pop.el.querySelector('.apply-week') && pop.el.querySelector('.apply-week').checked); } catch (e) { /* noop */ }
         var ops = week ? prevWeek.filter(function (o) { return o.prev !== type; }).map(function (o) { return { staffId: o.staffId, iso: o.iso, prev: o.prev, to: type }; }) : (prevOne !== type ? [{ staffId: staffId, iso: iso, prev: prevOne, to: type }] : []);
         if (ops.length) { V.undo.push({ label: (week ? 'Cả tuần của ' : U.fmtDate(iso, 'shortWeekday') + ' của ') + U.shortName(st.staff(staffId).name) + ' → ' + st.shiftType(type).label, ops: ops, at: Date.now() }); }
+        // Store đã vẽ lại lưới (ô cũ + anchor đã tách khỏi DOM) nên popover không trả focus được → tự đưa focus về ô mới
+        setTimeout(function () {
+          if (!V || !V.grid) return;
+          var c = V.grid.querySelector('.ro-cell[data-staff="' + staffId + '"][data-iso="' + iso + '"]');
+          if (c && !V.grid.contains(document.activeElement)) focusCell(c, { noScroll: true });
+        }, 0);
       }
     });
   }
@@ -517,7 +523,7 @@
           '<button type="button" class="btn btn--secondary btn--sm ro-today" data-act="today" data-tip="Về tuần này · T">Hôm nay</button>' +
           '<span class="ro-bar__arrows"><button type="button" class="icon-btn icon-btn--sm" data-act="prev" aria-label="Tuần trước (J)" data-tip="Tuần trước · J">' + UI.icon('chevron-left', 17) + '</button><button type="button" class="icon-btn icon-btn--sm" data-act="next" aria-label="Tuần sau (K)" data-tip="Tuần sau · K">' + UI.icon('chevron-right', 17) + '</button></span>' +
           '<h2 class="ro-title t-h2 tnum"><span class="ro-title__txt"></span></h2>' +
-          '<span class="ro-status chip chip--xs" hidden></span>' +
+          '<span class="ro-status chip" hidden></span>' +
         '</div>' +
         '<div class="ro-bar__seg"></div>' +
         '<div class="ro-bar__actions">' +
@@ -538,7 +544,7 @@
   }
   function publishState(cx) {
     var rec = V.published[periodKey(V.iso, V.range)];
-    if (!rec) return { state: 'draft', label: 'Nháp', tone: 'muted' };
+    if (!rec) return { state: 'draft', label: 'Nháp', tone: 'warn', icon: 'clock' };
     var same = rec.sig === signature(cx);
     var t = new Date(rec.time), when = U.pad(t.getHours()) + ':' + U.pad(t.getMinutes()) + (U.isToday(U.toISO(t)) ? '' : ' ' + U.fmtDate(t, 'dm'));
     return same ? { state: 'published', label: 'Đã công bố · ' + when, tone: 'ok', icon: 'check' } : { state: 'changed', label: 'Có thay đổi chưa công bố', tone: 'warn', icon: 'edit' };
@@ -552,7 +558,7 @@
     bar.querySelector('.ro-today').classList.toggle('is-current', cx.days.some(function (d) { return d.today; }));
     if (V.seg) { U.qsa('.segmented__btn', V.seg).forEach(function (b) { var on = b.dataset.value === String(V.range); b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); }); V.seg.refresh(); }
     var ps = publishState(cx), stEl = bar.querySelector('.ro-status');
-    stEl.hidden = false; stEl.className = 'ro-status chip chip--xs chip--' + ps.tone; stEl.innerHTML = (ps.icon ? UI.icon(ps.icon, 11) : '') + '<span>' + esc(ps.label) + '</span>';
+    stEl.hidden = false; stEl.className = 'ro-status chip chip--' + ps.tone; stEl.innerHTML = (ps.icon ? UI.icon(ps.icon, 12) : '') + '<span>' + esc(ps.label) + '</span>';
     var pub = bar.querySelector('.ro-publish'); pub.classList.toggle('btn--soft', ps.state !== 'published'); pub.classList.toggle('btn--secondary', ps.state === 'published');
     pub.querySelector('span').textContent = ps.state === 'published' ? 'Công bố lại' : 'Công bố lịch';
     var sub = periodTitle(V.iso, V.range) + ' · ' + cx.rows.length + (cx.filtered ? '/' + cx.allStaff.length : '') + ' người · ' + cx.teams.length + ' team';
@@ -826,7 +832,9 @@
       var q = inp.value;
       if (q === V.q) return;
       V.q = q;
-      try { history.replaceState(null, '', '#/roster/' + V.iso + '?range=' + V.range + (V.team ? '&team=' + encodeURIComponent(V.team) : '') + (V.loc ? '&loc=' + V.loc : '') + (q ? '&q=' + encodeURIComponent(q) : '')); } catch (err) { /* noop */ }
+      var hash = '#/roster/' + V.iso + '?range=' + V.range + (V.team ? '&team=' + encodeURIComponent(V.team) : '') + (V.loc ? '&loc=' + V.loc : '') + (q ? '&q=' + encodeURIComponent(q) : '');
+      // Đồng bộ router.current để app.js không coi lần bấm lại menu "Bảng ca" là hashchange rỗng (giống staff.js syncURL)
+      try { history.replaceState(null, '', hash); if (Z15.router && Z15.router.parse) Z15.router.current = Z15.router.parse(hash); } catch (err) { /* noop */ }
       refresh({ keepFocus: false });
     }, 120);
     inp.addEventListener('input', onSearch);

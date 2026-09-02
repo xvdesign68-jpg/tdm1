@@ -23,7 +23,8 @@
     parse: function (hash) {
       var h = (hash || location.hash || '#/dashboard').replace(/^#\/?/, '');
       var qi = h.indexOf('?'), query = {};
-      if (qi >= 0) { h.slice(qi + 1).split('&').forEach(function (kv) { if (!kv) return; var p = kv.split('='); query[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); }); h = h.slice(0, qi); }
+      var dec = function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } };
+      if (qi >= 0) { h.slice(qi + 1).split('&').forEach(function (kv) { if (!kv) return; var p = kv.split('='); query[dec(p[0])] = dec(p[1] || ''); }); h = h.slice(0, qi); }
       var parts = h.split('/').filter(Boolean);
       var view = parts.shift() || 'dashboard';
       if (!Z15.views[view]) { view = 'dashboard'; parts = []; }
@@ -68,12 +69,13 @@
     } else swap();
   }
 
-  function onRoute() { mountView(R.parse()); closeMobileNav(); }
+  var lastHash = null;
+  function onRoute() { if (location.hash === lastHash) return; lastHash = location.hash; mountView(R.parse()); closeMobileNav(); }
 
   /* ------------------------------------------------------------ sidebar */
   function renderNav() {
     els.nav.innerHTML = NAV.map(function (n) {
-      return '<a class="nav-item" href="#/' + n.id + '" data-view="' + n.id + '" data-tip-side="' + U.escapeHtml(n.label) + '"><span class="nav-item__icon">' + UI.icon(n.icon, 20) + '</span><span class="nav-item__label">' + n.label + '</span><span class="nav-item__badge" hidden></span><span class="nav-item__kbd">' + UI.kbd(n.shortcut) + '</span></a>';
+      return '<a class="nav-item" href="#/' + n.id + '" data-view="' + n.id + '" data-label="' + U.escapeHtml(n.label) + '" data-tip-pos="right"><span class="nav-item__icon">' + UI.icon(n.icon, 20) + '</span><span class="nav-item__label">' + n.label + '</span><span class="nav-item__badge" hidden></span><span class="nav-item__kbd" aria-hidden="true">' + UI.kbd(n.shortcut) + '</span></a>';
     }).join('');
     updateBadges();
   }
@@ -86,21 +88,25 @@
     NAV.forEach(function (n) {
       if (!n.badge) return;
       var b = els.nav.querySelector('[data-view="' + n.id + '"] .nav-item__badge'); if (!b) return;
-      var v = n.badge(); b.textContent = v; b.hidden = !v;
+      var v = n.badge(); b.textContent = v; b.hidden = !v; b.setAttribute('aria-label', v + ' yêu cầu chờ duyệt');
     });
     var unread = S.unreadCount();
     els.bellCount.textContent = unread > 9 ? '9+' : unread; els.bellCount.hidden = !unread;
+    els.bell.setAttribute('aria-label', unread ? 'Thông báo, ' + unread + ' chưa đọc' : 'Thông báo');
     els.bell.classList.toggle('has-unread', unread > 0);
   }
   function setCollapsed(v, persist) {
     document.body.classList.toggle('sidebar-collapsed', !!v);
+    document.documentElement.classList.remove('pre-collapsed');
+    U.qsa('.nav-item', els.nav).forEach(function (a) { if (v) a.dataset.tip = a.dataset.label; else delete a.dataset.tip; });
     els.collapse.setAttribute('aria-expanded', v ? 'false' : 'true');
     els.collapse.dataset.tip = v ? 'Mở rộng menu' : 'Thu gọn menu';
     if (persist) S.setSetting('sidebarCollapsed', !!v);
     setTimeout(function () { setActiveNav(R.current ? R.current.view : 'dashboard'); }, 260);
   }
-  function openMobileNav() { document.body.classList.add('nav-open'); els.menuBtn.setAttribute('aria-expanded', 'true'); }
-  function closeMobileNav() { document.body.classList.remove('nav-open'); els.menuBtn.setAttribute('aria-expanded', 'false'); }
+  function openMobileNav() { document.body.classList.add('nav-open'); els.menuBtn.setAttribute('aria-expanded', 'true'); var a = els.nav.querySelector('.is-active') || els.nav.firstElementChild; if (a) setTimeout(function () { a.focus({ preventScroll: true }); }, 60); }
+  function closeMobileNav(refocus) { if (!document.body.classList.contains('nav-open')) return; document.body.classList.remove('nav-open'); els.menuBtn.setAttribute('aria-expanded', 'false'); if (refocus) els.menuBtn.focus(); }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.body.classList.contains('nav-open')) { e.preventDefault(); closeMobileNav(true); } });
 
   /* --------------------------------------------------------------- theme */
   var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -109,7 +115,7 @@
     var dark = t === 'dark' || (t === 'system' && mq && mq.matches);
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     document.documentElement.dataset.themePref = t;
-    var meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', dark ? '#0B1020' : '#F6F7FB');
+    var meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute('content', dark ? '#0E1015' : '#F7F7F5');
     els.themeBtn.innerHTML = '<span class="theme-icon theme-icon--sun">' + UI.icon('sun', 18) + '</span><span class="theme-icon theme-icon--moon">' + UI.icon('moon', 18) + '</span>';
     els.themeBtn.dataset.tip = dark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối';
     document.body.dataset.density = S.state.settings.density || 'comfortable';
@@ -155,17 +161,17 @@
     var content = U.el('div', { class: 'settings' });
     content.innerHTML = '<div class="settings__row"><div><b>Giao diện</b><small>Sáng, tối hoặc theo hệ thống</small></div><div class="slot-theme"></div></div>' +
       '<div class="settings__row"><div><b>Mật độ hiển thị</b><small>Thoải mái hay gọn gàng</small></div><div class="slot-density"></div></div>' +
-      '<div class="settings__row"><div><b>Giảm chuyển động</b><small>Tắt animation trang trí</small></div><label class="switch"><input type="checkbox" class="rm"' + (s.reduceMotion ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
-      '<div class="settings__row"><div><b>Hiển thị cuối tuần</b><small>Trong lịch tuần & bảng phân ca</small></div><label class="switch"><input type="checkbox" class="wk"' + (s.showWeekend !== false ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
+      '<div class="settings__row"><div><b>Giảm chuyển động</b><small>Tắt animation trang trí</small></div><label class="switch"><input type="checkbox" class="rm" aria-label="Giảm chuyển động"' + (s.reduceMotion ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
+      '<div class="settings__row"><div><b>Hiển thị cuối tuần</b><small>Trong lịch tuần & bảng ca</small></div><label class="switch"><input type="checkbox" class="wk" aria-label="Hiển thị cuối tuần"' + (s.showWeekend !== false ? ' checked' : '') + '><span class="switch__track"></span></label></div>' +
       '<div class="settings__row settings__row--danger"><div><b>Dữ liệu mẫu</b><small>Đặt lại toàn bộ dữ liệu về trạng thái ban đầu</small></div><button class="btn btn--ghost-danger btn--sm reset">' + UI.icon('refresh', 15) + 'Đặt lại</button></div>' +
       '<div class="settings__foot muted">Dữ liệu được lưu cục bộ trên trình duyệt này (localStorage). Phiên bản 1.0 · Z15 Miracle Việt Nam</div>';
-    content.querySelector('.slot-theme').appendChild(UI.segmented([{ value: 'light', label: 'Sáng', icon: 'sun' }, { value: 'dark', label: 'Tối', icon: 'moon' }, { value: 'system', label: 'Hệ thống', icon: 'monitor' }], s.theme || 'system', function (v) { S.setSetting('theme', v); applyTheme(); }));
-    content.querySelector('.slot-density').appendChild(UI.segmented([{ value: 'comfortable', label: 'Thoải mái' }, { value: 'compact', label: 'Gọn' }], s.density || 'comfortable', function (v) { S.setSetting('density', v); applyTheme(); }));
+    content.querySelector('.slot-theme').appendChild(UI.segmented([{ value: 'light', label: 'Sáng', icon: 'sun' }, { value: 'dark', label: 'Tối', icon: 'moon' }, { value: 'system', label: 'Hệ thống', icon: 'monitor' }], s.theme || 'system', function (v) { S.setSetting('theme', v); applyTheme(); }, { label: 'Giao diện' }));
+    content.querySelector('.slot-density').appendChild(UI.segmented([{ value: 'comfortable', label: 'Thoải mái' }, { value: 'compact', label: 'Gọn' }], s.density || 'comfortable', function (v) { S.setSetting('density', v); applyTheme(); }, { label: 'Mật độ hiển thị' }));
     content.querySelector('.rm').addEventListener('change', function (e) { S.setSetting('reduceMotion', e.target.checked); applyTheme(); });
     content.querySelector('.wk').addEventListener('change', function (e) { S.setSetting('showWeekend', e.target.checked); });
     content.querySelector('.reset').addEventListener('click', function () {
       UI.confirm({ title: 'Đặt lại dữ liệu mẫu?', message: 'Mọi thay đổi bạn đã tạo (sự kiện, ca, yêu cầu…) sẽ bị xoá và thay bằng dữ liệu mẫu mới.', confirmLabel: 'Đặt lại', danger: true, icon: 'refresh' }).then(function (ok) {
-        if (!ok) return; var theme = S.state.settings; S.reset(); S.state.settings = Object.assign(S.state.settings, { theme: theme.theme, density: theme.density }); UI.closeAllLayers(); mountView(R.parse(), { immediate: true }); updateBadges(); UI.toast('Đã đặt lại dữ liệu mẫu', { kind: 'brand' });
+        if (!ok) return; S.reset(); UI.closeAllLayers(); applyTheme(); mountView(R.parse(), { immediate: true }); updateBadges(); UI.toast('Đã đặt lại dữ liệu mẫu', { kind: 'brand' });
       });
     });
     UI.modal({ title: 'Cài đặt', size: 'md', content: content, actions: [{ label: 'Xong', kind: 'primary' }] });
@@ -210,15 +216,6 @@
     UI.shortcuts.register('t', function () { if (R.current && R.current.view === 'calendar') { document.dispatchEvent(new CustomEvent('z15:today')); } else R.go('calendar/week/' + U.todayISO()); }, 'Về hôm nay', 'Lịch');
     UI.shortcuts.register('[', function () { setCollapsed(!document.body.classList.contains('sidebar-collapsed'), true); }, 'Thu gọn / mở rộng menu', 'Chung');
   }
-  // Shift+key handled here (UI.shortcuts lowercases keys): map explicitly
-  document.addEventListener('keydown', function (e) {
-    if (!e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
-    var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
-    if (document.querySelector('.modal-overlay, .drawer-overlay, .palette-overlay')) return;
-    if (e.key === 'R') { e.preventDefault(); E.request(); }
-    if (e.key === 'D') { e.preventDefault(); toggleTheme(); }
-  });
-
   /* --------------------------------------------------------------- boot */
   var App = Z15.app = {
     go: R.go, route: function () { return R.current; }, mountView: function () { mountView(R.parse(), { immediate: true }); }, updateBadges: updateBadges, openSettings: openSettings, toggleTheme: toggleTheme, NAV: NAV,
@@ -239,7 +236,8 @@
     els.brand.innerHTML = UI.logoMark(30) + '<span class="brand__txt"><b>Z15 MIRACLE</b><small>Lịch làm việc</small></span>';
 
     renderNav(); applyTheme(); tickClock(); setInterval(tickClock, 15000);
-    if (S.state.settings.sidebarCollapsed) setCollapsed(true, false);
+    if (S.state.settings.sidebarCollapsed || (S.state.settings.sidebarCollapsed == null && window.innerWidth <= 1100 && window.innerWidth > 768)) setCollapsed(true, false); else setCollapsed(false, false);
+    if (navigator.platform.indexOf('Mac') < 0) { var kb = els.search.querySelector('.search-btn__kbd'); if (kb) kb.innerHTML = UI.kbd('Ctrl K'); }
     registerCommands();
 
     els.collapse.addEventListener('click', function () { setCollapsed(!document.body.classList.contains('sidebar-collapsed'), true); });
@@ -260,10 +258,15 @@
       ], { placement: 'bottom-end' });
     });
     UI.bindEventPills(els.view); UI.bindAvatars(els.view);
-    S.subscribe(function (state, meta) { updateBadges(); if (meta.type === 'settings' && meta.key === 'showWeekend' && currentView && currentView.update) currentView.update(R.current); });
+    S.subscribe(function (state, meta) {
+      updateBadges();
+      if (meta.type === 'settings' && meta.key === 'showWeekend' && currentView && currentView.update) currentView.update(R.current);
+      if ((meta.type === 'staff:status' || meta.type === 'staff:update' || meta.type === 'reset') && (!meta.id || meta.id === S.state.currentUserId)) { var dot = els.user.querySelector('.avatar__status'); if (dot) dot.dataset.status = S.me().status; }
+    });
     window.addEventListener('hashchange', onRoute);
     window.addEventListener('resize', U.debounce(function () { setActiveNav(R.current ? R.current.view : 'dashboard'); }, 120));
     if (!location.hash) location.replace('#/dashboard');
+    lastHash = location.hash;
     mountView(R.parse(), { immediate: true });
 
     // Splash: đợi font (tối đa 900ms) rồi rút màn

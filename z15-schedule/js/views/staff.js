@@ -54,7 +54,7 @@
     var cell = { iso: iso, type: type, t: t, evCount: timed.length, meetings: timed.filter(function (e) { return MEETING_TYPES[e.type]; }).length, shiftMin: 0, outsideMin: 0, totalMin: 0, level: 0, pct: 0, working: false };
     if (type === 'off' || type === 'leave') return cell;
     var w = shiftWindow(staffId, iso, type, timed);
-    cell.working = true; cell.shiftMin = w.e - w.s;
+    cell.working = true; cell.shiftMin = w.shoot ? (w.e - w.s) : t.minutes; // ca chuẩn theo loại ca; ngày quay tính theo lịch quay thực tế
     timed.forEach(function (e) {
       if (w.shoot && e.id === w.shoot.id) return;
       var s = U.timeToMin(e.start), en = U.timeToMin(e.end), ov = Math.max(0, Math.min(en, w.e) - Math.max(s, w.s));
@@ -94,7 +94,6 @@
     if (ev.date === todayISO) return { text: 'Tiếp theo: ' + ev.title + ' · ' + time, id: ev.id };
     return { text: 'Tiếp theo: ' + U.fmtRelativeDay(ev.date) + ' · ' + ev.title + ' ' + time, id: ev.id };
   }
-  function statusFromShift(type) { return ({ full: 'available', morning: 'available', afternoon: 'available', ot: 'busy', remote: 'remote', onsite: 'onsite', leave: 'off', off: 'off' })[type] || 'off'; }
 
   /* ----------------------------------------------------------------- view */
   function StaffView(container, route) {
@@ -105,9 +104,9 @@
     this.focusISO = isWorkday(this.todayISO) ? this.todayISO : nextWorkday(this.todayISO);
     var sort = U.loadJSON(KEYS.sort, null);
     this.sort = sort && DEFAULT_DIR[sort.key] ? { key: sort.key, dir: sort.dir === 'desc' ? 'desc' : 'asc' } : { key: 'name', dir: 'asc' };
-    this.slot = this.defaultSlot(); this.slotTouched = false;
-    this.tableHi = -1;
+    this.slotTouched = false; this.tableHi = -1;
     this.readRoute(route);
+    this.slot = this.defaultSlot();
     this.build();
     this.renderTeams(); this.renderFree(); this.renderFilters(); this.renderResults(true, false);
     this.bind();
@@ -126,6 +125,10 @@
   /* ---------------------------------------------------------- route / state */
   StaffView.prototype.readRoute = function (route) {
     var q = (route && route.query) || {}, st = S();
+    // ?date=YYYY-MM-DD: xem "hôm nay" như một ngày khác (dùng để kiểm thử ngày thường / ngày lễ)
+    this.dateOverride = /^\d{4}-\d{2}-\d{2}$/.test(q.date || '') ? q.date : '';
+    var base = this.dateOverride || U.todayISO();
+    if (base !== this.todayISO) { this.todayISO = base; this.focusISO = isWorkday(base) ? base : nextWorkday(base); if (!this.slotTouched) this.slot = this.defaultSlot(); }
     var saved = U.loadJSON(KEYS.view, 'grid');
     var view = VIEWS.indexOf(q.view) >= 0 ? q.view : (VIEWS.indexOf(saved) >= 0 ? saved : 'grid');
     if (q.view && VIEWS.indexOf(q.view) >= 0) U.saveJSON(KEYS.view, view);
@@ -140,9 +143,9 @@
     };
     this.skills = skills;
   };
-  StaffView.prototype.key = function () { return JSON.stringify(this.F); };
+  StaffView.prototype.key = function () { return JSON.stringify(this.F) + '|' + this.todayISO; };
   StaffView.prototype.hasFilter = function () { var F = this.F; return !!(F.team || F.q || F.status || F.loc || F.skill); };
-  StaffView.prototype.query = function () { var F = this.F, q = { view: F.view }; ['team', 'q', 'status', 'loc', 'skill'].forEach(function (k) { if (F[k]) q[k] = F[k]; }); return q; };
+  StaffView.prototype.query = function () { var F = this.F, q = { view: F.view }; ['team', 'q', 'status', 'loc', 'skill'].forEach(function (k) { if (F[k]) q[k] = F[k]; }); if (this.dateOverride) q.date = this.dateOverride; return q; };
   StaffView.prototype.syncURL = function (push) {
     var q = this.query(), qs = Object.keys(q).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(q[k]); }).join('&');
     var hash = '#/staff' + (qs ? '?' + qs : '');
@@ -160,6 +163,7 @@
   };
   StaffView.prototype.defaultSlot = function () {
     var real = U.todayISO(), now = U.nowMinutes();
+    if (this.dateOverride && this.dateOverride !== real) return { iso: isWorkday(this.dateOverride) ? this.dateOverride : nextWorkday(this.dateOverride), time: '09:00' };
     if (isWorkday(real) && now < OFFICE.end - 30) return { iso: real, time: U.minToTime(Math.max(OFFICE.start, Math.ceil(now / 30) * 30)) };
     return { iso: nextWorkday(real), time: '09:00' };
   };
@@ -195,9 +199,9 @@
     var lead = isToday ? 'hôm nay' : dmw(iso);
     U.render(this.els.teams, h`${st.state.teams.map(function (t) {
       var x = self.teamStats(t.id, iso), parts = [];
-      if (x.vp) parts.push(h`<b>${x.vp}</b> tại VP`); if (x.remote) parts.push(h`<b>${x.remote}</b> remote`); if (x.onsite) parts.push(h`<b>${x.onsite}</b> on-site`);
-      var rest = x.leave + x.off; if (rest) parts.push(h`<b>${rest}</b> nghỉ`);
-      var today = parts.length ? parts.map(function (p, i) { return i ? h` · ${p}` : p; }) : [h`cả team nghỉ`];
+      if (x.vp) parts.push(h`<span class="st-team__part"><b>${x.vp}</b> tại VP</span>`); if (x.remote) parts.push(h`<span class="st-team__part"><b>${x.remote}</b> remote</span>`); if (x.onsite) parts.push(h`<span class="st-team__part"><b>${x.onsite}</b> on-site</span>`);
+      var rest = x.leave + x.off; if (rest) parts.push(h`<span class="st-team__part"><b>${rest}</b> nghỉ</span>`);
+      var today = parts.length ? parts.map(function (p, i) { return i ? h`<span class="st-team__sep"> · </span>${p}` : p; }) : [h`cả team nghỉ`];
       var pct = x.n ? Math.round(x.onDuty / x.n * 100) : 0, on = self.F.team === t.id;
       var label = t.name + ' · ' + x.n + ' người · ' + lead + ': ' + x.onDuty + ' đang làm' + (on ? ' · đang lọc' : '');
       return h`<button type="button" class="st-team${on ? ' is-active' : ''}" data-team-tile="${t.id}" style="--team:${t.color}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${label}" title="${t.desc}">
@@ -412,19 +416,18 @@
     var th = function (key, label, cls) { var on = self.sort.key === key; return h`<th scope="col" class="${cls || ''}" data-sort="${key}" aria-sort="${on ? (self.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><span class="st-th">${label}<span class="st-th__caret">${icon('chevron-up', 12)}</span></span></th>`; };
     U.render(this.els.results, h`<div class="table-wrap st-table-wrap${first ? ' reveal' : ''}" style="--i:3" tabindex="0" role="group" aria-label="Danh bạ dạng bảng — dùng mũi tên lên xuống và Enter">
       <table class="table st-table">
-        <thead><tr>${th('name', 'Nhân sự')}${th('role', 'Vai trò')}${th('team', 'Team')}${th('status', 'Trạng thái')}${th('shift', isToday ? 'Ca hôm nay' : 'Ca ' + dmw(this.focusISO))}${th('hours', 'Giờ tuần', 'num')}${th('load', 'Tải')}<th scope="col">Liên hệ</th><th scope="col"><span class="sr-only">Thao tác</span></th></tr></thead>
+        <thead><tr>${th('name', 'Nhân sự · vai trò')}${th('team', 'Team')}${th('status', 'Trạng thái')}${th('shift', isToday ? 'Ca hôm nay' : 'Ca ' + dmw(this.focusISO))}${th('hours', 'Giờ tuần', 'num')}${th('load', 'Tải')}<th scope="col">Liên hệ</th><th scope="col"><span class="sr-only">Thao tác</span></th></tr></thead>
         <tbody>${list.map(function (s, i) {
           var team = st.team(s.teamId), wl = st.workload(s.id), sh = st.shiftOf(s.id, self.focusISO), sht = st.shiftType(sh), wh = st.weekHours(s.id, self.todayISO), isMe = s.id === st.state.currentUserId;
           return h`<tr data-staff-row="${s.id}" data-i="${i}" tabindex="-1" aria-selected="false" class="${isMe ? 'is-me' : ''}" data-no-profile>
-            <td><div class="st-row__who">${raw(UI.avatar(s, { size: 'sm', status: true, title: false }))}<span class="st-row__name">${s.name}${isMe ? raw(' <span class="chip chip--blue chip--xs">Bạn</span>') : ''}</span></div></td>
-            <td class="st-row__role">${s.role}</td>
+            <td><div class="st-row__who">${raw(UI.avatar(s, { size: 'md', status: true, title: false }))}<span class="st-row__id"><span class="st-row__name">${s.name}${isMe ? raw(' <span class="chip chip--blue chip--xs">Bạn</span>') : ''}</span><small class="st-row__role">${s.role}</small></span></div></td>
             <td>${raw(UI.teamChip(team))}</td>
             <td><span class="st-status"><i class="status-dot" data-status="${s.status}"></i>${UI.statusLabel(s.status)}</span></td>
             <td><span class="st-row__shift">${raw(UI.shiftBadge(sh))}<small class="mono-sm faint">${sht.hours === '—' ? '' : sht.hours}</small></span></td>
             <td class="num${wh > 48 ? ' is-over' : ''}" title="${wh > 48 ? 'Trên 48 giờ / tuần' : ''}">${fmtNum(wh)}g</td>
             <td><div class="workload st-row__load" data-level="${wl.level}"><div class="workload__bar"><span style="width:${Math.min(100, wl.percent)}%"></span></div><b class="tnum">${wl.percent}%</b></div></td>
             <td><div class="st-row__contact"><button type="button" class="icon-btn icon-btn--sm" data-copy="${s.email}" data-tip="Sao chép email" aria-label="Sao chép email của ${U.shortName(s.name)}">${icon('mail', 15)}</button><button type="button" class="icon-btn icon-btn--sm" data-copy="${s.phone}" data-tip="Sao chép số điện thoại" aria-label="Sao chép số điện thoại của ${U.shortName(s.name)}">${icon('phone', 15)}</button></div></td>
-            <td><div class="row-actions st-row__actions"><button type="button" class="btn btn--sm btn--ghost" data-act="calendar" data-id="${s.id}">Xem lịch</button><button type="button" class="btn btn--sm btn--ghost" data-act="meet" data-id="${s.id}">Đặt họp</button><button type="button" class="btn btn--sm btn--soft" data-act="profile" data-id="${s.id}">Hồ sơ</button></div></td>
+            <td><div class="row-actions st-row__actions"><button type="button" class="icon-btn icon-btn--sm" data-act="calendar" data-id="${s.id}" data-tip="Xem lịch" aria-label="Xem lịch của ${U.shortName(s.name)}">${icon('calendar', 15)}</button><button type="button" class="icon-btn icon-btn--sm" data-act="meet" data-id="${s.id}" data-tip="Đặt họp" aria-label="Đặt họp với ${U.shortName(s.name)}">${icon('users', 15)}</button><button type="button" class="btn btn--sm btn--soft" data-act="profile" data-id="${s.id}">Hồ sơ</button></div></td>
           </tr>`;
         })}</tbody>
       </table></div>`);
@@ -617,7 +620,7 @@
   StaffView.prototype.onStore = function (meta) {
     var t = (meta && meta.type) || '';
     if (!/^(staff|shift|event|reset|request:status)/.test(t)) return;
-    if (t === 'reset') { this.todayISO = U.todayISO(); this.focusISO = isWorkday(this.todayISO) ? this.todayISO : nextWorkday(this.todayISO); this.skills = topSkills(S().state.staff, 10); }
+    if (t === 'reset') { if (!this.dateOverride) { this.todayISO = U.todayISO(); this.focusISO = isWorkday(this.todayISO) ? this.todayISO : nextWorkday(this.todayISO); } this.skills = topSkills(S().state.staff, 10); }
     this.renderTeams();
     if (!this.slotTouched) this.slot = this.defaultSlot();
     this.renderFreeList();
@@ -626,6 +629,7 @@
   };
   StaffView.prototype.tick = function () {
     var real = U.todayISO();
+    if (this.dateOverride) return;
     if (real !== this.todayISO) { this.todayISO = real; this.focusISO = isWorkday(real) ? real : nextWorkday(real); this.renderTeams(); this.renderResults(false, false); this.setTitle(); }
     if (!this.slotTouched) { var slot = this.defaultSlot(); if (slot.iso !== this.slot.iso || slot.time !== this.slot.time) { this.slot = slot; this.renderFree(); } }
   };
@@ -636,6 +640,7 @@
     this.readRoute(route);
     if (this.key() === prevKey) { this.setTitle(); return; }
     if (this.els.search && this.els.search.value !== this.F.q) this.els.search.value = this.F.q;
+    if (prevKey.split('|')[1] !== this.todayISO) this.renderFree();
     this.renderChips(); this.renderTeams(); this.syncSegmented();
     this.renderResults(false, prevView !== this.F.view);
     this.setTitle();

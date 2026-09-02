@@ -26,6 +26,10 @@ small { font-size: 12px; }
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--r-xs); }
 [hidden] { display: none !important; }
+html { scrollbar-gutter: stable; }
+body.has-layer { overflow: hidden; }
+.skip-link { position: absolute; top: 8px; left: 8px; z-index: 1000; padding: 8px 12px; border-radius: var(--r-sm); background: var(--bg-surface); color: var(--action); font-weight: 600; box-shadow: var(--shadow-pop); transform: translateY(-200%); transition: transform var(--dur-fast); }
+.skip-link:focus { transform: none; outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 /* scrollbar gọn */
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
@@ -109,8 +113,7 @@ body.reduce-motion .reveal { transform: none; }
 /* ---- print ---- */
 @media print {
   .sidebar, .topbar, .toasts, .splash, .nav-scrim, .modal-overlay, .drawer-overlay { display: none !important; }
-  body { background: #fff; color: #000; }
   .main { margin: 0 !important; }
   .view { padding: 0 !important; max-width: none !important; }
-  .card { border-color: #999 !important; break-inside: avoid; }
+  .card { break-inside: avoid; }
 }

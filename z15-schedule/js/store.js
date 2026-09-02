@@ -27,7 +27,7 @@
       _persist();
       return state;
     },
-    reset: function () { state = D.seed(); U.saveJSON(C.storageKey, state); S.emit({ type: 'reset' }); },
+    reset: function () { var keep = state && state.settings ? Object.assign({}, state.settings) : null; state = D.seed(); if (keep) Object.assign(state.settings, keep); U.saveJSON(C.storageKey, state); S.emit({ type: 'reset' }); },
 
     subscribe: function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (l) { return l !== fn; }); }; },
     emit: function (meta) { listeners.slice().forEach(function (l) { try { l(state, meta || {}); } catch (e) { console.error(e); } }); },
@@ -39,7 +39,8 @@
       _persist();
       S.emit(meta || { type: 'update' });
     },
-    setSetting: function (key, value) { S.update(function (s) { s.settings[key] = value; }, { type: 'settings', key: key, value: value }); },
+    /** Cài đặt giao diện không làm 'bẩn' dữ liệu mẫu (để demo vẫn tự làm mới theo ngày). */
+    setSetting: function (key, value) { state.settings[key] = value; _persist(); S.emit({ type: 'settings', key: key, value: value }); },
 
     /* ----------------------------------------------------------- lookups */
     me: function () { return S.staff(state.currentUserId); },
@@ -84,7 +85,7 @@
       var ev = S.event(id); if (!ev) return null;
       var dur = U.timeToMin(ev.end) - U.timeToMin(ev.start);
       var patch = { date: newDate };
-      if (newStart != null) { patch.start = U.minToTime(newStart); patch.end = U.minToTime(newStart + dur); }
+      if (newStart != null) { newStart = U.clamp(Math.round(newStart), 0, Math.max(0, 24 * 60 - dur)); patch.start = U.minToTime(newStart); patch.end = U.minToTime(newStart + dur); }
       return S.updateEvent(id, patch);
     },
     deleteEvent: function (id) { S.update(function (s) { s.events = s.events.filter(function (e) { return e.id !== id; }); }, { type: 'event:delete', id: id }); },
@@ -140,7 +141,7 @@
         if (status === 'approved' && (r.type === 'leave' || r.type === 'remote' || r.type === 'ot')) {
           var m = s.shifts[r.staffId] = s.shifts[r.staffId] || {};
           var t = r.type === 'leave' ? 'leave' : r.type === 'remote' ? 'remote' : 'ot';
-          for (var d = U.fromISO(r.from); U.toISO(d) <= r.to; d = U.addDays(d, 1)) if (!U.isWeekend(d)) m[U.toISO(d)] = t;
+          for (var d = U.fromISO(r.from); U.toISO(d) <= r.to; d = U.addDays(d, 1)) if (!U.isWeekend(d) && !D.holidayName(U.toISO(d))) m[U.toISO(d)] = t;
         }
       }, { type: 'request:status', id: id, status: status });
       return r;

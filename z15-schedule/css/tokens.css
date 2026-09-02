@@ -53,6 +53,7 @@
   --red-hatch: rgba(215, 20, 26, 0.10);
   --brand-red: var(--red-600);
   --red-ink: var(--red-700);
+  --badge-red: var(--red-600);
   --now: var(--brand-red);
 
   /* ---- semantic ---- */
@@ -162,7 +163,7 @@
     --border-hair: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.14);
     --blue-100: #22306A; --blue-50: #172040; --blue-ring: rgba(91, 125, 255, 0.35);
     --brand-blue: var(--blue-500); --action: var(--blue-500); --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
-    --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300);
+    --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300); --badge-red: var(--red-600);
     --ok: #4CC38A; --ok-soft: #10261B; --warn: #E5A83B; --warn-soft: #2A2110; --danger: var(--red-300); --info: var(--blue-500);
     --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #6E7280; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
     --ev-meeting: #A3ADD9; --ev-shoot: #C39BE0; --ev-deadline: #E5A83B; --ev-pitch: #DC7FA8; --ev-review: #5BBFDD; --ev-task: #A5B0C0; --ev-training: #4FC3B6; --ev-event: #E3B54A;
@@ -180,7 +181,7 @@
   --border-hair: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.14);
   --blue-100: #22306A; --blue-50: #172040; --blue-ring: rgba(91, 125, 255, 0.35);
   --brand-blue: var(--blue-500); --action: var(--blue-500); --action-hover: var(--blue-400); --action-pressed: var(--blue-600); --primary-fill: var(--blue-600); --primary-fill-hover: var(--blue-500); --border-focus: var(--blue-500);
-  --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300);
+  --red-100: #3E1C1E; --red-50: #2A1516; --red-hatch: rgba(255, 92, 97, 0.14); --brand-red: var(--red-400); --red-ink: var(--red-300); --badge-red: var(--red-600);
   --ok: #4CC38A; --ok-soft: #10261B; --warn: #E5A83B; --warn-soft: #2A2110; --danger: var(--red-300); --info: var(--blue-500);
   --shift-morning-ink: #E3B54A; --shift-morning-soft: #2A2210; --shift-afternoon-ink: #5BBFDD; --shift-afternoon-soft: #0F2530; --shift-full-ink: #A3ADD9; --shift-full-soft: #1C2038; --shift-remote-ink: #A5B0C0; --shift-remote-soft: #1B2028; --shift-onsite-ink: #C39BE0; --shift-onsite-soft: #241830; --shift-leave-ink: #6E7280; --shift-ot-ink: #E39A5C; --shift-ot-soft: #2C1B0E; --shift-off-ink: #454955; --hatch-ink: rgba(255, 255, 255, 0.05);
   --ev-meeting: #A3ADD9; --ev-shoot: #C39BE0; --ev-deadline: #E5A83B; --ev-pitch: #DC7FA8; --ev-review: #5BBFDD; --ev-task: #A5B0C0; --ev-training: #4FC3B6; --ev-event: #E3B54A;
@@ -197,7 +198,21 @@
   :root { --border-hair: rgba(17, 20, 28, 0.12); }
   :root[data-theme="dark"] { --border-hair: rgba(255, 255, 255, 0.10); }
 }
-@media (prefers-contrast: more) { :root { --border-hair: var(--border-strong); } }
+@media (prefers-contrast: more) { :root, :root[data-theme="dark"], :root:not([data-theme="light"]) { --border-hair: var(--border-strong); } }
+
+/* Native controls (date/time picker, select) theo đúng theme của app */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* In ấn: luôn nền sáng, không bóng */
+@media print {
+  :root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+    color-scheme: light;
+    --bg-canvas: #fff; --bg-surface: #fff; --bg-sunken: #f4f4f4; --bg-hover: #fff; --bg-selected: #eef1fb;
+    --fg-primary: #000; --fg-secondary: #333; --fg-tertiary: #666; --fg-disabled: #999;
+    --border-hair: #bbb; --border-strong: #999; --shadow-pop: none; --shadow-modal: none; --shadow-toast: none;
+  }
+}
 
 /* Mật độ gọn */
 body[data-density="compact"] { --row-h: 40px; --roster-row-h: 36px; --btn-h: 30px; --input-h: 34px; --hour-h: 52px; }

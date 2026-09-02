@@ -24,6 +24,7 @@
 .st-team__today { font-size: 12px; line-height: 16px; min-height: 32px; color: var(--fg-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .st-team__today b { font-weight: 600; color: var(--fg-primary); }
 .st-team__lead { color: var(--fg-tertiary); }
+.st-team__part { white-space: nowrap; }
 .st-team__bar { display: block; height: 4px; border-radius: var(--r-full); background: var(--bg-sunken); overflow: hidden; }
 .st-team__bar > i { display: block; height: 100%; background: var(--team); border-radius: inherit; transition: width 600ms var(--ease-out); }
 
@@ -113,7 +114,9 @@
 /* ---- table */
 .st-table-wrap { outline: none; }
 .st-table-wrap:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.st-table { min-width: 1040px; }
+.st-table { min-width: 940px; }
+.st-table th, .st-table td { padding-left: 12px; padding-right: 12px; }
+.st-table th:first-child, .st-table td:first-child { padding-left: 16px; }
 .st-table th[data-sort] { cursor: pointer; user-select: none; -webkit-user-select: none; transition: color var(--dur-instant) linear; }
 .st-table th[data-sort]:hover { color: var(--fg-secondary); }
 .st-table th[aria-sort="ascending"], .st-table th[aria-sort="descending"] { color: var(--fg-primary); }
@@ -126,16 +129,18 @@ th[aria-sort="descending"] .st-th__caret { transform: rotate(180deg); }
 .st-table tbody tr.is-hi { background: var(--bg-selected); box-shadow: inset 2px 0 0 var(--action); }
 .st-table tbody tr.is-me .st-row__name { color: var(--action); }
 .st-row__who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.st-row__id { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .st-row__name { font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-.st-row__role { color: var(--fg-secondary); white-space: nowrap; }
+.st-row__role { color: var(--fg-tertiary); white-space: nowrap; font-size: 11.5px; margin-top: 2px; }
 .st-status { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--fg-secondary); }
 .st-row__shift { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .st-table td.num { font-size: 13px; white-space: nowrap; }
 .st-table td.num.is-over { color: var(--red-ink); }
-.st-row__load { min-width: 132px; }
+.st-row__load { min-width: 120px; }
 .st-row__load b { font-size: 12px; }
 .st-row__contact { display: flex; gap: 2px; }
-.st-row__actions { display: flex; gap: 2px; justify-content: flex-end; white-space: nowrap; }
+.st-row__actions { display: flex; align-items: center; gap: 2px; justify-content: flex-end; white-space: nowrap; }
+.st-row__actions .btn { margin-left: 4px; }
 
 /* ---- pulse (Nhịp đội) */
 .st-pulse { display: grid; grid-template-columns: minmax(0, 1fr) 296px; gap: var(--sp-4); align-items: start; }

@@ -26,7 +26,7 @@
 .btn--ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--fg-primary); }
 .btn--ghost-danger { background: transparent; color: var(--fg-secondary); }
 .btn--ghost-danger:hover:not(:disabled) { background: var(--red-50); color: var(--red-ink); }
-.btn--danger { background: var(--red-700); color: #fff; }
+.btn--danger { background: var(--red-700); color: var(--fg-on-brand); }
 .btn--danger:hover:not(:disabled) { background: var(--red-500); }
 .btn--ok { background: var(--ok-soft); color: var(--ok); }
 .btn--ok:hover:not(:disabled) { filter: brightness(.97); }
@@ -60,7 +60,9 @@
 }
 .chip > span { overflow: hidden; text-overflow: ellipsis; }
 .chip .icon { width: 13px; height: 13px; }
-.chip--color { color: var(--chip); background: color-mix(in srgb, var(--chip) 10%, var(--bg-surface)); }
+.chip--color { color: color-mix(in srgb, var(--chip) 72%, var(--fg-primary)); background: color-mix(in srgb, var(--chip) 12%, var(--bg-surface)); }
+:root[data-theme="dark"] .chip--color { color: color-mix(in srgb, var(--chip) 55%, #fff); }
+@supports not (color: color-mix(in srgb, red, blue)) { .chip--color { color: var(--fg-primary); background: var(--bg-sunken); } }
 .chip__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--chip); flex: 0 0 auto; }
 .chip--xs { height: 18px; padding: 0 6px; font-size: 10.5px; }
 .chip--muted { color: var(--fg-tertiary); background: var(--bg-sunken); }
@@ -73,12 +75,13 @@
 .chip--btn { cursor: pointer; transition: background-color var(--dur-instant), color var(--dur-instant), border-color var(--dur-instant); height: 28px; padding: 0 11px; border-color: var(--border-hair); background: var(--bg-surface); color: var(--fg-secondary); }
 .chip--btn:hover { background: var(--bg-hover); color: var(--fg-primary); }
 .chip--btn.is-active { background: var(--blue-50); border-color: var(--blue-100); color: var(--action); font-weight: 600; }
-.chip--btn.chip--color.is-active { background: color-mix(in srgb, var(--chip) 14%, var(--bg-surface)); border-color: color-mix(in srgb, var(--chip) 35%, transparent); color: var(--chip); }
+.chip--btn.chip--color.is-active { background: color-mix(in srgb, var(--chip) 16%, var(--bg-surface)); border-color: color-mix(in srgb, var(--chip) 40%, transparent); color: color-mix(in srgb, var(--chip) 72%, var(--fg-primary)); }
+:root[data-theme="dark"] .chip--btn.chip--color.is-active { color: color-mix(in srgb, var(--chip) 55%, #fff); }
 .chip--person { height: 28px; padding: 0 8px 0 3px; background: var(--bg-sunken); color: var(--fg-primary); gap: 6px; }
 .chip__x { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; border-radius: 50%; color: var(--fg-tertiary); }
 .chip__x:hover { background: var(--red-50); color: var(--red-ink); }
 .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-full); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--bg-sunken); color: var(--fg-secondary); }
-.badge--red { background: var(--brand-red); color: #fff; }
+.badge--red { background: var(--badge-red); color: var(--fg-on-brand); }
 .badge--blue { background: var(--blue-50); color: var(--action); }
 .tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: var(--r-xs); font-size: 11px; font-weight: 500; background: var(--bg-sunken); color: var(--fg-secondary); }
 .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
@@ -206,12 +209,11 @@
 .input-icon > .input { padding-left: 34px; }
 input[type="date"].input, input[type="time"].input { font-family: var(--font-mono); font-size: 13px; font-feature-settings: "tnum" 1; }
 input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
-:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator, :root[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
 .range { width: 100%; accent-color: var(--action); height: 24px; }
 .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-size: 13.5px; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch__track { position: relative; width: 36px; height: 20px; border-radius: var(--r-full); background: var(--border-strong); transition: background-color var(--dur-fast); flex: 0 0 auto; }
-.switch__track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform var(--dur-base) var(--ease-spring); }
+.switch__track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--fg-on-brand); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform var(--dur-base) var(--ease-spring); }
 .switch input:checked + .switch__track { background: var(--primary-fill); }
 .switch input:checked + .switch__track::after { transform: translateX(16px); }
 .switch input:focus-visible + .switch__track { outline: 2px solid var(--border-focus); outline-offset: 2px; }
@@ -257,7 +259,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .staff-opt__txt small { font-size: 11.5px; color: var(--fg-tertiary); }
 .staff-opt__check { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; color: transparent; transition: all var(--dur-fast); flex: 0 0 auto; }
 .staff-opt.is-on { background: var(--blue-50); }
-.staff-opt.is-on .staff-opt__check { background: var(--primary-fill); border-color: var(--primary-fill); color: #fff; }
+.staff-opt.is-on .staff-opt__check { background: var(--primary-fill); border-color: var(--primary-fill); color: var(--fg-on-brand); }
 
 /* ---------------------------------------------------------------- table */
 .table-wrap { overflow: auto; border: 1px solid var(--border-hair); border-radius: var(--r-md); background: var(--bg-surface); }
@@ -291,7 +293,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .tooltip.is-open { opacity: 1; transform: none; }
 
 /* -------------------------------------------------------------- popover */
-.popover { position: fixed; z-index: var(--z-popover); min-width: 180px; max-width: min(92vw, 420px); background: var(--bg-surface); border-radius: var(--r-md); box-shadow: var(--shadow-pop); opacity: 0; transform: translateY(-4px) scale(.98); transform-origin: top left; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); outline: none; }
+.popover { position: fixed; z-index: calc(var(--z-modal) + 4); min-width: 180px; max-width: min(92vw, 420px); background: var(--bg-surface); border-radius: var(--r-md); box-shadow: var(--shadow-pop); opacity: 0; transform: translateY(-4px) scale(.98); transform-origin: top left; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); outline: none; }
 .popover[data-flip="top"] { transform-origin: bottom left; }
 .popover.is-open { opacity: 1; transform: none; }
 .popover.is-leaving { opacity: 0; transform: translateY(-2px) scale(.99); transition-duration: var(--dur-fast); transition-timing-function: var(--ease-in); }
@@ -299,7 +301,8 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .menu { padding: 6px; display: flex; flex-direction: column; }
 .menu__item { display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; padding: 0 10px; border-radius: var(--r-sm); text-align: left; font-size: 13.5px; color: var(--fg-primary); transition: background-color var(--dur-instant); }
 .menu__item .icon { color: var(--fg-tertiary); width: 16px; height: 16px; }
-.menu__item:hover, .menu__item:focus-visible { background: var(--bg-hover); outline: none; }
+.menu__item:hover { background: var(--bg-hover); }
+.menu__item:focus-visible { background: var(--bg-selected); outline: 2px solid var(--border-focus); outline-offset: -2px; }
 .menu__item:hover .icon { color: var(--fg-secondary); }
 .menu__item.is-danger { color: var(--red-ink); }
 .menu__item.is-danger:hover { background: var(--red-50); }
@@ -496,7 +499,6 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .profile__hero { position: relative; padding: 24px 24px 20px; background: linear-gradient(180deg, color-mix(in srgb, var(--team) 8%, var(--bg-surface)), var(--bg-surface)); border-bottom: 1px solid var(--border-hair); }
 .profile__close { position: absolute; top: 12px; right: 12px; }
 .profile__id { display: flex; gap: 16px; align-items: center; }
-.profile__id .avatar--ring { --team: var(--team); }
 .profile__name { font: var(--t-h1); font-size: 22px; line-height: 28px; letter-spacing: -0.015em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .profile__role { color: var(--fg-secondary); font-size: 13.5px; margin-top: 2px; }
 .profile__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

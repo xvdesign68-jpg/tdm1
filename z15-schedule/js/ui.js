@@ -236,7 +236,7 @@
     opts = opts || {};
     var prevFocus = document.activeElement;
     var overlay = U.el('div', { class: 'modal-overlay', role: 'presentation' });
-    var dlg = U.el('div', { class: 'modal modal--' + (opts.size || 'md') + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', 'aria-modal': 'true', 'aria-label': opts.title || 'Hộp thoại' });
+    var dlg = U.el('div', { class: 'modal modal--' + (opts.size || 'md') + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', 'aria-modal': 'true', tabindex: '-1', 'aria-label': opts.ariaLabel || (typeof opts.title === 'string' && opts.title ? opts.title : 'Hộp thoại') });
     var head = opts.title === false ? null : U.el('div', { class: 'modal__head' },
       U.el('div', { class: 'modal__titles' }, U.el('h2', { class: 'modal__title', text: opts.title || '' }), opts.subtitle ? U.el('p', { class: 'modal__sub', text: opts.subtitle }) : null),
       U.el('button', { class: 'icon-btn modal__close', 'aria-label': 'Đóng', html: UI.icon('x', 18), onclick: function () { api.close(); } }));
@@ -266,10 +266,10 @@
       },
       setBusy: function (b) { dlg.classList.toggle('is-busy', !!b); }
     };
-    var layer = { close: api.close, lock: true };
+    var layer = { close: function () { api.close(); }, lock: true };
     pushLayer(layer);
     if (opts.dismissible !== false) overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) api.close(); });
-    requestAnimationFrame(function () { requestAnimationFrame(function () { overlay.classList.add('is-open'); var f = dlg.querySelector('[autofocus], input, select, textarea, button.btn--primary'); (f || dlg).focus && (f || dlg).focus(); }); });
+    requestAnimationFrame(function () { requestAnimationFrame(function () { overlay.classList.add('is-open'); var f = dlg.querySelector('[autofocus], input, select, textarea, button.btn--primary, .modal__foot button, button'); (f || dlg).focus({ preventScroll: true }); }); });
     return api;
   };
   UI.confirm = function (opts) {
@@ -289,7 +289,7 @@
     opts = opts || {};
     var prevFocus = document.activeElement;
     var overlay = U.el('div', { class: 'drawer-overlay' });
-    var panel = U.el('aside', { class: 'drawer drawer--' + (opts.side || 'right') + (opts.size ? ' drawer--' + opts.size : '') + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', 'aria-modal': 'true', 'aria-label': opts.title || 'Bảng chi tiết' });
+    var panel = U.el('aside', { class: 'drawer drawer--' + (opts.side || 'right') + (opts.size ? ' drawer--' + opts.size : '') + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', 'aria-modal': 'true', tabindex: '-1', 'aria-label': opts.ariaLabel || (typeof opts.title === 'string' && opts.title ? opts.title : 'Bảng chi tiết') });
     var head = opts.title === false ? null : U.el('div', { class: 'drawer__head' }, U.el('h2', { class: 'drawer__title', text: opts.title || '' }), U.el('button', { class: 'icon-btn', 'aria-label': 'Đóng', html: UI.icon('x', 18), onclick: function () { api.close(); } }));
     var body = U.el('div', { class: 'drawer__body' });
     if (opts.content instanceof Node) body.appendChild(opts.content); else U.render(body, opts.content || '');
@@ -301,9 +301,9 @@
       close: function () { if (closed) return; closed = true; popLayer(layer); release(); overlay.classList.remove('is-open'); overlay.classList.add('is-leaving'); U.onceTransitionEnd(panel, function () { overlay.remove(); if (opts.onClose) opts.onClose(); if (prevFocus && prevFocus.focus) prevFocus.focus(); }, 420); },
       setTitle: function (t) { var h = panel.querySelector('.drawer__title'); if (h) h.textContent = t; }
     };
-    var layer = { close: api.close, lock: true }; pushLayer(layer);
+    var layer = { close: function () { api.close(); }, lock: true }; pushLayer(layer);
     overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) api.close(); });
-    requestAnimationFrame(function () { requestAnimationFrame(function () { overlay.classList.add('is-open'); }); });
+    requestAnimationFrame(function () { requestAnimationFrame(function () { overlay.classList.add('is-open'); var f = panel.querySelector('[autofocus], input, button, [tabindex]:not([tabindex="-1"])'); (f || panel).focus({ preventScroll: true }); }); });
     return api;
   };
 
@@ -317,6 +317,7 @@
     if (p === 'right') { left = r.right + offset; } else if (p === 'left') { left = r.left - w - offset; }
     else if (p.indexOf('end') > 0) left = r.right - w; else if (p.indexOf('center') > 0) left = r.left + r.width / 2 - w / 2; else left = r.left;
     if (top + h > vh - 8 && p.indexOf('bottom') === 0) { top = r.top - h - offset; node.dataset.flip = 'top'; } else node.dataset.flip = '';
+    if (top < 8 && p.indexOf('top') === 0) { top = r.bottom + offset; node.dataset.flip = 'bottom'; }
     if (top < 8) top = 8;
     left = U.clamp(left, 8, Math.max(8, vw - w - 8));
     node.style.top = Math.round(top) + 'px'; node.style.left = Math.round(left) + 'px'; node.style.visibility = '';
@@ -324,6 +325,8 @@
   /** popover(anchorEl, content, {placement, cls, onClose, width}) -> {el, close, reposition} */
   UI.popover = function (anchor, content, opts) {
     opts = opts || {};
+    if (anchor.__pop) { var prev = anchor.__pop; prev.close(); return prev; } // bấm lại anchor = đóng
+    var prevFocus = document.activeElement;
     var node = U.el('div', { class: 'popover' + (opts.cls ? ' ' + opts.cls : ''), role: 'dialog', tabindex: '-1' });
     if (opts.width) node.style.width = typeof opts.width === 'number' ? opts.width + 'px' : opts.width;
     if (content instanceof Node) node.appendChild(content); else U.render(node, content || '');
@@ -334,14 +337,20 @@
     function onScroll() { api.reposition(); }
     var api = {
       el: node,
-      close: function () { if (closed) return; closed = true; popLayer(layer); document.removeEventListener('mousedown', onDoc, true); window.removeEventListener('resize', onScroll); window.removeEventListener('scroll', onScroll, true); node.classList.remove('is-open'); node.classList.add('is-leaving'); U.onceTransitionEnd(node, function () { node.remove(); if (opts.onClose) opts.onClose(); }, 220); },
+      close: function () {
+        if (closed) return; closed = true; popLayer(layer); anchor.__pop = null; anchor.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('mousedown', onDoc, true); window.removeEventListener('resize', onScroll); window.removeEventListener('scroll', onScroll, true);
+        node.classList.remove('is-open'); node.classList.add('is-leaving');
+        var inside = node.contains(document.activeElement);
+        U.onceTransitionEnd(node, function () { node.remove(); if (opts.onClose) opts.onClose(); }, 220);
+        if (inside || document.activeElement === document.body) { var back = prevFocus && prevFocus.focus && document.contains(prevFocus) ? prevFocus : anchor; if (back && back.focus) back.focus({ preventScroll: true }); }
+      },
       reposition: function () { if (!closed) place(anchor, node, opts.placement, opts.offset); }
     };
-    var layer = { close: api.close, lock: false }; pushLayer(layer);
+    var layer = { close: function () { api.close(); }, lock: false }; pushLayer(layer);
     setTimeout(function () { if (!closed) { document.addEventListener('mousedown', onDoc, true); window.addEventListener('resize', onScroll); window.addEventListener('scroll', onScroll, true); } }, 0);
     requestAnimationFrame(function () { node.classList.add('is-open'); if (opts.focus !== false) { var f = node.querySelector('input,button,[tabindex]'); if (f) f.focus({ preventScroll: true }); } });
-    anchor.setAttribute('aria-expanded', 'true');
-    var origClose = api.close; api.close = function () { anchor.setAttribute('aria-expanded', 'false'); origClose(); };
+    anchor.setAttribute('aria-expanded', 'true'); anchor.__pop = api;
     return api;
   };
   /** menu(anchor, [{label, icon, onClick, danger, disabled, divider, hint, checked}], {placement}) */
@@ -404,7 +413,7 @@
     }
     if (isTyping(e) || layerStack.some(function (l) { return l.lock; })) return;
     if (e.altKey) return;
-    var single = e.key === '?' ? '?' : key;
+    var single = e.key === '?' ? '?' : ((e.shiftKey && e.key.length === 1) ? 'shift+' : '') + key;
     clearTimeout(seqTimer);
     if (seq) {
       var two = seq + ' ' + single, m = shortcuts.find(function (x) { return x.combo === two; });
@@ -429,10 +438,10 @@
   var paletteApi = null;
   function openPalette(initial) {
     if (paletteApi) return;
-    var S = Z15.store;
+    var S = Z15.store, prevFocus = document.activeElement;
     var overlay = U.el('div', { class: 'palette-overlay' });
     var box = U.el('div', { class: 'palette', role: 'dialog', 'aria-label': 'Tìm kiếm & lệnh nhanh' });
-    box.innerHTML = '<div class="palette__input-wrap">' + UI.icon('search', 18) + '<input class="palette__input" type="text" placeholder="Tìm người, dự án, sự kiện hoặc gõ lệnh…" aria-label="Tìm kiếm" autocomplete="off" spellcheck="false"><span class="palette__esc">' + UI.kbd('Esc') + '</span></div><div class="palette__list" role="listbox"></div><div class="palette__foot"><span>' + UI.kbd('↑') + UI.kbd('↓') + ' di chuyển</span><span>' + UI.kbd('↵') + ' chọn</span><span>' + UI.kbd('?') + ' phím tắt</span></div>';
+    box.innerHTML = '<div class="palette__input-wrap">' + UI.icon('search', 18) + '<input class="palette__input" type="text" placeholder="Tìm người, dự án, sự kiện hoặc gõ lệnh…" aria-label="Tìm kiếm" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="palList" aria-autocomplete="list" aria-haspopup="listbox"><span class="palette__esc">' + UI.kbd('Esc') + '</span></div><div class="palette__list" id="palList" role="listbox" aria-label="Kết quả"></div><div class="palette__foot"><span>' + UI.kbd('↑') + UI.kbd('↓') + ' di chuyển</span><span>' + UI.kbd('↵') + ' chọn</span><span>' + UI.kbd('?') + ' phím tắt</span></div>';
     overlay.appendChild(box); document.body.appendChild(overlay);
     var input = box.querySelector('.palette__input'), list = box.querySelector('.palette__list');
     var rows = [], active = 0;
@@ -458,14 +467,15 @@
     }
     function render() {
       list.innerHTML = rows.map(function (r, i) {
-        if (r.heading) return '<div class="palette__heading">' + U.escapeHtml(r.heading) + '</div>';
-        if (r.empty) return '<div class="palette__empty">Không tìm thấy kết quả phù hợp</div>';
+        if (r.heading) return '<div class="palette__heading" role="presentation">' + U.escapeHtml(r.heading) + '</div>';
+        if (r.empty) return '<div class="palette__empty" role="presentation">Không tìm thấy kết quả phù hợp</div>';
         var cls = 'palette__row' + (i === active ? ' is-active' : '');
-        if (r.cmd) return '<button class="' + cls + '" data-i="' + i + '" role="option">' + UI.icon(r.cmd.icon || 'command', 16) + '<span class="palette__label">' + U.escapeHtml(r.cmd.label) + '</span>' + (r.cmd.hint ? '<span class="palette__hint">' + U.escapeHtml(r.cmd.hint) + '</span>' : '') + (r.cmd.shortcut ? '<span class="palette__kbd">' + UI.kbd(r.cmd.shortcut) + '</span>' : '') + '</button>';
+        if (r.cmd) return '<button class="' + cls + '" data-i="' + i + '" id="pal-opt-' + i + '" role="option" aria-selected="' + (i === active) + '">' + UI.icon(r.cmd.icon || 'command', 16) + '<span class="palette__label">' + U.escapeHtml(r.cmd.label) + '</span>' + (r.cmd.hint ? '<span class="palette__hint">' + U.escapeHtml(r.cmd.hint) + '</span>' : '') + (r.cmd.shortcut ? '<span class="palette__kbd">' + UI.kbd(r.cmd.shortcut) + '</span>' : '') + '</button>';
         var x = r.result, lead = x.kind === 'staff' ? UI.avatar(x.item, { size: 'xs', title: false }) : x.kind === 'project' ? '<span class="palette__swatch" style="background:' + x.item.color + '"></span>' : UI.icon('calendar', 16);
-        return '<button class="' + cls + '" data-i="' + i + '" role="option">' + lead + '<span class="palette__label">' + U.escapeHtml(x.title) + '</span><span class="palette__hint">' + U.escapeHtml(x.sub) + '</span></button>';
+        return '<button class="' + cls + '" data-i="' + i + '" id="pal-opt-' + i + '" role="option" aria-selected="' + (i === active) + '">' + lead + '<span class="palette__label">' + U.escapeHtml(x.title) + '</span><span class="palette__hint">' + U.escapeHtml(x.sub) + '</span></button>';
       }).join('');
       var a = list.querySelector('.is-active'); if (a) a.scrollIntoView({ block: 'nearest' });
+      input.setAttribute('aria-activedescendant', active >= 0 ? 'pal-opt-' + active : '');
     }
     function move(d) { var n = rows.length, i = active; for (var k = 0; k < n; k++) { i = (i + d + n) % n; if (rows[i].cmd || rows[i].result) { active = i; break; } } render(); }
     function run(i) {
@@ -486,10 +496,14 @@
       else if (e.key === 'Enter') { e.preventDefault(); run(active); }
     });
     list.addEventListener('click', function (e) { var b = e.target.closest('.palette__row'); if (b) run(+b.dataset.i); });
-    list.addEventListener('mousemove', function (e) { var b = e.target.closest('.palette__row'); if (b && +b.dataset.i !== active) { active = +b.dataset.i; render(); } });
+    list.addEventListener('mousemove', function (e) {
+      var b = e.target.closest('.palette__row'); if (!b || +b.dataset.i === active) return;
+      var prev = list.querySelector('.is-active'); if (prev) { prev.classList.remove('is-active'); prev.setAttribute('aria-selected', 'false'); }
+      b.classList.add('is-active'); b.setAttribute('aria-selected', 'true'); active = +b.dataset.i; input.setAttribute('aria-activedescendant', 'pal-opt-' + active);
+    });
     overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(); });
     var closed = false;
-    function close() { if (closed) return; closed = true; popLayer(layer); paletteApi = null; overlay.classList.remove('is-open'); overlay.classList.add('is-leaving'); U.onceTransitionEnd(box, function () { overlay.remove(); }, 260); }
+    function close() { if (closed) return; closed = true; popLayer(layer); paletteApi = null; overlay.classList.remove('is-open'); overlay.classList.add('is-leaving'); U.onceTransitionEnd(box, function () { overlay.remove(); }, 260); if (prevFocus && prevFocus.focus && document.contains(prevFocus)) prevFocus.focus({ preventScroll: true }); }
     var layer = { close: close, lock: true }; pushLayer(layer);
     paletteApi = { close: close };
     build(initial || ''); if (initial) input.value = initial;
@@ -521,12 +535,17 @@
   /** Segmented control: segmented(items:[{value,label,icon}], value, onChange) -> element */
   UI.segmented = function (items, value, onChange, opts) {
     opts = opts || {};
-    var wrap = U.el('div', { class: 'segmented' + (opts.cls ? ' ' + opts.cls : ''), role: 'tablist' });
+    var wrap = U.el('div', { class: 'segmented' + (opts.cls ? ' ' + opts.cls : ''), role: 'radiogroup', 'aria-label': opts.label || null });
     var ind = U.el('span', { class: 'segmented__ind', 'aria-hidden': 'true' }); wrap.appendChild(ind);
     items.forEach(function (it) {
-      var b = U.el('button', { class: 'segmented__btn' + (it.value === value ? ' is-active' : ''), type: 'button', role: 'tab', 'aria-selected': it.value === value ? 'true' : 'false', dataset: { value: it.value }, html: (it.icon ? UI.icon(it.icon, 15) : '') + '<span>' + U.escapeHtml(it.label) + '</span>' });
-      b.addEventListener('click', function () { if (b.classList.contains('is-active')) return; U.qsa('.segmented__btn', wrap).forEach(function (x) { x.classList.remove('is-active'); x.setAttribute('aria-selected', 'false'); }); b.classList.add('is-active'); b.setAttribute('aria-selected', 'true'); moveInd(); onChange(it.value); });
+      var b = U.el('button', { class: 'segmented__btn' + (it.value === value ? ' is-active' : ''), type: 'button', role: 'radio', 'aria-checked': it.value === value ? 'true' : 'false', dataset: { value: it.value }, html: (it.icon ? UI.icon(it.icon, 15) : '') + '<span>' + U.escapeHtml(it.label) + '</span>' });
+      b.addEventListener('click', function () { if (b.classList.contains('is-active')) return; U.qsa('.segmented__btn', wrap).forEach(function (x) { x.classList.remove('is-active'); x.setAttribute('aria-checked', 'false'); }); b.classList.add('is-active'); b.setAttribute('aria-checked', 'true'); moveInd(); onChange(it.value); });
       wrap.appendChild(b);
+    });
+    wrap.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      var btns = U.qsa('.segmented__btn', wrap), i = btns.indexOf(document.activeElement); if (i < 0) return;
+      e.preventDefault(); var n = btns[(i + (e.key === 'ArrowRight' ? 1 : btns.length - 1)) % btns.length]; n.focus(); n.click();
     });
     function moveInd() { var a = wrap.querySelector('.segmented__btn.is-active'); if (!a) return; ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + (a.offsetLeft) + 'px)'; }
     wrap.refresh = moveInd;

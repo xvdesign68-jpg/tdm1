@@ -26,7 +26,7 @@
   U.today = function () { var d = new Date(); d.setHours(0, 0, 0, 0); return d; };
   U.todayISO = function () { return U.toISO(U.today()); };
   U.addDays = function (d, n) { var r = new Date(d); r.setDate(r.getDate() + n); return r; };
-  U.addMonths = function (d, n) { var r = new Date(d); r.setMonth(r.getMonth() + n); return r; };
+  U.addMonths = function (d, n) { var r = new Date(d), day = r.getDate(); r.setDate(1); r.setMonth(r.getMonth() + n); r.setDate(Math.min(day, new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate())); return r; };
   U.startOfWeek = function (d) { // Thứ Hai là đầu tuần
     var r = new Date(d); r.setHours(0, 0, 0, 0);
     var day = (r.getDay() + 6) % 7; r.setDate(r.getDate() - day); return r;
@@ -66,9 +66,9 @@
    *  'short'     -> 02/09/2026
    *  'dm'        -> 02/09
    *  'medium'    -> 2 Th9
-   *  'long'      -> Thứ Tư, 2 tháng 9, 2026
+   *  'long'      -> Thứ Tư, 02/09/2026
    *  'weekday'   -> Thứ Tư
-   *  'monthYear' -> Tháng 9, 2026
+   *  'monthYear' -> Tháng 9/2026
    *  'dayMonth'  -> 2 tháng 9
    */
   U.fmtDate = function (d, style) {
@@ -77,9 +77,9 @@
     switch (style || 'short') {
       case 'dm': return pad(day) + '/' + pad(m + 1);
       case 'medium': return day + ' Th' + (m + 1);
-      case 'long': return U.weekdayLong(d) + ', ' + day + ' tháng ' + (m + 1) + ', ' + y;
+      case 'long': return U.weekdayLong(d) + ', ' + pad(day) + '/' + pad(m + 1) + '/' + y;
       case 'weekday': return U.weekdayLong(d);
-      case 'monthYear': return U.MONTHS[m] + ', ' + y;
+      case 'monthYear': return U.MONTHS[m] + '/' + y;
       case 'dayMonth': return day + ' tháng ' + (m + 1);
       case 'shortWeekday': return U.weekdayShort(d) + ' ' + pad(day) + '/' + pad(m + 1);
       default: return pad(day) + '/' + pad(m + 1) + '/' + y;
@@ -108,7 +108,7 @@
     mins = Math.round(mins);
     if (mins < 60) return mins + ' phút';
     var h = Math.floor(mins / 60), m = mins % 60;
-    return m ? h + 'g' + pad(m) : h + ' giờ';
+    return m ? h + 'g' + pad(m) : h + 'g';
   };
   U.fmtTimeRange = function (s, e) { return s && e ? s + ' – ' + e : (s || ''); };
   U.timeAgo = function (iso) {
@@ -237,11 +237,11 @@
   };
   U.onceTransitionEnd = function (node, cb, timeout) {
     var done = false;
-    var finish = function () { if (done) return; done = true; node.removeEventListener('transitionend', finish); node.removeEventListener('animationend', finish); cb(); };
+    var finish = function (e) { if (e && e.target && e.target !== node) return; if (done) return; done = true; node.removeEventListener('transitionend', finish); node.removeEventListener('animationend', finish); cb(); };
     node.addEventListener('transitionend', finish); node.addEventListener('animationend', finish);
     setTimeout(finish, timeout || 600);
   };
-  U.prefersReducedMotion = function () { return global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches; };
+  U.prefersReducedMotion = function () { return !!(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches) || !!(global.document && document.body && document.body.classList.contains('reduce-motion')); };
 
   /** Đếm số tăng dần (wow nhỏ cho KPI). */
   U.countUp = function (node, to, opts) {

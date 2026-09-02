@@ -111,6 +111,8 @@
     var parts = route.parts || [];
     var mode = MODES.indexOf(parts[0]) >= 0 ? parts[0] : U.loadJSON(PREF_MODE, 'week');
     if (MODES.indexOf(mode) < 0) mode = 'week';
+    var q = route.query || {};
+    if (!parts[0] && mode === 'team' && (q.staff || q.compare || q.mine === '1')) mode = 'week'; // deep link "lịch của …" không có nghĩa trong chế độ đội ngũ
     var iso = validISO(parts[1]) ? parts[1] : U.todayISO();
     return { mode: mode, iso: iso, F: filtersFromRoute(route, mode) };
   }
@@ -1020,7 +1022,7 @@
     } else { legend.hidden = true; legend.innerHTML = ''; }
     // Xung đột
     V.conflicts = conflictList(cx);
-    var cf = bar.querySelector('.cal-tool--conf'); cf.hidden = !V.conflicts.length; cf.querySelector('.cal-tool__n').textContent = V.conflicts.length;
+    var cf = bar.querySelector('.cal-tool--conf'); cf.hidden = !V.conflicts.length && !cf.__pop; cf.querySelector('.cal-tool__n').textContent = V.conflicts.length; // giữ nút khi popover đang mở để popover không mất neo
     cf.setAttribute('aria-label', V.conflicts.length + ' xung đột lịch');
     // Ghi chú ngày lễ hôm nay (tuần / tháng)
     var note = bar.querySelector('.cal-bar__note'), holToday = st.holidayName(cx.today);
@@ -1112,7 +1114,7 @@
   /* ------------------------------------------------------- xung đột */
   function laterOf(c) { var pa = c.a.priority || 2, pb = c.b.priority || 2; if (pa !== pb) return pa > pb ? c.a : c.b; return evStart(c.b) >= evStart(c.a) ? c.b : c.a; }
   function openConflicts(anchor) {
-    var pop = UI.popover(anchor, '', { placement: 'bottom-end', cls: 'popover--cal popover--conf', width: 380, ariaLabel: 'Xung đột lịch', focus: false });
+    var pop = UI.popover(anchor, '', { placement: 'bottom-end', cls: 'popover--cal popover--conf', width: 380, ariaLabel: 'Xung đột lịch', focus: false, onClose: function () { if (V && V.bar) syncBar(ctx()); } });
     function draw() {
       var cx = ctx(), st = S(), list = V.conflicts = conflictList(cx);
       pop.el.innerHTML = '<div class="cal-cf"><div class="cal-lay__head"><b>Xung đột lịch</b><small class="muted">' + list.length + ' · từ hôm nay trong kỳ đang xem</small></div>' +

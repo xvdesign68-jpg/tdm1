@@ -86,6 +86,7 @@
       var ev = S.event(id); if (!ev) return null;
       S.update(function () {
         Object.assign(ev, patch);
+        if (patch.prep) ev.prep = (ev.prep || []).map(function (p) { return Object.assign({ id: U.uid('pp'), done: false, ownerId: ev.ownerId }, p); }); // dòng mới thêm khi sửa cũng phải có id
         if (patch.attendeeIds) { ev.attendeeIds = U.uniq(patch.attendeeIds); ev.roles = ev.roles || {}; ev.rsvp = ev.rsvp || {}; ev.attendeeIds.forEach(function (a) { if (!ev.roles[a]) ev.roles[a] = a === ev.ownerId ? 'organizer' : 'required'; if (!ev.rsvp[a]) ev.rsvp[a] = a === ev.ownerId ? 'yes' : 'pending'; }); }
         if (patch.priority && !patch.reminders) ev.reminders = ev.priority === 1 ? [1440, 60, 15] : ev.priority === 2 ? [60, 15] : [15];
       }, { type: 'event:update', id: id });
@@ -301,12 +302,13 @@
     },
     /** Ước lượng phút di chuyển giữa hai sự kiện liên tiếp (dựa trên địa điểm). */
     travelBetween: function (a, b) {
-      var isExt = function (loc) { return !!loc && !/phòng|sảnh|pantry|online|zoom|meet|văn phòng/i.test(loc); };
+      var office = /phòng|sảnh|pantry|online|zoom|meet|văn phòng/i;
+      var isExt = function (e) { return e.travelMinutes > 0 || (!!e.location && !office.test(e.location)); }; // đã khai báo phút di chuyển = họp ngoài (kể cả "Văn phòng luật…")
       var la = a.location || '', lb = b.location || '';
-      if (!isExt(la) && !isExt(lb)) return 0;
+      if (!isExt(a) && !isExt(b)) return 0;
       if (la && lb && U.normalizeVN(la) === U.normalizeVN(lb)) return 0;
       var far = /đông anh|cổ loa|long biên|ba vì|sân bay/i;
-      var need = Math.max(isExt(lb) ? (b.travelMinutes || 30) : 0, isExt(la) ? (a.travelMinutes || 30) : 0);
+      var need = Math.max(isExt(b) ? (b.travelMinutes || 30) : 0, isExt(a) ? (a.travelMinutes || 30) : 0);
       if (far.test(la) || far.test(lb)) need = Math.max(need, 45);
       return need;
     },
@@ -498,8 +500,10 @@
       var who = S.staff(staffId), list = S.eventsFor(staffId, iso), lines = ['📋 Lịch ' + U.fmtDate(iso, 'long') + ' — ' + (who ? U.shortName(who.name) : '')];
       if (!list.length) lines.push('Không có lịch.');
       list.forEach(function (e) {
+        var when = e.allDay ? 'Cả ngày' : e.start + '–' + e.end;
+        if (!S.canSee(e)) { lines.push(when + '  Bận (riêng tư)'); return; } // người xem không phải người tham gia / ban điều hành: không lộ chi tiết
         var ps = S.prepStatus(e), rs = S.rsvpSummary(e);
-        lines.push((e.allDay ? 'Cả ngày' : e.start + '–' + e.end) + '  ' + S.displayTitle(e, staffId) + (e.location ? ' · ' + e.location : '') + (e.travelMinutes ? ' · di chuyển ~' + e.travelMinutes + "'" : '') + (e.priority === 1 ? ' · P1' : '') + (ps.open ? ' · ⚠ ' + ps.open + ' việc chuẩn bị' : '') + (rs.pending ? ' · ' + rs.pending + ' chưa xác nhận' : ''));
+        lines.push(when + '  ' + e.title + (e.location ? ' · ' + e.location : '') + (e.travelMinutes ? ' · di chuyển ~' + e.travelMinutes + "'" : '') + (e.priority === 1 ? ' · P1' : '') + (ps.open ? ' · ⚠ ' + ps.open + ' việc chuẩn bị' : '') + (rs.pending ? ' · ' + rs.pending + ' chưa xác nhận' : ''));
       });
       return lines.join('\n');
     },

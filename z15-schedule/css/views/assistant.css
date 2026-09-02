@@ -72,6 +72,10 @@
 .as-issues__done b { color: var(--fg-primary); }
 .as-issues__groups { display: flex; flex-direction: column; gap: 18px; }
 .as-issues__gtitle { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.as-issues__ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.as-issues__ghead .as-issues__gtitle { margin-bottom: 0; }
+.as-issues__gact .badge { margin-left: 2px; }
+.as-issues__more { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 12.5px; }
 .as-issues__gtitle i { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-disabled); }
 .as-issues__group[data-sev="3"] .as-issues__gtitle { color: var(--red-ink); }
 .as-issues__group[data-sev="3"] .as-issues__gtitle i { background: var(--red-ink); }

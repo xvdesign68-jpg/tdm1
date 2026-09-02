@@ -19,6 +19,7 @@
   var KEYS = { staff: 'z15.ui.assistant.staff', brief: 'z15.ui.assistant.brief', find: 'z15.ui.assistant.find' };
   var TABS = ['issues', 'brief', 'find', 'focus'];
   var FOCUS_TARGET = 8 * 60;          // 8g tập trung / tuần (mục tiêu)
+  var GROUP_LIMIT = 5;                // mỗi nhóm mức độ hiện tối đa 5 dòng, còn lại sau "Xem thêm"
   var MEETING_CAP = 5 * 9 * 60;       // 45g "giờ làm" tuần dùng cho % họp (đồng bộ store.weekHealth)
   var SEV = { 3: { label: 'Khẩn', icon: 'alert-triangle' }, 2: { label: 'Nên xử lý', icon: 'alert-circle' }, 1: { label: 'Gợi ý', icon: 'info' } };
   var KIND_LABEL = { conflict: 'Xung đột', 'focus-conflict': 'Đè khối tập trung', travel: 'Thiếu di chuyển', chain: 'Chuỗi họp sát nhau', b2b: 'Họp sát nhau', prep: 'Chuẩn bị', overload: 'Quá tải', agenda: 'Thiếu agenda', delegate: 'Uỷ quyền', rsvp: 'Chưa xác nhận' };
@@ -65,7 +66,7 @@
   function AssistantView(container, route) {
     var self = this;
     this.container = container; this.unbinders = []; this.timers = []; this.destroyed = false;
-    this.handled = {}; this.resolved = 0; this.busy = false; this.pendingRerender = false; this.issueFilter = null; this.kpiAnimated = false;
+    this.handled = {}; this.resolved = 0; this.busy = false; this.pendingRerender = false; this.issueFilter = null; this.kpiAnimated = false; this.expanded = {};
     this.readRoute(route);
     this.initBrief(); this.initFind();
     this.build(); this.renderAll(true); this.bind();
@@ -311,7 +312,14 @@
         <div><div class="card__eyebrow">Trợ lý lịch · ${weekLabel(this.weekISO)}</div><h3 class="card__title">Cần xử lý <span class="badge${list.some(function (i) { return i.severity === 3; }) ? ' badge--red' : ''} tnum">${list.length}</span>${f ? h` <button type="button" class="chip chip--blue chip--xs as-issues__filter" data-kpi-clear aria-label="Bỏ lọc ${f.label}"><span>Lọc: ${f.label}${f.date ? ' · ' + dmw(f.date) : ''}</span>${icon('x', 11)}</button>` : ''}</h3></div>
         <div class="as-issues__done" aria-label="Đã xử lý ${done} trong phiên này"><span class="faint">Đã xử lý <b class="tnum">${done}</b> trong phiên này</span>${raw(UI.progress(pct, { size: 'xs', color: 'var(--ok)' }))}</div>
       </div>
-      ${groups.length ? h`<div class="as-issues__groups">${groups.map(function (g) { return h`<section class="as-issues__group" data-sev="${g.sev}" aria-label="${SEV[g.sev].label}"><h4 class="eyebrow as-issues__gtitle"><i></i>${SEV[g.sev].label} · ${g.items.length}</h4><ul class="as-issues__list" role="list">${g.items.map(function (i, k) { return self.issueRow(i, k); })}</ul></section>`; })}</div>`
+      ${groups.length ? h`<div class="as-issues__groups">${groups.map(function (g) {
+        var open = !!self.expanded[g.sev], shown = open ? g.items : g.items.slice(0, GROUP_LIMIT), hiddenN = g.items.length - shown.length;
+        var rsvpRows = g.items.filter(function (i) { return i.kind === 'rsvp'; }), pend = U.sum(rsvpRows, function (i) { var rs = S().rsvpSummary(i.events[0]); return rs.pending + rs.maybe; });
+        return h`<section class="as-issues__group" data-sev="${g.sev}" aria-label="${SEV[g.sev].label}">
+          <div class="as-issues__ghead"><h4 class="eyebrow as-issues__gtitle"><i></i>${SEV[g.sev].label} · ${g.items.length}</h4>${rsvpRows.length > 1 ? h`<button type="button" class="btn btn--sm btn--secondary as-issues__gact" data-nudge-group="${g.sev}" aria-label="Nhắc tất cả ${pend} người chưa xác nhận ở ${rsvpRows.length} sự kiện">${icon('bell', 13)}<span>Nhắc tất cả</span><span class="badge tnum">${pend}</span></button>` : ''}</div>
+          <ul class="as-issues__list" role="list">${shown.map(function (i, k) { return self.issueRow(i, k); })}</ul>
+          ${g.items.length > GROUP_LIMIT ? h`<button type="button" class="link-btn as-issues__more" data-more="${g.sev}" aria-expanded="${open ? 'true' : 'false'}">${icon(open ? 'chevron-up' : 'chevron-down', 13)}<span>${open ? 'Thu gọn' : 'Xem thêm ' + hiddenN + ' mục'}</span></button>` : ''}
+        </section>`; })}</div>`
         : h`<div class="empty as-empty"><span class="as-empty__mark">${raw(UI.logoMark(56))}</span><p class="empty__title">${f ? 'Không có mục nào thuộc bộ lọc này.' : total ? 'Đã xử lý hết các mục hiển thị.' : 'Lịch tuần này sạch — không có gì cần xử lý.'}</p><p class="empty__body">${f ? 'Bỏ lọc để xem toàn bộ danh sách.' : 'Trợ lý sẽ báo ngay khi có trùng lịch, họp sát nhau hay thiếu chuẩn bị.'}</p>${f ? h`<button type="button" class="btn btn--soft btn--sm" data-kpi-clear>${icon('x', 14)}<span>Bỏ lọc</span></button>` : ''}</div>`}
       <div class="card__foot as-issues__foot"><span>${raw(UI.kbd('↑'))}${raw(UI.kbd('↓'))} chọn dòng · ${raw(UI.kbd('E'))} hành động đầu · ${raw(UI.kbd('J'))}${raw(UI.kbd('K'))} đổi tuần</span><span class="faint">${total} mục · ${this.allIssues.filter(function (i) { return i.severity === 3; }).length} khẩn</span></div>`);
     if (focusKey) { var again = block.querySelector('.as-issue[data-key="' + focusKey + '"]') || block.querySelector('.as-issue'); if (again) again.focus({ preventScroll: true }); }
@@ -383,9 +391,9 @@
         UI.toast('Đã gửi yêu cầu agenda tới ' + (ow ? U.shortName(ow.name) : 'chủ trì'), { kind: 'success' }); ok = true; break;
       }
       case 'delegate': {
-        if (!i.to) return; var ev5 = evs[0], from = this.staffId;
+        if (!i.to) return; var ev5 = evs[0], from = this.staffId, oldIds = ev5.attendeeIds.slice();
         st.delegate(ev5.id, from, i.to.id); ok = true;
-        UI.toast('Đã uỷ quyền “' + ev5.title + '” cho ' + U.shortName(i.to.name), { kind: 'success', duration: 6000, action: { label: 'Hoàn tác', onClick: function () { st.updateEvent(ev5.id, { attendeeIds: U.uniq([from].concat(ev5.attendeeIds)) }); } } });
+        UI.toast('Đã uỷ quyền “' + ev5.title + '” cho ' + U.shortName(i.to.name), { kind: 'success', duration: 6000, action: { label: 'Hoàn tác', onClick: function () { st.updateEvent(ev5.id, { attendeeIds: oldIds, delegatedFrom: undefined }); } } });
         break;
       }
     }
@@ -418,13 +426,25 @@
     var nextKey = next ? next.dataset.key : null;
     this.later(function () { row.classList.add('is-leaving'); }, 420);
     this.later(function () {
-      var remaining = U.qsa('.as-issue, .as-issues__gtitle, .as-issues__foot', block).filter(function (n) { return n !== row; });
+      var remaining = U.qsa('.as-issue, .as-issues__ghead, .as-issues__more, .as-issues__foot', block).filter(function (n) { return n !== row; });
       var followers = []; var sib = block.nextElementSibling; while (sib) { followers.push(sib); sib = sib.nextElementSibling; }
       flipY(remaining.concat(followers), function () { var grp = row.closest('.as-issues__group'); row.remove(); if (grp && !grp.querySelector('.as-issue')) grp.remove(); }, 240);
       self.later(function () { self.busy = false; self.renderIssues(); if (nextKey) { var n2 = block.querySelector('.as-issue[data-key="' + nextKey + '"]'); if (n2 && self.focusedIssue() == null) n2.focus({ preventScroll: true }); } self.flushPending(); }, 270);
     }, 640);
   };
   AssistantView.prototype.flushPending = function () { if (this.pendingRerender) { this.pendingRerender = false; this.renderAll(false); } };
+  /** "Nhắc tất cả" trên đầu nhóm: nhắc mọi dòng RSVP của nhóm trong một lần, một toast tổng. */
+  AssistantView.prototype.nudgeGroup = function (sev) {
+    var st = S(), me = st.state.currentUserId, self = this;
+    var rows = (this.allIssues || []).filter(function (i) { return i.kind === 'rsvp' && i.severity === sev && !self.handled[i.key]; });
+    if (!rows.length) { UI.toast('Không còn ai cần nhắc', { kind: 'info' }); return; }
+    var total = 0, evs = 0;
+    this.busy = true; // gom các lần store phát sự kiện thành một lần vẽ lại
+    try { rows.forEach(function (i) { var n = st.nudge(i.events[0].id, me); if (n) { total += n; evs++; } self.handled[i.key] = true; self.resolved++; }); }
+    finally { this.busy = false; this.pendingRerender = false; }
+    this.renderAll(false);
+    UI.toast(total ? 'Đã nhắc ' + total + ' người xác nhận ở ' + evs + ' sự kiện' : 'Mọi người đã xác nhận rồi', { kind: total ? 'brand' : 'info' });
+  };
 
   /* -------------------------------------------------------------- brief */
   AssistantView.prototype.gapRow = function (gap, need, prev, next) {
@@ -655,6 +675,8 @@
     on('click', '[data-kpi]', function (e, el) { self.setKpiFilter(el.dataset.kpi); });
     on('click', '[data-kpi-clear]', function () { self.issueFilter = null; U.qsa('.as-kpi', self.blocks.kpis).forEach(function (t) { t.classList.remove('is-on'); t.setAttribute('aria-pressed', 'false'); }); self.renderIssues(); });
     on('click', '.as-issue [data-act]', function (e, el) { var row = el.closest('.as-issue'); if (!row || row.classList.contains('is-resolving')) return; self.doAction(row, el.dataset.act, el); });
+    on('click', '[data-more]', function (e, el) { var sev = el.dataset.more; self.expanded[sev] = !self.expanded[sev]; self.renderIssues(); var again = self.blocks.issues.querySelector('[data-more="' + sev + '"]'); if (again) again.focus({ preventScroll: true }); });
+    on('click', '[data-nudge-group]', function (e, el) { self.nudgeGroup(+el.dataset.nudgeGroup); });
     on('keydown', '.as-issue', function (e, el) {
       if (e.target !== el || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); var rows = U.qsa('.as-issue', self.blocks.issues), i = rows.indexOf(el), n = rows[i + (e.key === 'ArrowDown' ? 1 : -1)]; if (n) { n.focus(); n.scrollIntoView({ block: 'nearest' }); } }
@@ -685,7 +707,7 @@
     var prevKey = this.key(), prevStaff = this.staffId, prevTab = this.tab;
     this.readRoute(route);
     if (this.key() === prevKey) { this.setTitle(); return; }
-    if (this.staffId !== prevStaff) { this.handled = {}; this.resolved = 0; this.issueFilter = null; this.find.people = U.uniq([this.staffId, S().state.currentUserId]); }
+    if (this.staffId !== prevStaff) { this.handled = {}; this.resolved = 0; this.issueFilter = null; this.expanded = {}; this.find.people = U.uniq([this.staffId, S().state.currentUserId]); }
     this.renderAll(false);
     if (this.tab !== prevTab && this.tab !== 'issues') { var b = this.blocks[this.tab]; if (b) b.scrollIntoView({ block: 'start', behavior: reduceMotion() ? 'auto' : 'smooth' }); }
   };

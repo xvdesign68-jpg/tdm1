@@ -137,9 +137,18 @@
     content.querySelector('.staff-picker-slot').appendChild(picker);
     renderRoles();
     rolesEl.addEventListener('click', function (e) { var b = e.target.closest('[data-role-toggle]'); if (!b) return; var pid = b.dataset.roleToggle, i = optional.indexOf(pid); if (i >= 0) optional.splice(i, 1); else optional.push(pid); renderRoles(); });
-    var prioEl = content.querySelector('.prio-picker');
-    prioEl.addEventListener('click', function (e) { var b = e.target.closest('.prio-opt'); if (!b) return; U.qsa('.prio-opt', prioEl).forEach(function (x) { x.classList.remove('is-on'); x.setAttribute('aria-checked', 'false'); }); b.classList.add('is-on'); b.setAttribute('aria-checked', 'true'); data.priority = +b.dataset.prio; });
-    content.querySelector('.reminder-chips').addEventListener('click', function (e) { var b = e.target.closest('[data-rem]'); if (!b) return; b.classList.toggle('is-active'); b.setAttribute('aria-pressed', b.classList.contains('is-active')); });
+    var prioEl = content.querySelector('.prio-picker'), remEl = content.querySelector('.reminder-chips'), remTouched = false;
+    var remDefault = function (p) { return p === 1 ? [1440, 60, 15] : p === 3 ? [15] : [60, 15]; };
+    var remCurrent = function () { return U.qsa('.is-active', remEl).map(function (b) { return +b.dataset.rem; }).sort(); };
+    var remIsDefault = function (p) { return JSON.stringify(remCurrent()) === JSON.stringify(remDefault(p).slice().sort()); };
+    prioEl.addEventListener('click', function (e) {
+      var b = e.target.closest('.prio-opt'); if (!b) return;
+      U.qsa('.prio-opt', prioEl).forEach(function (x) { x.classList.remove('is-on'); x.setAttribute('aria-checked', 'false'); }); b.classList.add('is-on'); b.setAttribute('aria-checked', 'true');
+      var prev = data.priority; data.priority = +b.dataset.prio;
+      // Nhắc trước đi theo mức ưu tiên (P1 thêm nhắc 1 ngày) chừng nào người dùng chưa tự chỉnh chip
+      if (!remTouched && remIsDefault(prev)) U.qsa('[data-rem]', remEl).forEach(function (c) { var on = remDefault(data.priority).indexOf(+c.dataset.rem) >= 0; c.classList.toggle('is-active', on); c.setAttribute('aria-pressed', on); });
+    });
+    remEl.addEventListener('click', function (e) { var b = e.target.closest('[data-rem]'); if (!b) return; remTouched = true; b.classList.toggle('is-active'); b.setAttribute('aria-pressed', b.classList.contains('is-active')); });
     var typeEl = content.querySelector('.type-picker');
     typeEl.addEventListener('click', function (e) { var b = e.target.closest('.type-opt'); if (!b) return; U.qsa('.type-opt', typeEl).forEach(function (x) { x.classList.remove('is-on'); x.setAttribute('aria-checked', 'false'); }); b.classList.add('is-on'); b.setAttribute('aria-checked', 'true'); data.type = b.dataset.type; if (data.type === 'deadline') { var s = content.querySelector('#' + id + '-start'); content.querySelector('#' + id + '-end').value = s.value; } });
     var allDay = content.querySelector('#' + id + '-allday');

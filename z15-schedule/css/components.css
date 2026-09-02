@@ -370,9 +370,9 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .toast--brand .toast__icon { color: var(--action); }
 .toast__body { flex: 1; display: flex; flex-direction: column; gap: 1px; font-size: 13.5px; line-height: 1.4; min-width: 0; }
 .toast__body strong { font-weight: 600; }
-.toast__action { flex: 0 0 auto; font-weight: 600; font-size: 13px; color: var(--action); padding: 2px 6px; border-radius: var(--r-xs); }
+.toast__action { position: relative; flex: 0 0 auto; font-weight: 600; font-size: 13px; color: var(--action); padding: 2px 6px; border-radius: var(--r-xs); }
 .toast__action:hover { background: var(--blue-50); }
-.toast__close { flex: 0 0 auto; color: var(--fg-tertiary); width: 28px; height: 28px; margin: -3px -4px -3px 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-xs); }
+.toast__close { position: relative; flex: 0 0 auto; color: var(--fg-tertiary); width: 28px; height: 28px; margin: -3px -4px -3px 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-xs); }
 .toast__close:hover { background: var(--bg-hover); color: var(--fg-primary); }
 .toast__bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--border-strong); transform-origin: left; animation: toast-bar var(--dur, 4s) linear forwards; }
 .toast.is-paused .toast__bar { animation-play-state: paused; }

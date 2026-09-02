@@ -360,7 +360,7 @@
     /** Sức khoẻ lịch cả tuần (T2–T6) của một người, kèm điểm 0–100. */
     weekHealth: function (staffId, iso) {
       var days = U.weekDays(U.fromISO(iso || U.todayISO())).slice(0, 5), from = U.toISO(days[0]), to = U.toISO(days[4]);
-      var agg = { days: [], meetingMin: 0, focusMin: 0, travelMin: 0, backToBack: 0, travelIssues: 0, conflicts: 0, focusConflicts: 0, longestFocusBlock: 0, daysOver6h: 0, external: 0, prepMissing: 0, byPriority: { 1: 0, 2: 0, 3: 0 }, byCalendar: {} };
+      var agg = { days: [], meetingMin: 0, focusMin: 0, travelMin: 0, backToBack: 0, travelIssues: 0, conflicts: 0, focusConflicts: 0, longestFocusBlock: 0, longestFreeGap: 0, daysOver6h: 0, external: 0, prepMissing: 0, byPriority: { 1: 0, 2: 0, 3: 0 }, byCalendar: {} };
       days.forEach(function (d) {
         var di = U.toISO(d), dl = S.dayLoad(staffId, di); agg.days.push({ iso: di, load: dl });
         agg.meetingMin += dl.meetingMin; agg.focusMin += dl.focusMin; agg.travelMin += dl.travelMin; agg.backToBack += dl.backToBack.length; agg.travelIssues += dl.travelIssues.length; agg.external += dl.external; agg.prepMissing += dl.prepMissing.length;
@@ -370,7 +370,7 @@
           if (e.type === 'focus') agg.longestFocusBlock = Math.max(agg.longestFocusBlock, dur);
           else { agg.byPriority[e.priority || 2] += dur; var ck = S.calendarOf(e).kind; agg.byCalendar[ck] = (agg.byCalendar[ck] || 0) + dur; }
         });
-        dl.gaps.forEach(function (g) { agg.longestFocusBlock = Math.max(agg.longestFocusBlock, g.minutes); });
+        dl.gaps.forEach(function (g) { agg.longestFreeGap = Math.max(agg.longestFreeGap, g.minutes); });
       });
       var cf = S.conflictsFor(staffId, from, to); agg.conflicts = cf.filter(function (c) { return c.kind === 'hard'; }).length; agg.focusConflicts = cf.filter(function (c) { return c.kind === 'focus'; }).length;
       var capacity = 5 * 9 * 60;

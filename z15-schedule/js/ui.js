@@ -167,7 +167,7 @@
   UI.progress = function (pct, opts) {
     opts = opts || {};
     var st = opts.color ? ' style="--bar:' + opts.color + '"' : '';
-    return '<span class="progress' + (opts.size ? ' progress--' + opts.size : '') + '"' + st + ' role="progressbar" aria-valuenow="' + Math.round(pct) + '" aria-valuemin="0" aria-valuemax="100"><span class="progress__bar" style="width:' + U.clamp(pct, 0, 100) + '%"></span></span>';
+    return '<span class="progress' + (opts.size ? ' progress--' + opts.size : '') + (opts.cls ? ' ' + opts.cls : '') + '"' + st + ' role="progressbar" aria-valuenow="' + Math.round(pct) + '" aria-valuemin="0" aria-valuemax="100"><span class="progress__bar" style="width:' + U.clamp(pct, 0, 100) + '%"></span></span>';
   };
   UI.kbd = function (keys) { return String(keys).split(' ').map(function (k) { return '<kbd class="kbd">' + U.escapeHtml(k) + '</kbd>'; }).join('<span class="kbd-sep">+</span>'); };
   UI.empty = function (opts) {

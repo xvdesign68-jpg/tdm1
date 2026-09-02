@@ -213,17 +213,18 @@
     // Lịch dày, có chủ đích chứa vài "lỗi" để trợ lý xử lý: trùng lịch, họp sát nhau, thiếu giờ di chuyển, thiếu chuẩn bị.
     var HEADS = ['s01', 's04', 's10', 's13', 's16', 's19', 's20'];
     var pushExec = function (e) { e.exec = true; e.attendeeIds = U.uniq(['s23'].concat(e.attendeeIds || [])); if (!e.ownerId) e.ownerId = 's24'; return push(e); };
+    var pushExecRec = function (e) { e.recurring = true; return pushExec(e); };
     var weekIdx = 0;
     for (var eo = -21; eo <= 28; eo++) {
       var ed = U.addDays(today, eo), eiso = U.toISO(ed), ewd = U.weekdayIndex(ed);
       if (ewd >= 5 || holidayName(eiso)) continue;
       if (ewd === 0) weekIdx++;
-      pushExec({ title: 'Điểm tin & ưu tiên ngày', type: 'meeting', date: eiso, start: '08:15', end: '08:30', location: 'Phòng CEO', attendeeIds: ['s24'], ownerId: 's24', priority: 2, notes: 'Trợ lý điểm lại lịch, rủi ro trong ngày và việc cần quyết.' });
-      if (ewd === 0) pushExec({ title: 'Họp Ban điều hành', type: 'meeting', date: eiso, start: '10:00', end: '11:30', location: 'Phòng Hà Nội', attendeeIds: HEADS.concat(['s24']), ownerId: 's23', priority: 1, notes: 'Agenda: số liệu tuần · pipeline · nhân sự · rủi ro dự án.' });
-      if (ewd === 1 && eo !== 6) pushExec({ title: '1:1 với ' + U.shortName(U.by(STAFF)[HEADS[weekIdx % 5]].name), type: 'meeting', date: eiso, start: '09:30', end: '10:15', location: 'Phòng CEO', attendeeIds: [HEADS[weekIdx % 5]], ownerId: 's23', priority: 2 });
-      if (ewd === 2) pushExec({ title: 'Tập trung: Chiến lược 2027 & kế hoạch nhân sự', type: 'focus', date: eiso, start: '14:00', end: '16:00', location: 'Phòng CEO', attendeeIds: [], ownerId: 's23', priority: 1, notes: 'Không xếp họp. Trợ lý chỉ ngắt khi khẩn.' });
-      if (ewd === 3 && eo !== 1) pushExec({ title: 'Review pipeline khách hàng', type: 'review', date: eiso, start: '15:00', end: '16:00', location: 'Phòng Sài Gòn', attendeeIds: ['s01', 's02', 's21'], ownerId: 's01', priority: 2 });
-      if (ewd === 4) pushExec({ title: 'Review tuần & duyệt lịch tuần sau', type: 'meeting', date: eiso, start: '15:30', end: '16:15', location: 'Phòng CEO', attendeeIds: ['s24'], ownerId: 's24', priority: 1 });
+      pushExecRec({ title: 'Điểm tin & ưu tiên ngày', type: 'meeting', date: eiso, start: '08:15', end: '08:30', location: 'Phòng CEO', attendeeIds: ['s24'], ownerId: 's24', priority: 2, notes: 'Trợ lý điểm lại lịch, rủi ro trong ngày và việc cần quyết.' });
+      if (ewd === 0) pushExecRec({ title: 'Họp Ban điều hành', type: 'meeting', date: eiso, start: '10:00', end: '11:30', location: 'Phòng Hà Nội', attendeeIds: HEADS.concat(['s24']), ownerId: 's23', priority: 1, notes: 'Agenda: số liệu tuần · pipeline · nhân sự · rủi ro dự án.' });
+      if (ewd === 1) pushExecRec({ title: '1:1 với ' + U.shortName(U.by(STAFF)[HEADS[weekIdx % 5]].name), type: 'meeting', date: eiso, start: '09:30', end: '10:15', location: 'Phòng CEO', attendeeIds: [HEADS[weekIdx % 5]], ownerId: 's23', priority: 2 });
+      if (ewd === 2) pushExecRec({ title: 'Tập trung: Chiến lược 2027 & kế hoạch nhân sự', type: 'focus', date: eiso, start: '14:00', end: '16:00', location: 'Phòng CEO', attendeeIds: [], ownerId: 's23', priority: 1, notes: 'Không xếp họp. Trợ lý chỉ ngắt khi khẩn.' });
+      if (ewd === 3) pushExecRec({ title: 'Review pipeline khách hàng', type: 'review', date: eiso, start: '15:00', end: '16:00', location: 'Phòng Sài Gòn', attendeeIds: ['s01', 's02', 's21'], ownerId: 's01', priority: 2 });
+      if (ewd === 4) pushExecRec({ title: 'Review tuần & duyệt lịch tuần sau', type: 'meeting', date: eiso, start: '15:30', end: '16:15', location: 'Phòng CEO', attendeeIds: ['s24'], ownerId: 's24', priority: 1 });
     }
     // Thứ Năm dày đặc (D+1): trùng lịch + chuỗi họp sát nhau + họp ngoài không có giờ di chuyển
     pushExec({ title: 'Họp Techcombank — chốt phạm vi hợp tác', type: 'meeting', projectId: 'p05', date: d(1), start: '10:00', end: '11:00', location: 'Techcombank Tower, 6 Quang Trung', attendeeIds: ['s01', 's21'], ownerId: 's01', priority: 1, travelMinutes: 30, prep: [{ text: 'Đọc lại brief & KPI khách hàng', ownerId: 's23', done: true }, { text: 'Chuẩn bị 3 phương án ngân sách', ownerId: 's21', done: false }], rsvp: { s21: 'pending' } });
@@ -233,7 +234,7 @@
     pushExec({ title: 'Họp ngân hàng — hạn mức tín dụng', type: 'meeting', date: d(1), start: '14:45', end: '15:30', location: 'Phòng Sài Gòn', attendeeIds: ['s20'], ownerId: 's20', priority: 2 });
     pushExec({ title: 'Call nhà đầu tư quý III', type: 'meeting', date: d(1), start: '15:30', end: '16:30', location: 'Online · Zoom', attendeeIds: ['s20', 's24'], ownerId: 's24', priority: 1, prep: [{ text: 'Cập nhật số liệu doanh thu Q3', ownerId: 's20', done: false }, { text: 'Gửi trước deck cho nhà đầu tư', ownerId: 's24', done: false }], rsvp: { s20: 'pending' } });
     pushExec({ title: 'Ký hợp đồng MoMo — Lì Xì Tết', type: 'meeting', projectId: 'p07', date: d(1), start: '16:30', end: '17:00', location: 'Phòng Hà Nội', attendeeIds: ['s16', 's20'], ownerId: 's16', priority: 1 });
-    pushExec({ title: 'Đón con', type: 'event', date: d(1), start: '17:30', end: '18:15', location: '', attendeeIds: [], ownerId: 's23', priority: 1, visibility: 'private', calendarId: 'personal:s23' });
+    pushExec({ title: 'Đón con', type: 'event', date: d(5), start: '17:30', end: '18:15', location: '', attendeeIds: [], ownerId: 's23', priority: 1, visibility: 'private', calendarId: 'personal:s23' });
     // Thứ Sáu (D+2): thăm set quay ở Đông Anh rồi về nội thành ăn trưa
     pushExec({ title: 'Thăm set quay TVC Tết', type: 'shoot', projectId: 'p01', date: d(2), start: '10:00', end: '11:30', location: 'Studio Cổ Loa, Đông Anh', attendeeIds: ['s13', 's04'], ownerId: 's13', priority: 2, travelMinutes: 45 });
     pushExec({ title: "Ăn trưa đối tác Biti's", type: 'meeting', projectId: 'p06', date: d(2), start: '12:15', end: '13:30', location: 'Nhà hàng Ngon Garden, Tây Hồ', attendeeIds: ['s06', 's02'], ownerId: 's24', priority: 2, travelMinutes: 45 });
@@ -258,6 +259,14 @@
     pushExec({ title: 'Ăn tối đối tác truyền thông', type: 'meeting', date: d(-7), start: '18:30', end: '20:30', location: 'Nhà hàng Sen Tây Hồ', attendeeIds: ['s10'], ownerId: 's24', priority: 2, travelMinutes: 30 });
     pushExec({ title: 'Họp nhà đầu tư — kết quả Q2', type: 'meeting', date: d(-10), start: '09:00', end: '10:30', location: 'Online · Zoom', attendeeIds: ['s20', 's24'], ownerId: 's24', priority: 1 });
 
+    // Lịch lặp của CEO nhường chỗ cho lịch cố định cùng ngày (trừ khối tập trung, để còn ví dụ 'họp đè khối tập trung')
+    var fixedExec = events.filter(function (e) { return e.exec && !e.recurring; });
+    events = events.filter(function (e) {
+      if (!e.recurring || e.type === 'focus') return true;
+      var s = U.timeToMin(e.start), en = U.timeToMin(e.end);
+      return !fixedExec.some(function (f) { return f.date === e.date && !f.allDay && U.timeToMin(f.start) < en && U.timeToMin(f.end) > s; });
+    });
+    events.forEach(function (e) { delete e.recurring; });
     /* ------------------------------------------------ làm giàu mọi sự kiện */
     var byId = U.by(STAFF);
     var isExternal = function (loc) { return !!loc && !/phòng|sảnh|pantry|online|zoom|meet|văn phòng|văn phòng hcm/i.test(loc); };

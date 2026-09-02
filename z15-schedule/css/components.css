@@ -661,6 +661,7 @@ input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webk
 .topbar__next .dot { width: 6px; height: 6px; background: var(--now); flex: 0 0 auto; animation: breathe var(--dur-ambient) ease-in-out infinite alternate; }
 .topbar__next b { font-weight: 600; color: var(--fg-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar__next small { font: var(--t-mono-sm); color: var(--fg-tertiary); white-space: nowrap; }
+@media (max-width: 1560px) { .topbar__next { max-width: 230px; } }
 @media (max-width: 1280px) { .topbar__next { display: none; } }
 
 /* Trình chọn ưu tiên trong form */

@@ -2,6 +2,7 @@
 
 > Bộ nhớ dự án để mọi phiên Claude Code sau tiếp tục đúng "gu" của anh, không mất ngữ cảnh.
 > **TUYỆT ĐỐI không đưa secret (mật khẩu, API key, token, IP máy chủ) vào file này, vào git, hay vào zip deploy.**
+> 📦 **Chuyển phiên/gói Claude Code khác?** Đọc thêm `HANDOFF.md` (cùng thư mục) — gói bàn giao đầy đủ: file cần đưa, hạ tầng, nơi để secret, trạng thái deploy, cách khởi động phiên mới.
 
 ## Ngôn ngữ & xưng hô
 - Luôn trả lời **tiếng Việt**, xưng **"em"**, gọi người dùng là **"anh"** (anh Vinh — Super Admin, xuanvinhsc68.work@gmail.com).

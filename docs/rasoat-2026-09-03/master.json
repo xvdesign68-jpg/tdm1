@@ -1,0 +1,1281 @@
+{
+ "items": [
+  {
+   "id": "P01",
+   "title": "Gói tuân thủ BVDLCN 2026: opt-out/do_not_contact + suppression list + AI phân loại 'đừng nhắn' + retention TTL + xoá theo yêu cầu",
+   "description": "Cờ `lead.do_not_contact` + collection `suppression/{brand}__{sha256(phone|uid|author_url)}`; nút 🚫 'Khách yêu cầu không liên hệ' trên thẻ feed/modal (ẩn Gọi/Zalo, loại khỏi Hôm nay/pipeline, chip 🚫). Engine `apEnqueueFunnel`/`stepNick` + worker `runFunnel` tra suppression trước MỖI bước (fail-closed); `funcWebhook`/hộp thư AI phân loại reply (từ_chối/quan_tâm/hỏi_giá/hẹn) → 'từ_chối' tự set cờ + `outreach_threads.active=false`, ghi `consent_log`. Tin inbox mở đầu bắt buộc có câu opt-out (footer UI hứa nhưng chưa có). `brands.retention{coldMonths}` → CF đêm đóng dấu `expireAt` lên leads/notes lạnh không tương tác (loại trừ closed/có deal), bật TTL policy (pattern outreach_log ACTIVE). CF `eraseSubject({phone|uid})` xoá cascade leads+notes+outreach_map/threads/log, sinh biên bản `erasure_log`. Tab 'Tuân thủ' (super + admin brand): suppression, nhật ký xoá, import CSV DNC, chính sách lưu.",
+   "category": "compliance",
+   "personas": [
+    "owner",
+    "sales",
+    "ai",
+    "engineer",
+    "agency",
+    "strategist"
+   ],
+   "value": 4,
+   "effort": "L",
+   "risk": "Xoá cascade sai tenant nếu khớp SĐT xuyên brand → khoá theo brand + confirm 2 bước; AI phân loại sai 'từ chối' → mất lead: đặt ngưỡng confidence + cho sales gỡ cờ; Luật 91/2025 không có ngoại lệ 'dữ liệu công khai' → gói này giảm rủi ro chứ không xoá, cần luật sư review. Rules field `do_not_contact` + write suppression qua CF.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf",
+    "worker"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-18",
+    "sales-14",
+    "ai-08",
+    "engineer-01",
+    "agency-17",
+    "strategist-03"
+   ]
+  },
+  {
+   "id": "P02",
+   "title": "Bản tin sáng 7h30 (+ tối 21h) qua Zalo OA/ZBS/Telegram theo vai trò + card 'Hôm nay' đọc daily_brief",
+   "description": "CF `dailyBrief` onSchedule 7:30 VN (pattern outreachTick, asia-southeast1, maxInstances:1): mỗi brand tổng hợp bằng getCountFromServer/`daily_stats` (lead mới/nóng hôm qua, nóng chưa ai chăm >1h, hẹn hôm nay/quá hẹn, đã chốt, bot chạm/rep, nick needLogin, chi phí/lead) + top 3 lead nên gọi (score × SLA × fu_at) kèm deep-link `app.html#feed&lead=<id>`; OpenAI chỉ DIỄN GIẢI số đã tính thành 5 dòng tiếng Việt (không tự tính). Gửi qua cụm `~/smartlead-zalo-fn` (notifyBrandZalo/sendZaloZBS) tới role owner trong `brand_sales`; sales nhận bản 'việc của tôi' (Telegram bot đã có ở backend / Zalo); agency nhận bản gộp; fallback email. Card 'Thông báo cá nhân' (hiện demo) nối thật → `users/{uid}.notify{kênh, giờ, enabled}`; tab Cảnh báo thêm 'Báo cáo sáng'. Card 'Hôm nay' đầu Overview render cùng payload `daily_brief/{brand}__{day}`. Ghi `notify_log` để biết chắc đã gửi/lỗi.",
+   "category": "growth",
+   "personas": [
+    "owner",
+    "sales",
+    "ai",
+    "strategist"
+   ],
+   "value": 4.25,
+   "effort": "M",
+   "risk": "ZBS (thay ZNS từ 1/1/2026) cần OA gói Tăng trưởng + mẫu duyệt + quota 1 tin hậu mãi/user/ngày (~1.100đ/tin) → 2 mẫu sáng/tối hoặc gộp 1 tin; bắt đầu Telegram/email, Zalo OA sau. KHÔNG gửi SĐT khách qua kênh ngoài (chỉ tên+điểm+link) để không lộ PII.",
+   "touches": [
+    "cf",
+    "external",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-01",
+    "sales-17",
+    "ai-04",
+    "strategist-09"
+   ]
+  },
+  {
+   "id": "P03",
+   "title": "Đóng vòng kín: bắt phản hồi khách trên nick AdsPower + Hộp thư 2 chiều + AI tóm tắt/gợi ý trả lời",
+   "description": "Worker mỗi phiên mở nick thêm bước cuối đọc messenger.com (thread chưa đọc) + trang thông báo (reply comment), CHỈ thread có trong `outreach_threads/outreach_map` (scope strict) → ghi giống funcWebhook: note hệ thống '💬 Khách đã phản hồi: …' vào leads/{id}/notes, stage `responded` + stage_at, `outreach_replied`, thread step replied (dừng AI), addLog status 'reply' (+`outreach_stats.replied`). Lưu `conversations/{leadId}` {messages[], lastInboundAt}; CF trigger onWrite gọi OpenAI phân loại intent + tóm tắt 3 dòng + 2 câu trả lời theo brand voice. FE: tab 'Hội thoại' trong lead modal + view 'Hộp thư' (part mới, Vận hành) realtime theo brand/nick/lead, bàn giao sales, SLA phản hồi 15'; sales sửa rồi 'Gửi' → enqueue `outreach_tasks` action `send_message`/`reply` (worker DOM messenger, van riêng). Chuông/Hôm nay hiện 'Khách vừa trả lời'; Rules conversations theo brandCode.",
+   "category": "automation",
+   "personas": [
+    "owner",
+    "ai",
+    "strategist"
+   ],
+   "value": 5,
+   "effort": "L",
+   "risk": "DOM messenger đổi thường xuyên → selector fail-closed như luồng comment-lead; đọc inbox thêm ~20–40s/phiên và là hành vi thêm trên nick (nhẹ, giống người); FB đánh dấu 'đã xem' nên người phải trả lời nhanh; hội thoại là PII → TTL + Rules theo brand, không lưu ngoài đoạn trích.",
+   "touches": [
+    "worker",
+    "cf",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-14",
+    "ai-03",
+    "strategist-01"
+   ]
+  },
+  {
+   "id": "P04",
+   "title": "Wizard 'Brand mới + lead đầu tiên trong 15 phút' + checklist onboarding thay KPI 0/NaN%",
+   "description": "Nút '+ Brand mới' (trang Người dùng) mở wizard 6 bước trong 1 modal: (1) mã/tên/logo + gói; (2) Hồ sơ AI chọn preset ngành (spa/F&B/BĐS/giáo dục/mẹ&bé) tự điền nganh/dichvu/khach/giong; (3) chọn 3 group gợi ý theo ngành + dán URL, gán brand NGAY trong form (sửa openSourceForm — hết toast 'chạy script dán nhãn'), keyword/loại trừ mẫu; (4) SLA + assignMode + ma trận Tiếp cận preset Cân bằng; (5) mời sales bằng link/QR (P22); (6) 'Quét thử 15 bài' gọi manualScan limit 15 riêng nguồn → hiện 3 bài + điểm + lý do AI trong ~1 phút. Brand 0 lead: Overview hiện checklist 4 bước tick tự động (nguồn đã gán → lượt quét đầu → mời sales → nhận báo Zalo) thay KPI 0 và phễu 'NaN%' (sửa chia 0).",
+   "category": "feature",
+   "personas": [
+    "owner",
+    "agency",
+    "strategist"
+   ],
+   "value": 4.67,
+   "effort": "M",
+   "risk": "Quét thử tốn BrightData/AI → giới hạn 15 bài + 1 lần/brand/giờ; thư viện group gợi ý cần Super Admin duyệt; backend manualScan cần nhận tham số nguồn/limit.",
+   "touches": [
+    "fe",
+    "live",
+    "cf",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-12",
+    "agency-02",
+    "strategist-05"
+   ]
+  },
+  {
+   "id": "P05",
+   "title": "PWA cài lên màn hình chính + bottom tab theo vai trò + Web Push (FCM) + chỉ báo offline",
+   "description": "`manifest.webmanifest` (icon 192/512, standalone, theme #1B2DCC) + `sw.js` precache app shell theo danh sách hash `?v=` do tools/build.mjs sinh (HTML network-first, assets cache-first; `skipWaiting` + banner 'có bản mới'); nút 'Thêm vào màn hình chính' ở Cài đặt tài khoản. Bottom tab ≤639px: Hôm nay · Lead · Pipeline · Tìm · Tôi thay hamburger 15 mục; ẩn hotline nổi + mascot AI trên phone (đang chiếm ~40% đáy màn), 'Hỏi AI' vào tab Tôi. Chip 'Ngoại tuyến · N thay đổi chờ đồng bộ' từ online/offline + `waitForPendingWrites`; thao tác ghi đóng ngay (optimistic). Push: FE xin quyền Notification, lưu `users/{uid}.fcm[]`; CF `notifyTick` (5', pattern outreachTick) quét `fu_at` trong 15' tới + `assigned_at` mới; `funcWebhook` push khi khách rep; super nhận nick checkpoint. Click → `app.html#feed&lead=<id>`. Ghi `fu_notified_at` chống lặp; giờ im lặng theo user. CSP thêm fcm.googleapis.com, worker-src; Netlify header `/sw.js` max-age=0.",
+   "category": "platform",
+   "personas": [
+    "owner",
+    "sales",
+    "engineer"
+   ],
+   "value": 4.33,
+   "effort": "L",
+   "risk": "iOS chỉ nhận Web Push khi đã cài PWA (≥16.4) → onboarding rõ; SW cache sai → user kẹt bản cũ (test kỹ với hash build); cần index leads(brand, fu_at) + Rules `users.fcm`.",
+   "touches": [
+    "fe",
+    "live",
+    "cf",
+    "rules",
+    "external"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-10",
+    "sales-04",
+    "engineer-12"
+   ]
+  },
+  {
+   "id": "P06",
+   "title": "Content Studio theo brand: persona + mẫu × bước × kênh + AI 3 biến thể + spam-score (thay 1 field lead.reply dùng chung)",
+   "description": "`brands/{code}.content={persona:{xưng hô, giọng, tên nick}, templates:{comment[], inbox[], zalo[], sms[]}, optOutLine}`. CF `genVariants(leadId)` (lúc chấm điểm hoặc on-demand) sinh `lead.replies{comment,inbox,zalo}` × 3 biến thể từ bài + need/intent + `brands.ai.{giong,dichvu,khach}` + 3 ghi chú gần nhất: comment = ngắn, đồng cảm, KHÔNG chào bán; inbox = xưng hô + tên + nhu cầu + opt-out; zalo = thân mật; SMS ≤160 ký tự. Chấm spam-score (từ khoá bán hàng, link, trùng ≥70% với 30–50 comment gần nhất của brand/nick). Engine `apEnqueueFunnel` chọn biến thể ít dùng nhất, ghi `variantId` lên thread (→ đo reply-rate, P21). Modal lead: gợi ý AI đưa lên ngay dưới bài gốc, nút '✨ Viết lại' (assistantChat mode `draft`, ≤5 lượt/lead/ngày), sửa tại chỗ, 'Lưu làm bản gửi' (worker dùng bản người duyệt) hoặc 'Lưu làm mẫu của tôi' (`users/{uid}.templates[]` biến {ten},{dich_vu},{brand}) → hiện trong sheet Zalo/SMS của P08. Mục 'Nội dung' trong ⚙️ brand: xem/sửa/gửi thử vào nick mình. Vá bug 'Sao chép gợi ý' ghi 'undefined'.",
+   "category": "ai",
+   "personas": [
+    "ai",
+    "strategist",
+    "sales"
+   ],
+   "value": 4.33,
+   "effort": "M",
+   "risk": "Token ×3/lead → cache biến thể, chỉ sinh cho hot/warm; biến thể AI lệch persona → cần bản 'người duyệt' làm chuẩn, chế độ duyệt trước cho brand mới; comment công khai vẫn là tín hiệu spam nếu tần suất/nick cao dù nội dung khác.",
+   "touches": [
+    "cf",
+    "fe",
+    "live",
+    "worker",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "ai-02",
+    "strategist-12",
+    "sales-07"
+   ]
+  },
+  {
+   "id": "P07",
+   "title": "Sau khi Gọi/Zalo → hỏi kết quả 1 chạm (hoặc nói 20 giây) → tự ghi note + đặt hẹn kế + call log",
+   "description": "Khi bấm Gọi/Zalo (P08) FE lưu `pendingTouch={leadId,channel,at}`; quay lại app (`visibilitychange`/focus ≥20s, fallback hiện khi mở lại thẻ trong 10') → bottom-sheet 5 chip: Không nghe máy · Hẹn gọi lại · Quan tâm · Không nhu cầu · Sai số. Chọn → 1 lần ghi: note hệ thống vis=team '📞 Gọi 14:02 — Không nghe máy' (addLeadNote sẵn có) + `fu_at` theo nhịp (không nghe +2h; hẹn lại chọn giờ; quan tâm +1 ngày; không nhu cầu → dropped + lost_reason) + `first_care_at` nếu chưa có + gợi ý đổi stage. Ghi `leads/{id}/touches/{auto}` {channel,result,by,at} (Rules create cho active user cùng brand). Tuỳ chọn 🎤: MediaRecorder ≤90s → CF `transcribeNote` (gpt-4o-mini-transcribe tiếng Việt) → LLM trích {kết_quả, giá_trị_dự_kiến, hẹn_lúc, tóm_tắt} → sales xác nhận 1 chạm (không lưu file audio, chỉ transcript). Dashboard admin/Hôm nay/ROI: số cuộc gọi/nghe máy/lý do rớt theo sales.",
+   "category": "feature",
+   "personas": [
+    "owner",
+    "sales",
+    "ai"
+   ],
+   "value": 4.33,
+   "effort": "M",
+   "risk": "Sheet gây phiền nếu bật với mọi lần quay lại app → chỉ khi lần rời app xuất phát từ nút Gọi/Zalo, có Bỏ qua; iOS Safari `visibilitychange` đôi khi không bắn với tel: → fallback; MediaRecorder iOS cần fallback text; Rules subcollection touches cần lệnh Cloud Shell.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-04",
+    "sales-03",
+    "ai-11"
+   ]
+  },
+  {
+   "id": "P08",
+   "title": "Thanh 'Chăm khách 1 chạm': Gọi · Zalo · SMS · Chép trên thẻ feed, thẻ kanban và modal",
+   "description": "Thay pill SĐT chỉ-chép bằng nhóm nút deep-link: `tel:<sđt>`, `https://zalo.me/<sđt>` (ẩn khi `phone_has_zalo===false`, hồi sinh helper `zaloDial()` đang là code chết 20-feed.js:675), `sms:<sđt>?body=<mẫu>`; giữ Chép. Render trong `contactPills()` (20-feed.js ~756) nên tự có ở feed + modal; thêm vào `kCardV2` (30-pipeline.js:312) vì thẻ kanban hiện không có SĐT. Chuẩn hoá +84→0 bằng `phoneLocal`/`normPhoneVN` sẵn có; sink qua `escUrl`/`escJsAttr`. Tap target ≥44px trên pointer:coarse. Bấm nút ghi `touches{channel,by,at}` (nền cho P07) — kiểm whitelist Rules leads trước khi ship.",
+   "category": "ux-fix",
+   "personas": [
+    "owner",
+    "sales"
+   ],
+   "value": 5,
+   "effort": "S",
+   "risk": "Thấp. zalo.me chỉ mở đúng khi số có Zalo — `undefined` vẫn hiện nút; Rules leads update cần cho field touches (nếu ghi).",
+   "touches": [
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": true,
+   "sources": [
+    "owner-03",
+    "sales-01"
+   ]
+  },
+  {
+   "id": "P09",
+   "title": "Kênh Zalo trong Tiếp cận: Zalo OA + ZBS cho lead đã phản hồi (hợp lệ) + Zalo cá nhân qua func ở van thấp",
+   "description": "Lớp chính hợp lệ: brand kết nối Zalo OA (OAuth qua CF `zaloOAConnect`, token vào Secret Manager) → lead có SĐT và đã `responded`/`booked` nhận ZBS template Giao dịch/Hậu mãi (xác nhận lịch hẹn, nhắc lịch, ưu đãi); webhook OA reply → note + pipeline như funcWebhook. Lớp phụ: engine outreach.js mở rộng cho nick Zalo (`fb_accounts.platform='zalo'`, Account Token func ở Secret Manager) chạy FIND_USER → REQUEST_FRIEND → poll GET_REQUEST_FRIEND_STATUS → USER_SEND_MESSAGE (tin cá nhân hoá từ P06 + opt-out) CHỈ cho lead hot/warm có `phone_has_zalo===true`; van riêng ≤20–30 mời/ngày/nick, ≤20 tin, khung 8–21h, giãn ≥5'. FE: hàng 'Zalo' trong ma trận ⚙️ brand, cột Kênh trong bảng nick, card Zalo OA ở Tích hợp, cảnh báo ToS trong UI. Dữ liệu `phone`/`phone_has_zalo`/`brand_sales` đã có.",
+   "category": "automation",
+   "personas": [
+    "owner",
+    "strategist"
+   ],
+   "value": 5,
+   "effort": "L",
+   "risk": "Zalo cấm kết bạn/nhắn người lạ bằng công cụ (khoá số vĩnh viễn) → tin người lạ vào mục 'Tin nhắn từ người lạ', hiệu quả có trần; cần điều khoản 'ai chịu rủi ro nick' + van rất thấp + opt-out tức thì. ZBS cần OA xác thực gói Tăng trưởng (2,5tr/năm) + mẫu duyệt + quota; chưa có bảng giá func Zalo.",
+   "touches": [
+    "cf",
+    "external",
+    "fe",
+    "live",
+    "rules",
+    "worker"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-15",
+    "strategist-02"
+   ]
+  },
+  {
+   "id": "P10",
+   "title": "Màn 'Hôm nay' mobile-first thay 4 KPI delta giả: việc theo độ gấp + 3 lead nên gọi ngay",
+   "description": "Part mới `src/app/25-today.js` (view `today`, mặc định ≤639px cho sales/admin) hoặc card đầu Overview (20-feed.js:108) cho role admin/sales, tính từ `D.leads` sẵn có: (1) Quá hẹn (`fu_at<=now`), (2) Hẹn hôm nay, (3) Lead nóng giao cho tôi/chưa ai chăm (`first_care_at` null + detected_at > `crmCfg.slaWarn`), (4) Lead vừa giao, (5) Đã chốt tuần này. Mỗi dòng có Gọi/Zalo (P08), 'Xong' (đặt `first_care_at`), '+Hẹn kế'. Dưới là 3 lead 'nên gọi ngay' (score × tuổi SLA) mở modal. Bỏ delta cứng '+12,4%' và KPI 'Bài đã quét' bịa (valid×14) → số thật từ D.scans hoặc ẩn với brand user. Rail desktop ('Lead của tôi', 'Hôm nay cần chăm') hiện mất hoàn toàn trên mobile — khối này là rail ở dạng mobile. Tôn trọng cơ chế `SLApp.reload` diff/hoãn (90-boot).",
+   "category": "ux-fix",
+   "personas": [
+    "owner",
+    "sales"
+   ],
+   "value": 5,
+   "effort": "M",
+   "risk": "Số tính trên cửa sổ lead đang nạp (≤4.000) — đủ đúng cho 'hôm nay', ghi chú nhỏ khi brand vượt trần; thêm part + router `go()` + CSS mobile. Bản card-đầu-Overview có thể ship trước như quick win (S).",
+   "touches": [
+    "fe"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-02",
+    "sales-02"
+   ]
+  },
+  {
+   "id": "P11",
+   "title": "Pipeline dùng được trên điện thoại: nút '→ Bước kế' + bottom-sheet 'Chuyển sang…' + 7 chip stage bấm được trong modal",
+   "description": "Ở ≤639px thay kanban xếp dọc 7 cột (trang dài, kéo-thả HTML5 không chạy trên touch) bằng tab ngang 7 giai đoạn có số đếm + danh sách thẻ compact. Thẻ `kCardV2` thêm '→ Bước kế' (hồi sinh `pvMoveNext` code chết) và giữ/tap tên giai đoạn mở sheet 7 lựa chọn / đặt hẹn / Gọi / Zalo; cả hai đi qua `pvApplyStage(id,stage)` sẵn có (optimistic + Hoàn tác 6s + stage_at/first_care_at). Modal: thanh segment 7 giai đoạn (65-charts-lead-modal.js:109) thành chip bấm được; modal không đóng sau khi đổi stage. Chống bấm đúp; chuyển lùi >1 bước confirm nhỏ.",
+   "category": "ux-fix",
+   "personas": [
+    "owner",
+    "sales"
+   ],
+   "value": 4.5,
+   "effort": "S",
+   "risk": "Thấp: dùng lại pvApplyStage. Nút 'Đánh dấu đã xử lý' (đang set thẳng `closed`, sai KPI) đổi thành 'Đã chốt'/'Không thành' — xem P26/P34.",
+   "touches": [
+    "fe"
+   ],
+   "quick_win": true,
+   "sources": [
+    "owner-07",
+    "sales-06"
+   ]
+  },
+  {
+   "id": "P12",
+   "title": "Workspace agency: 1 tài khoản – nhiều brand, vai trò `owner`, brand switcher + view gộp",
+   "description": "`users.brands:[code…]` + `brandRoles:{code:'owner'|'admin'|'sales'}`; `users.brand` = brand đang chọn. Khối brand ở sidebar (80-rbac-auth brandBlock) thành dropdown đổi brand → ghi `brand` → dataKey đổi → startData nạp lại (cơ chế đã có). Vai trò `owner` thấy tổng quan gộp các brand mình sở hữu (bảng brand lead/nóng/chốt/chi phí/rep, xuất PDF có logo) KHÔNG cần superadmin — hết hard-code SUPER_EMAIL là đường duy nhất xem nhiều brand. Rules: `resource.data.brand in get(users/{uid}).data.brands` cho leads/sources/notes/outreach_log/outreach_stats; live.js `where('brand','in',brands)` (≤30) hoặc listener theo brand. Gói Agency (P13) tính theo số brand.",
+   "category": "platform",
+   "personas": [
+    "agency",
+    "strategist"
+   ],
+   "value": 4.5,
+   "effort": "L",
+   "risk": "Đổi model `users.brand` string → mảng đụng Rules + query tenancy toàn hệ (fail-closed đang đúng) → migration + test đối kháng rò chéo brand (P49); `in` giới hạn 30 giá trị.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "agency-01",
+    "strategist-10"
+   ]
+  },
+  {
+   "id": "P13",
+   "title": "Gói giá phẳng theo brand + trial 14 ngày + billing 1 nguồn phí + enforce entitlement + nhắc hạn + tự tạm dừng",
+   "description": "Gộp `brands.plan.price` và `brands.roi.fee` về 1 field (migrate 1 lần). `brands/{code}.plan = {tier:'starter|growth|agency', price, cycle, status:trial/active/past_due/paused, nicks:N, sources:N, users:N, outreach, zalo, trialEndsAt, nextDueAt}`. Đề xuất: Starter 490k/brand/tháng (quét + CRM + 1 nick), Growth 990k (+3 nick, Zalo OA, báo cáo Zalo), Agency 2,5tr/5 brand; nick thêm 150k/tháng; −30% trả năm; không setup fee; pilot pay-per-lead nóng cho 3 brand BĐS. CF `enforcePlan` onSchedule hằng ngày: sắp hết hạn 7/3/1 ngày → Zalo/email cho brand + AM; hết trial/quá hạn N ngày → `sources.active=false` + tắt `outreach.on` + banner 'Gói đã hết hạn'; quá số nick → khoá outreach. FE: 'đang dùng/hạn mức' ở Cài đặt tài khoản + banner nâng cấp; trang Người dùng cột trạng thái gói + lọc 'sắp hết hạn'; biên lai (plRcp) tự tính kỳ kế; xuất công nợ CSV theo tháng. Rules chặn ghi vượt hạn mức (`fb_accounts` count qua counter).",
+   "category": "growth",
+   "personas": [
+    "agency",
+    "strategist"
+   ],
+   "value": 4.5,
+   "effort": "M",
+   "risk": "Tự tạm dừng nhầm brand đang trả tiền → grace period + override Super Admin + log; giá phẳng có thể lỗ với brand quét nhiều → cần trần ngân sách theo brand (P23); pay-per-lead cần định nghĩa 'lead nóng' chống tranh cãi.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "agency-05",
+    "strategist-04"
+   ]
+  },
+  {
+   "id": "P14",
+   "title": "Nhắc hẹn 15' trước giờ + SLA có cam kết theo giai đoạn + leo thang lead nóng bỏ quên qua Zalo/Telegram/chuông",
+   "description": "Mở rộng crmCfg (đã có slaWarnMin/slaBadMin theo brand) thành bộ SLA theo giai đoạn: lần chăm đầu (15'), 'Đã phản hồi' → sales trả lời (60'), 'Đã hẹn' xác nhận trước giờ hẹn, kẹt cột giữa (N ngày). CF scheduler 5' (pattern outreachTick, maxInstances:1) quét leads theo brand: (a) `fu_at` trong 15' tới chưa nhắc → Zalo/Telegram cho assignee ('⏰ 9:00 gọi chị Hương – Spa Q7', deep-link); (b) temp=hot, `first_care_at` null, quá slaWarn → nhắc sales; quá slaBad/2×SLA → nhắc chủ/admin brand + AM kèm gợi ý 'giao cho sales rảnh nhất' (đếm tải như rail feed). Ghi `fu_notified`/`sla_escalated` chống lặp; `sla_events` → KPI 'SLA đạt %' và 'thời gian phản hồi TB' THẬT thay số cứng '2,4 phút −18%' trong Báo cáo; đưa vào báo cáo white-label (P15). Card Hôm nay hiện 'tỷ lệ chăm trong 15 phút' theo sales.",
+   "category": "automation",
+   "personas": [
+    "owner",
+    "agency"
+   ],
+   "value": 4.5,
+   "effort": "M",
+   "risk": "Chi phí ZBS theo tin + quota 1 tin hậu mãi/user/ngày → Telegram/Zalo OA cho sales, ZBS chỉ cho leo thang tới chủ; cần index leads(brand, fu_at); mốc thời gian CRM đang lấy đồng hồ client (assigned_at, first_care_at) → SLA sai khi máy lệch giờ, nên chuyển serverTimestamp trước.",
+   "touches": [
+    "cf",
+    "external",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-09",
+    "agency-08"
+   ]
+  },
+  {
+   "id": "P15",
+   "title": "Báo cáo white-label tự động gửi khách (tuần/tháng): PDF + link + Zalo OA/Email, logo brand + nhắc gia hạn",
+   "description": "CF `brandReport` onSchedule (thứ 2 8h & ngày 1, + 7 ngày trước `plan.to`) + gọi tay từ web: dựng 1 trang HTML→PDF (Puppeteer trong CF/Cloud Run, memory ~1GB) theo brand: lead nhận/nóng/chốt, doanh thu thật (`deal_value` nếu có, không thì ghi 'ước tính'), chi phí/lead VND, so kỳ trước, top 3 nguồn, SLA đạt %, hoạt động Tiếp cận, 3 việc đề xuất. Header = `brands.logo` + tên brand + tên AGENCY (không Z15). Lưu Storage `reports/{brand}/{kỳ}.pdf` link ký hạn 30 ngày; gửi qua notifyBrandZalo (cụm smartlead-zalo-fn) + Resend email tới `billing.email`; route `#report&m=YYYY-MM` có @media print. Notice theo brand 'Gói hết hạn 7 ngày — Gia hạn' từ plan.to (`brands.notices[]` thay ticker toàn hệ). FE tab Báo cáo: 'Lịch gửi' + 'Xem trước' + lịch sử; Super Admin thấy brand sắp hết hạn + tỷ lệ mở báo cáo. Counter `roi_stats/{brand}__{YYYY-MM}` (increment) để không tính từ cửa sổ 500 lead.",
+   "category": "growth",
+   "personas": [
+    "owner",
+    "agency"
+   ],
+   "value": 4.5,
+   "effort": "L",
+   "risk": "Số liệu phải là số THẬT (không dùng delta giả/KPI bịa hiện tại); doanh thu phụ thuộc P34; Zalo OA gói/ZBS có quota.",
+   "touches": [
+    "cf",
+    "external",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-17",
+    "agency-03"
+   ]
+  },
+  {
+   "id": "P16",
+   "title": "Tìm khách theo SĐT/email/mã lead (kể cả 4 số cuối) ở ô tìm feed + Cmd-K, mở được Cmd-K trên mobile, tra toàn kho",
+   "description": "20-feed.js:455 chuỗi `l.__q` chỉ gộp name/text/need/intent/industry/source/service — thêm `l.phone` (cả +84 và 0xxx qua `phoneLocal`), `l.email`, `l.id`; query toàn số ≥3–4 ký tự → `endsWith` trên số chuẩn hoá (gõ '3456' ra 0938 123 456). Palette 70-shell-tools.js:22 tương tự + dòng kết quả hiện 'Số này là ai · ai đang chăm · stage · ghi chú cuối' + nút Gọi/Zalo. Thêm nút 🔍 ở mobile-bar mở `ckOpen()` (hiện chỉ có phím tắt, ẩn <1024px). Không thấy trong RAM → live.js `getDocs(where('brand','==',byBrand), where('phone','==',norm))` (Rules brand-scope sẵn) nhét vào leadsExtra, hiện 'ngoài cửa sổ'.",
+   "category": "ux-fix",
+   "personas": [
+    "owner",
+    "sales"
+   ],
+   "value": 4,
+   "effort": "S",
+   "risk": "Backend cần đảm bảo `lead.phone` lưu dạng chuẩn hoá để where== khớp; composite index leads(brand, phone) nếu kết hợp; single-field tự có.",
+   "touches": [
+    "fe",
+    "live"
+   ],
+   "quick_win": true,
+   "sources": [
+    "owner-11",
+    "sales-05"
+   ]
+  },
+  {
+   "id": "P17",
+   "title": "Chuông thành 'Hộp việc của tôi hôm nay' (thay đếm lead nóng toàn kho không bao giờ giảm)",
+   "description": "Bell panel (70-shell-tools.js:76-95, hiện = 4 lead score≥60 gắn kênh giả 'Đa kênh', badge = tổng lead nóng) thay bằng danh sách VIỆC suy từ `D.leads` không cần backend: (a) `assignee_uid==me && !first_care_at` (mới giao), (b) `fu_at` trong 1h hoặc quá hẹn, (c) `stage=='responded' && isMine` / `outreach_replied` (khách phản hồi — engine đã set qua funcWebhook), (d) lead nóng của tôi/của brand (admin) chưa ai chăm > slaWarn. Mỗi dòng có Gọi/Zalo/Xong (tick → note hệ thống); đã xem lưu localStorage theo id+at, tự biến mất khi điều kiện hết. Badge = số việc chưa xử lý của TÔI; hết việc ẩn badge thay vì '0'. Admin brand: đổi 'Xem tất cả cảnh báo' (đang dẫn tới trang super-only) thành 'Xem Hôm nay'.",
+   "category": "ux-fix",
+   "personas": [
+    "owner",
+    "sales"
+   ],
+   "value": 4,
+   "effort": "S",
+   "risk": "Trạng thái 'đã xem' chỉ theo thiết bị (localStorage) tới khi có notifications/{uid} — đủ cho bước đầu.",
+   "touches": [
+    "fe"
+   ],
+   "quick_win": true,
+   "sources": [
+    "owner-08",
+    "sales-08"
+   ]
+  },
+  {
+   "id": "P18",
+   "title": "Dấu vết máy trên thẻ khách + Timeline 360° trong modal + nút 'Dừng máy, tôi tiếp quản'",
+   "description": "Khi mở modal, live.js subscribe `outreach_log where leadId==id orderBy at desc limit 30` (Rules outreach_log đã cho brand user đọc theo brandCode; cần composite index `outreach_log(leadId, at desc)`) + notes + touches (P07) + `stage_history[]` (mỗi `pvApplyStage`/giao lead append `{stage,by,at}` vào mảng trên lead — không cần collection mới). Vẽ 1 dòng thời gian: 🤖 nick nào đã react/comment/kết bạn/inbox (nội dung gửi, trạng thái thread), 💬 khách phản hồi, 👤 giao/đổi giai đoạn, 📞 gọi. Badge 'Bot đã inbox 10:32' đầu modal; thẻ feed/kanban chip nhỏ '🤖 đã chào · chờ rep' từ `outreach_threads` (mở Rules read theo brand). Nút 'Dừng máy, tôi tiếp quản' → `outreach_threads/{leadId}.active=false` qua CF nhỏ (không mở write cho client) + note hệ thống. Subscribe/unsubscribe theo vòng đời modal.",
+   "category": "ux-fix",
+   "personas": [
+    "owner",
+    "sales"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Index mới + Rules read outreach_threads theo brand; nick func path ghi log thiếu name/temp (CLAUDE.md v119-38 tồn b); modal hiện là snapshot lúc mở nên cần cơ chế subscribe riêng.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-13",
+    "sales-11"
+   ]
+  },
+  {
+   "id": "P19",
+   "title": "Hồ sơ khách theo SĐT/author_url: cảnh báo 'đã có trong CRM', gộp hồ sơ, chặn giao trùng, phát hiện người bán giả khách",
+   "description": "Client: Map `phoneIdx` (normPhoneVN → [leadIds]) + `authorIdx` dựng 1 lần mỗi snapshot từ `D.leads` → chip 'Khách cũ · 2 lead · #211 Đã chốt 03/2026 (Ngọc)' + nút mở lead cũ; cảnh báo khi giao lead cho người khác người đã chăm. Server: CF trigger onCreate leads ghi `contacts/{brand}__{normPhone|author_uid}` {leadIds[], lastStage, lastAssignee, lastOutcome, postCount30d, industries[]}; nút Gộp (`merged_into`, ẩn khỏi pipeline); engine bỏ qua uid/phone đã inbox trong 30 ngày. Tầng 'gian lận': rule + LLM nhỏ cờ `suspect` khi cùng số/author đăng ≥3 ngành khác nhau/tuần, bài có mẫu bán hàng ('nhận làm', 'inbox em', giá bảng), đầu số lạ, tài khoản <30 ngày → hạ điểm + chip '⚠ nghi người bán'.",
+   "category": "feature",
+   "personas": [
+    "sales",
+    "ai"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Gộp nhầm tên phổ biến/'Ẩn danh' → chỉ tự gộp theo SĐT chuẩn hoá hoặc uid số, author_url username chỉ gợi ý; author_url ~31% lead, phone chỉ phần lead có SĐT → phủ chưa đủ; index contacts theo brand.",
+   "touches": [
+    "cf",
+    "fe",
+    "live",
+    "rules",
+    "worker"
+   ],
+   "quick_win": false,
+   "sources": [
+    "sales-09",
+    "ai-07"
+   ]
+  },
+  {
+   "id": "P20",
+   "title": "Nhật ký quản trị (audit log) bất biến bằng CF trigger + tab 'Nhật ký' theo brand + confirm/re-auth khi nâng quyền",
+   "description": "CF `onDocumentWritten` cho users/{uid}, brands/{code}, sources/{id}, config/*, fb_accounts/{pid}, leads/{id} (chỉ field nhạy: stage/assignee_uid/dropped/phone/brand/delete — lọc ngay đầu hàm để không tốn invocation) → ghi `audit_log` {actor, action, target, brandCode, diff before→after, at, ua/sid, expireAt 12 tháng}. Actor từ `updatedBy:{uid,email}` live.js tự gắn vào mọi write qua SL_FB (setUserRole/setUserBrand/setUserActive/setBrandLeadWindow/setSource/setConfig/setOutreach/assign/updateLead/deleteLead hiện thiếu), fallback 'system/engine'. Rules audit_log: read super || admin cùng brandCode, write=false; ép `updatedBy.uid == request.auth.uid` để không giả actor. FE 85-users-admin tab 'Nhật ký' lọc actor/loại/ngày + xuất CSV — cũng là bằng chứng 'ghi vết xử lý' cho DPIA. Đổi role lên admin/superadmin → modal confirm + re-auth + ghi `changedBy`.",
+   "category": "compliance",
+   "personas": [
+    "agency",
+    "engineer"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Trigger trên leads volume lớn tốn invocations → chỉ ghi khi field nhạy đổi; TTL 12 tháng để không phình.",
+   "touches": [
+    "cf",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "agency-06",
+    "engineer-06"
+   ]
+  },
+  {
+   "id": "P21",
+   "title": "Đo lift thật: holdout 10% + attribution 'bot chạm → rep → hẹn → chốt' theo biến thể/nick/nhiệt độ + CPL thực VND",
+   "description": "Engine gán `lead.exp_group` = 'auto' | 'holdout' (hash leadId, tỉ lệ theo brand, mặc định 10%; holdout không vào phễu). `outreach_threads` lưu `variant` (P06) + `doneSteps`. CF job đêm join threads × leads.stage/stage_at/deal_value → `outreach_attr/{brand}__{tháng}` {theo variant, nick, temp, bước: touched, replied, booked, closed, revenue; holdout cùng chỉ số}; cộng chi phí (VPS+proxy+nick khai báo ở brand.plan, BrightData từ bd_month, OpenAI) → CPL thực và 'doanh thu do automation'. FE tab Tiếp cận/Báo cáo khối 'Hiệu quả': lift % (auto vs holdout, khoảng tin cậy), reply-rate theo biến thể, ban-rate/nick, so với CPL ads ngành (ROI_DEF), nút 'Chia sẻ PDF/Zalo'; tự tăng tỉ trọng biến thể tốt (Thompson sampling đơn giản). Hiện 'chạm cuối' và 'có tham gia' song song.",
+   "category": "growth",
+   "personas": [
+    "ai",
+    "strategist"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Holdout làm mất 10% cơ hội → brand tắt sau khi đủ mẫu; số nhỏ nhiễu; thiếu `deal_value` (P34) thì doanh thu vẫn ước lượng; attribution đa chạm dễ tranh cãi.",
+   "touches": [
+    "cf",
+    "worker",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "ai-10",
+    "strategist-11"
+   ]
+  },
+  {
+   "id": "P22",
+   "title": "Mời sales bằng link/QR Zalo (tự duyệt khi bấm) + admin brand tự quản team trong phạm vi brand",
+   "description": "Nút 'Mời sales' (mở cho admin/owner) → CF `createInvite` tạo `invites/{token}` {brand, role, expiresAt 48h, uses}; link/QR gửi Zalo; người nhận đăng nhập → CF onCreate user khớp token → set role/brand/active + Zalo 'bạn đã vào brand X' (approveUser live.js:681 hiện không gửi thông báo). Mở view `users` cho role admin/owner ở scope brand: thấy user cùng brand, đổi role ∈ {sales, viewer}, khoá/mở, đặt khung lead riêng; không đụng brand/superadmin. Rules users update: cùng brand + `affectedKeys ⊆ {role, active, leadFrom, leadTo}` + role mới ∉ {admin, superadmin} (mẫu guard affectedKeys sẵn có). Thẻ 'Chờ duyệt' hiện cho admin brand với pending có token brand mình.",
+   "category": "feature",
+   "personas": [
+    "agency",
+    "owner"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Mở Rules users cho non-super là điểm nhạy nhất tenancy → test leo thang quyền (P49); token mời rò rỉ → giới hạn uses + hết hạn; người tự đăng ký email chưa xác minh → invite ràng buộc email/SĐT hoặc chỉ Google login (P53).",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf",
+    "external"
+   ],
+   "quick_win": false,
+   "sources": [
+    "agency-07",
+    "owner-12"
+   ]
+  },
+  {
+   "id": "P23",
+   "title": "Self-service admin brand: cấu hình THEO BRAND (nguồn/keyword/loại trừ/kênh cảnh báo/lịch quét/trần ngân sách/Tiếp cận) + tách config public/private",
+   "description": "Đổi `config/app` toàn cục thành 3 tầng: `config/public` (stages, ticker, SLA mặc định) mọi user đọc; `config/private` (ngân sách BrightData, credit OpenAI, tỷ giá, KB trợ lý, token kênh) chỉ super; `brands/{code}.cfg` {keywords, exclude, channels{zalo/telegram/email}, scanWindow, budgetCap VND/tháng, aiMode}. Backend scan (manualScan/scheduledScan) merge brand.cfg ⊕ global khi quét nguồn của brand; chạm 80% trần → aiMode saver, 100% → tạm dừng nguồn brand. FE: mở Nguồn quét (thêm group, chọn brand ngay trong form), Keyword, Cảnh báo (nhóm Zalo/Telegram + Gửi thử) và Tiếp cận (bật/tắt `outreach.on`, ⚙️ ma trận trong clamp, log/stats + nick brand mình — không thấy token/VPS/cap trần) cho owner/admin ở scope brand; bỏ SUPER_ONLY tương ứng; Super Admin giữ toàn cục. Rules brands update cho admin cùng brand với affectedKeys ⊆ {cfg, outreach}; fb_accounts read theo brand.",
+   "category": "platform",
+   "personas": [
+    "agency",
+    "strategist"
+   ],
+   "value": 4,
+   "effort": "L",
+   "risk": "Đụng backend scan (~/firebase-s13) + Rules config; migrate keyword hiện tại; sai merge → brand mất lead; mở cấu hình cho admin làm tăng chi phí BrightData → PHẢI đi cùng trần ngân sách/brand; mở outreach cho non-super đụng chỗ bay nick → chỉ bật/tắt + ma trận, không đổi cap/nick engine/VPS.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "agency-09",
+    "strategist-05",
+    "agency-14"
+   ]
+  },
+  {
+   "id": "P24",
+   "title": "Rules hardening: whitelist field `leads` theo vai trò + note đối chiếu brand + custom claims; sửa SĐT/tên lead trong modal khi AI trích sai",
+   "description": "Rules `leads` update: sales chỉ khi `assignee_uid==uid || null` và `affectedKeys ⊆ {name,phone,email,stage,stage_at,first_care_at,first_care_by,fu_at,fu_note,dropped,dropped_at,dropped_by,lost_reason,do_not_contact,views,views_by,lastViewAt}`; admin thêm `assignee_*`; cấm đổi `brand/score/temp/reply`. `notes` create: `request.resource.data.brand == get(/leads/$(leadId)).data.brand`. CF onWrite `users` → custom claims `{role,brand}` để Rules bớt `get(users)` (1 read/thao tác). Đóng lỗ `updateLead` pass-through mọi field (live.js:423). FE: nút ✏️ cạnh tên/pill SĐT trong modal → form 3 ô (tên, SĐT, email); SĐT qua `normPhoneVN()`, lưu `phone_edited_by/at` + giữ `phone_ai` gốc; `phone_has_zalo` reset. Liệt kê field từ mọi `updateLead(` trong src/app trước khi viết Rules.",
+   "category": "compliance",
+   "personas": [
+    "engineer",
+    "sales"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Whitelist thiếu field → thao tác hợp lệ bị permission-denied (toast chung) → cần test emulator (P49) + toast kèm tên thao tác (P53); sửa `phone` ảnh hưởng dedupe P19 (chủ ý).",
+   "touches": [
+    "rules",
+    "live",
+    "fe",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-02",
+    "sales-13"
+   ]
+  },
+  {
+   "id": "P25",
+   "title": "Khoá tài khoản có hiệu lực THẬT + offboarding 1 chạm 'Khoá & bàn giao' + ép 2FA cho admin/super",
+   "description": "CF `adminUserAction(uid,{disable|enable|revokeSessions|resetMfa|resetPassword})` (verify super) gọi `auth.revokeRefreshTokens` + `updateUser({disabled})` + `users/{uid}.tokensValidAfter`; Rules `leads` read thêm `request.auth.token.auth_time > tokensValidAfter` (fail-closed sau revoke — thay revokeSession chỉ set flag client live.js:604). live.js khi bị khoá/thu hồi/đăng xuất → stopData → `terminate(db)` + `clearIndexedDbPersistence` (xoá lead trong IndexedDB máy người nghỉ). Offboarding: modal chọn người nhận → CF `offboardUser` batch (chia lô 500) chuyển mọi lead `assignee_uid==uid` chưa chốt sang người nhận với `assigned_by` + note 'Bàn giao từ A'; ghi chú `vis=private` của A → team hoặc xoá theo lựa chọn; xoá `brand_sales` nhận Zalo; gỡ 2FA; ghi audit (P20). `config/public.security{mfaRequiredRoles:['superadmin','admin']}` → 80-rbac-auth chặn tới khi enroll TOTP.",
+   "category": "compliance",
+   "personas": [
+    "engineer",
+    "agency"
+   ],
+   "value": 3.5,
+   "effort": "M",
+   "risk": "clearIndexedDbPersistence yêu cầu terminate trước và không tab khác mở (multi-tab cache) → try/catch, fallback reload; batch >500 lead chia lô.",
+   "touches": [
+    "cf",
+    "live",
+    "fe",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-05",
+    "agency-16"
+   ]
+  },
+  {
+   "id": "P26",
+   "title": "Chốt/mất khách rõ ràng: nút '✕ Không thành' + lý do chuẩn VN, Hoàn tác, feed ẩn Rác/Đã loại mặc định + khôi phục",
+   "description": "Thay nút 'Loại' (chỉ lead junk) và 'Đánh dấu đã xử lý' (=closed sai nghĩa) bằng 2 nút kết thúc trên thẻ kanban + modal: '✅ Đã chốt' (hỏi giá trị — P34) và '✕ Không thành' chọn lý do (không nghe máy / không nhu cầu / giá cao / chọn bên khác / đã có NCC / spam) + ghi chú → `dropped:true, lost_reason, lost_at`; Hoàn tác 6s; 'Loại ngay' hàng loạt thêm confirm. Filter feed (20-feed.js:450) mặc định `!l.dropped && l.temp!=='junk'` cho sales/admin (super giữ nguyên) + công tắc 'Hiện rác/đã loại (N)'; thẻ dropped chip xám 'Đã loại · bởi X' + nút 'Khôi phục' (revert optimistic như pvApplyStage). Đổi filter giữ vị trí cuộn. Overview/ROI bảng 'Mất khách vì…' theo nguồn; feedback 'spam/sai ngành' đẩy vào `scan_feedback` (nuôi P37).",
+   "category": "feature",
+   "personas": [
+    "owner",
+    "sales"
+   ],
+   "value": 3.5,
+   "effort": "S",
+   "risk": "Rules leads update cần cho `lost_reason/lost_at` (P24); còn lại chỉ client.",
+   "touches": [
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": true,
+   "sources": [
+    "owner-16",
+    "sales-16"
+   ]
+  },
+  {
+   "id": "P27",
+   "title": "Chế độ 'Chủ shop' cho ROI/Overview: 3 con số + 1 câu kết luận + nút 'Giải thích cho tôi' / 'Hỏi AI về lead này' (tái dùng assistantChat)",
+   "description": "Toggle 'Xem đơn giản' (mặc định cho admin brand trên mobile) ở 40-roi.js: chỉ hiện Tiền thu về từ lead SmartLead (Σ deal_value, không có thì nhãn 'ước tính'), Tiền đã trả SmartLead (`plan.price`, thống nhất với roi.fee), Lời/lỗ + 'x lần', 1 câu tiếng người; ẩn bảng tham số/'CPL benchmark'/ký hiệu 'tr₫'; ẩn phí hợp đồng với sales. Nút 'Giải thích cho tôi' gửi CHÍNH các số roiCompute/KPI đã tính tới CF `assistantChat` (AI không tính lại) → 3 câu + 3 việc cần làm. Modal lead: 'Hỏi AI về lead này' kèm context {bài, insight, 5 notes, stage, outreach log} với chip 'Tóm tắt 3 dòng', 'Khách này cần gì?', 'Soạn tin Zalo'; ≥5 ghi chú tự hiện 'Tóm tắt & bước kế'. Backend: thêm field `context` vào payload + rate-limit 20 lượt/user/giờ (đóng lỗi chưa giới hạn tần suất).",
+   "category": "ux-fix",
+   "personas": [
+    "owner",
+    "ai"
+   ],
+   "value": 3.5,
+   "effort": "S",
+   "risk": "AI diễn giải sai số → luôn kèm số gốc; chưa có deal_value thì phải ghi nhãn 'ước tính' rõ để không mất tin.",
+   "touches": [
+    "fe",
+    "live",
+    "cf"
+   ],
+   "quick_win": true,
+   "sources": [
+    "owner-06",
+    "ai-14"
+   ]
+  },
+  {
+   "id": "P28",
+   "title": "Monitoring & alerting chủ động: Cloud Monitoring cho CF/scheduler + CF `healthTick` + điểm sức khoẻ brand + bản tin AM 8h",
+   "description": "(1) Cloud Monitoring alert policy: `outreachTick`/`scheduledScan`/`funcWebhook` error-rate >5% hoặc 0 execution 30' (scheduler chết im), uptime check domain. (2) CF `healthTick` (10'): VPS `workers.lastSeen` >5' offline; nick `challenge`/`needLogin` mới; dead-letter tăng; BrightData ≥80%; Firestore read/ngày vượt ngưỡng (gcpUsage/BigQuery export đã có); auto-scan không có bản ghi mới >30' → ghi `system_alerts` (collection đã có) + Telegram (bot có ở backend, KHÔNG vào FE) + Zalo cho Super Admin; cờ hạ tầng riêng cho worker (AdsPower Local API lỗi ≠ lỗi task). (3) CF 8h VN tính điểm sức khoẻ mỗi brand từ `daily_stats` + sources + fb_accounts + plan (0 lead 3 ngày, nguồn 0 lead 14 ngày, nóng chưa chăm >60', sales không đăng nhập 5 ngày, gói sắp hết hạn, ngân sách 80%) → 1 tin cho AM '3 brand đỏ · 5 vàng' + link. FE Overview dải 'Sức khoẻ hệ thống' (super) / dải chip xanh-vàng-đỏ + 'cần làm ngay' (owner).",
+   "category": "ops",
+   "personas": [
+    "engineer",
+    "agency"
+   ],
+   "value": 3.5,
+   "effort": "M",
+   "risk": "Ồn nếu ngưỡng thấp → gộp theo giờ + cooldown/loại; ngưỡng brand cần theo quy mô lead/ngày; phụ thuộc counter `daily_stats` (P35).",
+   "touches": [
+    "cf",
+    "external",
+    "fe",
+    "live"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-09",
+    "agency-13"
+   ]
+  },
+  {
+   "id": "P29",
+   "title": "Thư viện keyword + nguồn + mẫu tin theo ngành VN bấm chọn + nhân bản brand từ template/brand đã chạy tốt",
+   "description": "Doc `config/templates` / `brand_templates/{ngành}` (Super Admin soạn 1 lần) per ngành (spa, F&B, BĐS, giáo dục, mẹ&bé, thời trang): 15–25 keyword tín hiệu mua, 10 từ loại trừ, 5–10 group công khai gợi ý, 3 mẫu comment/inbox, 1 hồ sơ AI mẫu, tham số ROI (AOV/tỉ lệ chốt), SLA, ma trận Tiếp cận. FE: modal thêm nguồn/keyword + wizard (P04) có dropdown 'Áp bộ mẫu ngành' → merge vào keyword brand; thay `prompt()` thêm từng từ bằng textarea dán hàng loạt + dedupe. Nút 'Nhân bản từ…' trong Quản lý brand: chọn brand nguồn hoặc template → copy `ai`, `roi`, `crm`, `outreach.matrix/caps`, `cfg.keywords/exclude` trong 1 setDoc merge; KHÔNG copy plan/billing/logo/leadWindow; ép reset caps về preset Cân bằng khi clone. Bộ mẫu tái dùng cho landing 'SmartLead cho Spa'.",
+   "category": "growth",
+   "personas": [
+    "strategist",
+    "agency"
+   ],
+   "value": 3.5,
+   "effort": "S",
+   "risk": "Bộ mẫu lệch thực tế theo vùng (HN/HCM) → cập nhật từ dữ liệu lead thật hằng quý; group gợi ý có thể chuyển private; copy nhầm ma trận 'Mạnh' sang brand nick mới.",
+   "touches": [
+    "fe",
+    "live"
+   ],
+   "quick_win": true,
+   "sources": [
+    "strategist-06",
+    "agency-12"
+   ]
+  },
+  {
+   "id": "P30",
+   "title": "Van an toàn nick tầng 2: worker kiểm giờ/brand.on/nick active trước khi chạy, circuit breaker toàn hệ, nút '⏸ Dừng tất cả'",
+   "description": "Worker `claimBatch`/`runNick`: trước khi mở nick đọc lại `fb_accounts.active`, `brands.outreach.on`, khung giờ 8–22h VN (brand override `outreach.hours`) và `config/public.outreach.paused` → task không đủ điều kiện trả `queued` (không tính tries) — hiện grep `getHours|outreach.on` trong worker = 0, tắt nick/brand KHÔNG huỷ task đã xếp hàng, reaper re-queue chạy ban đêm. CF `outreachTick` thêm circuit breaker: đếm `outreach_log` status challenge/fail 60' gần nhất; >N% → `paused:true` + giảm cap 50% + `system_alerts`. FE tab Tiếp cận: nút '⏸ Dừng tất cả' ghim đầu trang (super) / 'Dừng khẩn tất cả brand của tôi' (admin agency) → setOutreach on:false hàng loạt + CF huỷ task queued; thẻ brand hiện lịch giờ.",
+   "category": "automation",
+   "personas": [
+    "engineer",
+    "agency"
+   ],
+   "value": 3.5,
+   "effort": "S",
+   "risk": "Đọc thêm 2 doc/nick/phiên (rẻ). Circuit breaker ngưỡng sai → dừng oan; bắt đầu ở mức cảnh báo, bật tự dừng sau 1 tuần dữ liệu.",
+   "touches": [
+    "worker",
+    "cf",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": true,
+   "sources": [
+    "engineer-10",
+    "agency-14"
+   ]
+  },
+  {
+   "id": "P31",
+   "title": "White-label shell theo brand/agency: hotline, tên tab, mascot, ticker, màn login (quick win)",
+   "description": "`brands/{code}.support {name, hotline, zalo, logo, mascot?}` + `config/public.whitelabel` mặc định cho agency. Shell đọc theo CURRENT_BRAND: sidebar-hotline + floating hotline (app.html:70-78 hotline 1900.5368 cứng), `<title>` 'SmartLead by Z15 Miracle' (app.html:8), lỗi trợ lý AI, footer, màn login (logo-mark), mascot Cloudinary (90-boot.js:104,195). Ticker mặc định TẮT cho brand chưa cấu hình, có phạm vi 'toàn hệ thống / 1 brand' (hết thông điệp nội bộ Z15 hiện cho mọi brand). Editor trong Quản lý brand cạnh nút Logo; dùng signature-guard sẵn có của brandBlock/ticker. Tuỳ chọn sau: custom domain qua Netlify alias đọc `location.host` → brand.",
+   "category": "ux-fix",
+   "personas": [
+    "agency",
+    "strategist"
+   ],
+   "value": 3.5,
+   "effort": "S",
+   "risk": "Nhầm brand khi user chưa gán brand → fallback mặc định agency; ticker nội bộ Z15 lộ cho brand nếu quên phạm vi.",
+   "touches": [
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": true,
+   "sources": [
+    "agency-11",
+    "strategist-10"
+   ]
+  },
+  {
+   "id": "P32",
+   "title": "Trang Kết nối thật (Google Sheet theo brand, Zalo OA, Webhook n8n, KiotViet/Sapo) + xuất CSV/Excel/Sheet theo brand & khoảng ngày",
+   "description": "Thay view Tích hợp tĩnh (4 card demo, 'Cấu hình →' không handler, D.integrations luôn lấy từ demo) bằng card có trạng thái thật theo brand: Google Sheet (OAuth → `syncLeadToSheet` codebase2 gom về s13, tham số `brands.integrations.sheetId` thay 1 Sheet toàn cục), Zalo OA (OAuth, P09), Webhook (URL + secret + Gửi thử + log 20 lần gần nhất), KiotViet/Sapo (API key → lead `responded/booked` có SĐT thì CF tạo/cập nhật khách + tag 'SmartLead', đọc ngược trạng thái mua để đóng ROI thật). Secrets ở Secret Manager; doc `integrations/{brand}__{kind}` = {status,lastSyncAt,lastError}. Tab Báo cáo (owner/admin) 'Xuất': brand + khoảng ngày + cột (SĐT che/không theo vai trò) → CSV BOM (tái dùng 85-users-admin.js:360); >4.000 lead gọi CF `exportLeads` (Admin SDK, giới hạn 20k, link Storage ký hạn 1h); nút 'Đẩy sang Google Sheet' (`backfillSheet`). Ghi audit mỗi lần xuất (PII).",
+   "category": "platform",
+   "personas": [
+    "strategist",
+    "agency"
+   ],
+   "value": 3.5,
+   "effort": "L",
+   "risk": "API KiotViet/Sapo cần đăng ký đối tác, rate limit, mapping SĐT trùng; Sheet sync nằm ở codebase2 (snapshot cũ, trùng tên function) → gom về s13 trước; xuất SĐT hàng loạt là rủi ro PII lớn nhất → audit + che số cho sales + chỉ owner/admin. Ưu tiên Sheet + Zalo OA + KiotViet.",
+   "touches": [
+    "cf",
+    "external",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "strategist-08",
+    "agency-18"
+   ]
+  },
+  {
+   "id": "P33",
+   "title": "Hỗ trợ chuẩn thị trường: nhóm Zalo hỗ trợ theo gói + nút 'Báo lỗi' có ngữ cảnh + Super/Owner 'Xem như user X' (chỉ đọc)",
+   "description": "(1) Sidebar/help: link nhóm Zalo hỗ trợ theo gói. (2) Nút 'Báo lỗi' trong app tự đính kèm brand/role/view/hash/version/`fbDown` state + ảnh chụp (html2canvas từ cdnjs) → CF `supportTicket` ghi `tickets` (ảnh ở Storage private, TTL 30 ngày) + Telegram cho Z15; Super Admin thấy danh sách ở Người dùng. (3) 'Xem như' trong bảng tài khoản: FE gán CURRENT_ROLE/CURRENT_BRAND + userWin (leadFrom/leadTo) của người đó, gọi startData với ràng buộc y hệt live.js áp cho họ, chặn mọi SL_FB write bằng cờ `impersonating`, banner đỏ 'Đang xem như X · Thoát'; owner agency chỉ xem user brand mình; ghi audit (P20). Không cần Admin SDK vì Super Admin vốn đọc mọi brand. (4) Trang trợ giúp theo ngành + video 60s trong wizard.",
+   "category": "ops",
+   "personas": [
+    "strategist",
+    "agency"
+   ],
+   "value": 3,
+   "effort": "S",
+   "risk": "Impersonate quên chặn write → ghi nhầm actor; Rules vẫn chạy theo tài khoản thật nên chỉ mô phỏng (không tái hiện 100% permission-denied); ticket ảnh có thể chứa SĐT khách.",
+   "touches": [
+    "fe",
+    "live",
+    "cf",
+    "rules"
+   ],
+   "quick_win": true,
+   "sources": [
+    "strategist-14",
+    "agency-15"
+   ]
+  },
+  {
+   "id": "P34",
+   "title": "Tiền trong phễu: nhập giá trị đơn khi chốt + tổng cột kanban + doanh thu dự kiến/đã thu trên Overview, ROI realized thật",
+   "description": "Khi kéo thẻ sang 'Đã chốt' (pvApplyStage → closed) hoặc bấm '✅ Đã chốt' trong modal: bottom-sheet hỏi giá trị đơn với chip gợi ý (AOV ngành từ `roiParamsFor`, ngân sách khách nêu từ `roiBudgetHint`, nhập tay, 'Nhập sau' + nhắc trên card Hôm nay) → ghi `deal_value, closed_at, deal_by`. Header mỗi cột kanban hiện tổng (CSS `.pv2-kval` đã có, JS chưa render) + tổng có trọng số ROI_STAGE_P. Overview/Hôm nay: 'Doanh thu dự kiến tháng này' + 'Đã thu từ lead SmartLead'. ROI realized = Σ deal_value thay closedN×AOV (grep toàn src hiện không có deal_value/revenue). Là nền cho P15/P21/P41.",
+   "category": "feature",
+   "personas": [
+    "owner"
+   ],
+   "value": 5,
+   "effort": "M",
+   "risk": "Rules leads phải cho ghi `deal_value/closed_at` (P24); sales quên nhập → cho phép 'Nhập sau'.",
+   "touches": [
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "owner-05"
+   ]
+  },
+  {
+   "id": "P35",
+   "title": "Agency Overview: bảng so sánh/xếp hạng brand trên counter server-side `daily_stats` (chính xác mọi quy mô)",
+   "description": "CF trigger onWrite leads/notes tăng `daily_stats/{brand}__{ngàyVN}` bằng FieldValue.increment (pattern outreach_stats đã chứng minh đa VPS): new/hot/warm/cold, contacted, responded, booked, closed, untouched15m/60m, Σ first-care-min. View Overview cho role owner/super đổi thành bảng brand: lead 7/30 ngày, %nóng, tỉ lệ chốt, SLA đạt %, thời gian phản hồi TB, automation rep, chi phí/lead, xu hướng ▲▼ so kỳ trước, xếp hạng + cờ đỏ 'tụt 2 tuần liên tiếp'; bấm dòng → drill-down brand. FE đọc `daily_stats` theo tháng (≤31 doc/brand) thay vì tính trên cửa sổ 500 lead (KPI/chart hiện sai ở brand lớn). Cũng là nguồn cho P02/P28.",
+   "category": "feature",
+   "personas": [
+    "agency"
+   ],
+   "value": 5,
+   "effort": "M",
+   "risk": "Counter tăng dần không sửa được số quá khứ khi xoá lead → job đối soát đêm; backfill 30 ngày từ leads khi bật.",
+   "touches": [
+    "cf",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "agency-04"
+   ]
+  },
+  {
+   "id": "P36",
+   "title": "Bỏ serviceAccount.json trên VPS: worker dùng custom token theo mã ghép + Rules scope collection outreach_*",
+   "description": "VPS Windows (AdsPower+proxy) hiện giữ khoá Admin SDK đọc/ghi TOÀN BỘ Firestore (worker.mjs:38-40, SA `outreach-worker@` role datastore.user). Thay bằng: web (panel VPS tab Tiếp cận) tạo mã ghép 6 số → worker khởi động gọi CF `workerPair(code)` → nhận custom token claims `{worker:true, workerId}` (+ refresh qua CF `workerToken` trước khi hết hạn 1h). Worker chuyển từ `firebase-admin` sang Firebase client SDK (Node, tắt persistentLocalCache) — vẫn có runTransaction/increment/arrayUnion/serverTimestamp. Rules: `worker==true` chỉ được `outreach_tasks/threads/log/stats/usage`, `workers/{workerId}`, `fb_accounts` (field needLogin/challenge*/active/nextFreeAt), `leads` chỉ update `outreach_*`. Thu hồi 1 chạm = xoá `worker_tokens/{workerId}`. Migrate từng VPS, giữ nhánh Admin SDK 1 bản chuyển tiếp.",
+   "category": "platform",
+   "personas": [
+    "engineer"
+   ],
+   "value": 5,
+   "effort": "M",
+   "risk": "Client SDK trên Node cần xử lý token hết hạn — worker phải refresh trước khi claim; nếu 1 VPS bị chiếm, kẻ tấn công chỉ đụng hàng đợi automation của VPS đó.",
+   "touches": [
+    "worker",
+    "cf",
+    "rules",
+    "fe",
+    "live"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-03"
+   ]
+  },
+  {
+   "id": "P37",
+   "title": "AI chấm điểm học theo brand: nút Đúng/Sai lead + kết quả Chốt/Thua → few-shot, mô tả 'khách lý tưởng' bằng tiếng Việt, đề xuất keyword/loại trừ hằng tuần",
+   "description": "(a) Nút 👍/👎 (lý do: sai ngành/người bán/đã có NCC/spam) trên thẻ feed + modal bài đã quét → `lead_feedback/{leadId}` {brand, expected, reason, by}; kết quả `deal_value`/`lost_reason` (P26/P34) làm nhãn. CF trigger gom 20–30 mẫu/brand thành few-shot + precision theo temp/source nạp vào prompt chấm điểm (cạnh `brands.ai`); hiện 'Độ chính xác AI 30 ngày'. (b) Hồ sơ AI brand thêm ô 'Khách lý tưởng / KHÔNG nhận' tự nhiên → CF `compileIcp` sinh {weights, rules, few-shot, keywords, exclude} lưu `brands/{code}.scoring` (phiên bản hoá, rollback); nút 'Thử chấm lại 20 bài gần nhất' từ `scanned_posts` → bảng điểm cũ/mới trước khi áp. (c) Job tuần đọc `scanned_posts.decision/signals` + feedback → thẻ 'Đề xuất' ở Keyword/AI Scoring: keyword ra lead nóng chưa có, từ loại trừ cho mẫu rác lặp, keyword 0 lead 30 ngày, ngưỡng hot/warm — Super Admin duyệt 1 chạm; áp theo brand thay config/app toàn cục.",
+   "category": "ai",
+   "personas": [
+    "ai"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Ít mẫu → overfit: ngưỡng ≥15 mẫu/brand (tái dùng logic roiRates), Super Admin luôn duyệt; backend chấm điểm phải nhận tham số theo brand (hiện toàn cục); thử chấm lại tốn token → giới hạn 20 bài.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "ai-01",
+    "ai-13"
+   ]
+  },
+  {
+   "id": "P38",
+   "title": "Chi phí/lead & biên lợi nhuận theo brand và theo nguồn (mở rộng widget lãi gộp đã có) + tạm dừng nguồn kém",
+   "description": "Nâng widget 'Ngân sách Bright Data' (10-core-overview.js:338-419 đã phân bổ bd_month theo nguồn + lãi gộp theo brand) thành trang 'Chi phí & biên' cho owner/super: mỗi brand = BrightData phân bổ + token AI + hạ tầng chia đều + chi phí automation (VPS/proxy/nick nhập tay chia theo nick gán) → CPL thật, CPL lead nóng, CPL lead phản hồi, margin = phí gói − chi phí. Bảng nguồn: CPL/nguồn, lead→chốt/nguồn, nút 'Tạm dừng nguồn' (setSource sẵn có) khi CPL > 3× TB. Snapshot tháng `cost_months/{brand}__{YYYY-MM}` để so xu hướng và đưa vào billing (P13).",
+   "category": "feature",
+   "personas": [
+    "agency"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Chi phí automation nhập tay dễ lệch; lead nối nguồn theo TÊN (đổi tên nguồn về 0) cần sửa sang id trước.",
+   "touches": [
+    "fe",
+    "live",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "agency-10"
+   ]
+  },
+  {
+   "id": "P39",
+   "title": "Next-Best-Action theo stage × nhiệt độ × lịch sử tương tác, có nút hành động + nội dung sẵn trên thẻ",
+   "description": "Thay hint tĩnh `pvOf()` (30-pipeline.js — lead Đã hẹn ≥80 vẫn bị gợi 'inbox trong hôm nay') bằng ma trận stage×temp×ngữ cảnh tính client: quá hẹn / khách rep chưa ai trả lời (`outreach_replied`) / bot đã inbox chưa rep 48h / kẹt ≥2 ngày / có SĐT Zalo chưa nhắn. Mỗi NBA kèm 1 nút: Gọi tel:, Zalo, 'Soạn tin' lấy biến thể theo bước từ P06, Đặt hẹn. Lead ≥5 ghi chú: 'Tóm tắt & bước kế' gọi assistantChat với notes + stage → 3 dòng. Log `nba_shown/nba_clicked` lên lead để đo tỷ lệ nghe theo → ưu tiên NBA có tỉ lệ chốt cao.",
+   "category": "ai",
+   "personas": [
+    "ai"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Hint sai lệch làm mất niềm tin — bắt đầu bằng rule tường minh, LLM chỉ cho tóm tắt/soạn tin; cần `outreach_threads` mở đọc cho brand user (Rules, P18).",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "ai-05"
+   ]
+  },
+  {
+   "id": "P40",
+   "title": "Trợ lý AI → Copilot hành động (function-calling) + thanh lệnh tiếng Việt trong Cmd-K",
+   "description": "CF `assistantChat` (live.js:645 hiện chỉ gửi messages, trả {reply}, backend nạp 500 lead nhưng không hành động) nhận thêm `{view, leadId, brand}` và trả `{reply, actions[]}` với tool-schema: openLead, filterFeed{temp,source,days}, assignLead, setFollowUp, addNote, draftMessage{channel}, runScan (super). FE (90-boot) render nút hành động dưới câu trả lời, thẻ xác nhận trước khi ghi + Hoàn tác 6s; chip gợi ý đổi theo view ('Lead nóng chưa ai chăm', 'Tóm tắt hôm nay', trong modal 'Soạn tin Zalo'). Cmd-K nhận câu tự nhiên 'giao lead 0938 cho Ngọc', 'hẹn mai 9h #10' → regex trước cho 5 lệnh phổ biến (không tốn AI), còn lại parse bằng cùng CF. Mọi ghi vẫn qua SL_FB → Rules áp như tay.",
+   "category": "ai",
+   "personas": [
+    "ai"
+   ],
+   "value": 4,
+   "effort": "L",
+   "risk": "Hành động sai đích (giao nhầm) → luôn xác nhận + Hoàn tác; rate-limit assistantChat theo user (hiện chưa có, P27/P53).",
+   "touches": [
+    "fe",
+    "live",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "ai-06"
+   ]
+  },
+  {
+   "id": "P41",
+   "title": "Dự báo pipeline: xác suất chốt học từ kết quả thật + run-rate cuối tháng + cảnh báo thiếu pipeline",
+   "description": "Job đêm (CF onSchedule) đọc lead có `closed_at`/`lost_reason` 90 ngày (từ P26/P34/P37) → hồi quy logistic đơn giản theo brand (features: temp, source, có SĐT/Zalo, phút phản hồi đầu, tuổi stage, số lần chạm bot, ngành) → `brands/{code}.model{coef, calibratedStageP, n, auc}`. FE 40-roi thay `ROI_STAGE_P` cứng (5/10/15/25/40/60/100%) bằng calibratedStageP khi n≥30 (tag 'TỰ HỌC' như roiRates); thẻ pipeline hiện 'xác suất chốt 62%'; Overview card 'Dự kiến tháng này' = Σ p×deal_value + run-rate; admin nhập mục tiêu → 'cần thêm ~14 lead nóng'. AI diễn giải 1 câu (số đưa sẵn).",
+   "category": "ai",
+   "personas": [
+    "ai"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Dữ liệu ít → chỉ bật khi ≥30 outcome/brand, fallback ROI_STAGE_P; giữ công thức minh bạch (điểm mạnh ROI hiện tại).",
+   "touches": [
+    "cf",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "ai-09"
+   ]
+  },
+  {
+   "id": "P42",
+   "title": "AI đón inbound Zalo OA & Facebook Page (API hợp lệ): trả lời 24/7 theo Hồ sơ AI brand, tạo lead, bàn giao người khi nóng",
+   "description": "CF `inboundWebhook` nhận webhook Zalo OA (Official API) + Meta Page Messenger (Page API) → tạo/khớp lead theo SĐT/psid (P19) → LLM trả lời với KB = `brands.ai` + `assistantKb` + FAQ brand (form mới ở Người dùng) + guardrail (không hứa giá ngoài bảng, không tư vấn y tế). Chấm ý định mỗi lượt; đạt 'nóng' (hỏi giá/hẹn/để lại SĐT) → dừng bot, stage `responded`, giao sales rảnh nhất, chuông/push. Hội thoại vào `conversations` (dùng chung P03). Token OA ở Secret Manager; brand admin bật/tắt + giờ bot trực; chế độ 'gợi ý cho người' trước khi 'tự trả lời'.",
+   "category": "ai",
+   "personas": [
+    "ai"
+   ],
+   "value": 4,
+   "effort": "L",
+   "risk": "Bot trả lời sai → bắt đầu ở chế độ gợi ý; Zalo OA gói Tiêu chuẩn (1tr/năm) mới có OpenAPI; tin ngoài 48h tính phí; view Tích hợp hiện là 4 card tĩnh (P32).",
+   "touches": [
+    "cf",
+    "fe",
+    "live",
+    "rules",
+    "external"
+   ],
+   "quick_win": false,
+   "sources": [
+    "ai-12"
+   ]
+  },
+  {
+   "id": "P43",
+   "title": "Tối thiểu hoá PII: che SĐT theo vai trò + `pii_log` khi hiện/chép số + logLeadView bỏ ghi email vào lead",
+   "description": "Thẻ feed/pipeline/modal: sales chưa được giao thấy `0938***456`; bấm 'Hiện số' → live.js `revealPhone(leadId)` ghi `pii_log/{auto}` {uid, leadId, brand, at, reason:'reveal|copy'} rồi hiện đủ (admin/super mặc định đủ nhưng vẫn log khi chép). Thay `logLeadView` (live.js:429-437 đang increment `views_by.<email>` lên mọi doc lead) bằng `lead_views/{leadId}__{uid}` (uid, không email) — 85-users-admin đọc collection này. Rules `pii_log` create-only cho user active, read super/admin brand. Tab Tuân thủ hiện 'ai xem số nào' + xuất CSV (báo cáo truy cập theo Luật BVDLCN). Bước 2: tách `leads/{id}/private/contact` + Rules riêng để che THẬT.",
+   "category": "compliance",
+   "personas": [
+    "engineer"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Che số phía client vẫn có SĐT trong snapshot (bước 1 chỉ giảm lộ vô ý + có log); bước 2 mới che thật.",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-07"
+   ]
+  },
+  {
+   "id": "P44",
+   "title": "Backup/DR + bản sao dữ liệu tại Việt Nam: PITR, export Firestore hằng ngày, runbook khôi phục, xuất dữ liệu brand",
+   "description": "(1) Bật Firestore PITR 7 ngày (1 lệnh gcloud). (2) Cloud Scheduler + CF `dailyExport` gọi `firestore.export` → bucket `gs://smartlead-z15-backup` (asia-southeast1, retention lock 90 ngày, IAM chặt SA export-only). (3) Storage Transfer/rclone định kỳ sang object storage đặt tại VN (Viettel Cloud/VNG/FPT S3) đáp ứng NĐ 53/2022 'bản sao tại VN'. (4) Runbook `RESTORE.md`: import về project staging, kiểm tenancy, RTO 4h/RPO 24h, test restore quý 1 lần. (5) CF `exportBrand(code)` (super/admin brand) xuất leads+notes+outreach_log JSON/CSV → quyền 'nhận bản sao dữ liệu' + di chuyển khi khách rời SmartLead. CLAUDE.md/HANDOFF hiện không có mục backup nào.",
+   "category": "ops",
+   "personas": [
+    "engineer"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Chi phí export ~ số doc đọc/ngày (nhỏ); bucket phải có IAM chặt để backup không thành nguồn rò rỉ mới.",
+   "touches": [
+    "cf",
+    "external",
+    "fe"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-08"
+   ]
+  },
+  {
+   "id": "P45",
+   "title": "Chi phí Firestore ở 50k lead: aggregation query cho KPI, giới hạn ghi chú, avatar ra Storage, trang lead cũ bằng onSnapshot",
+   "description": "(1) `getCountFromServer`/`getAggregateFromServer` theo brand+khung cho KPI tổng/nóng/ấm/lạnh/stage/'chưa chăm >60'' (1 read/1.000 doc; grep live.js = 0) — thẻ KPI/rail dùng số server, feed vẫn cửa sổ 500; poll 60s hoặc refresh khi snapshot leads đổi. (2) Notes: bỏ collectionGroup toàn bộ (live.js:350-361 tải TOÀN BỘ ghi chú 1 lượt); subscribe `leads/{id}/notes` cho lead đang mở + query notes 30 ngày cho rail (limit 500) — giữ semantics realtime v119-20/21/23 (dedupe nid, focus). (3) Avatar data-URL 200KB/doc users → Firebase Storage URL; `loadTeam/refreshAdmin` select field tối thiểu. (4) Auto-fill `getDocs` 8×500 (3.500 read/F5) → onSnapshot theo trang (resume token, lead cũ realtime). (5) `usage_client/{brand}__{day}` đếm docChanges → tab ROI hiện read/ngày/brand.",
+   "category": "platform",
+   "personas": [
+    "engineer"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Aggregation không realtime; đổi notes subscription là vùng đã qua 4 vòng fix — cần regression test Playwright notes 3/3 + smoke.",
+   "touches": [
+    "live",
+    "fe",
+    "rules",
+    "cf"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-11"
+   ]
+  },
+  {
+   "id": "P46",
+   "title": "Hồ sơ pháp lý để bán được: DPIA + Mẫu 09 (xuyên biên giới) + DPA theo brand + thông báo xử lý dữ liệu + tick ToS khi bật automation",
+   "description": "Việc ngoài code nhưng có hook trong app: (1) DPIA nộp A05 (SmartLead = bên xử lý, KHÔNG được miễn) + Mẫu 09 cho Firebase SG — dùng kiến trúc đã có (collections, TTL, Rules, Secret Manager) làm phụ lục kỹ thuật. (2) DPA mẫu Z15 ↔ mỗi brand (bên kiểm soát) + điều khoản 'rủi ro nick/ToS Facebook-Zalo do brand chịu, SmartLead cung cấp van an toàn'. (3) `privacy.html` sinh theo brand từ Hồ sơ HKD/MST (85-users-admin đã có billing profile) + link ở màn đăng nhập (đang thiếu). (4) Banner ToS trong tab Tiếp cận khi bật brand lần đầu ('automation FB/Zalo cá nhân ngoài ToS nền tảng') phải tick, ghi `brands.outreach.tosAcceptedBy/At`. (5) Bổ nhiệm DPO + runbook 72h thông báo vi phạm.",
+   "category": "compliance",
+   "personas": [
+    "engineer"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Cơ sở pháp lý cho quét bài công khai vẫn cần luật sư — Luật 91/2025 không có exception; tài liệu tốt giảm phạt nhưng không xoá rủi ro gốc.",
+   "touches": [
+    "external",
+    "fe",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-13"
+   ]
+  },
+  {
+   "id": "P47",
+   "title": "'Safety Score' — sức khoẻ nick 0–100 + ramp-up nick mới + tự hạ cap khi RATE_LIMIT, hiển thị cho khách như số liệu quản trị",
+   "description": "Nâng bảng nick (đã có badge needLogin/checkpoint) thành điểm 0–100/nick: tuổi nick, challengeCount/needLoginCount, tỷ lệ bước thành công 7 ngày (outreach_log), % cap đã dùng (`outreach_usage` — có ở backend nhưng FE không đọc), proxy ổn định. Worker ghi thêm `fb_accounts.{score, apiOkRate, lastRunAt}`; CF nightly tính trend. Ramp-up: nick mới tuần 1 chỉ 20% cap, tự nới tuần 1–4; RATE_LIMIT → hạ cap 50% 3 ngày; cap = f(score). FE: vòng màu + lý do + 'nick nên nghỉ'; thẻ brand hiện 'Mức rủi ro: Thấp' theo preset. Thông điệp bán hàng: ATP/MKT đẩy 100% rủi ro checkpoint cho người dùng, SmartLead có 'phanh'.",
+   "category": "automation",
+   "personas": [
+    "strategist"
+   ],
+   "value": 4,
+   "effort": "M",
+   "risk": "Điểm số sai lệch (false-red) làm khách mất niềm tin/tự tắt nick khoẻ; calibrate trên dữ liệu thật vài tuần trước khi hiện cho khách.",
+   "touches": [
+    "worker",
+    "cf",
+    "fe",
+    "live"
+   ],
+   "quick_win": false,
+   "sources": [
+    "strategist-07"
+   ]
+  },
+  {
+   "id": "P48",
+   "title": "Modal lead làm lại: ghi chú + chip kết quả nhanh trong modal, không văng sau thao tác, nhận realtime, <dialog>/bottom-sheet trên phone",
+   "description": "Đưa khối ghi chú (`leadNotes()`/`notesIdx` + ô `data-ninput` + handler `saveNote`/`data-ndel` 20-feed.js:461-522, 836-851) thành hàm dùng chung `notesBlock(l)` để modal mở từ Pipeline/Chuông/Cmd-K vẫn thấy đồng nghiệp đã nói gì; hàng chip 'Không nghe máy · Hẹn lại · Quan tâm · Không nhu cầu · Sai số' chèn prefix `[KQ:…]`; Enter = lưu, Shift+Enter / nút ↵ (mobile) = xuống dòng. Sửa `openLead`: đặt hẹn/giao/đổi stage/ghi chú xong cập nhật tại chỗ thay vì `closeModal()`; đăng ký `modalLeadId` để `SLApp.reload` vẽ lại modal khi lead đó đổi. Chuyển sang `<dialog>` native (Escape + focus trap); ≤639px: sheet bo góc, vuốt xuống đóng, header co khi cuộn; ẩn bong bóng 'Hỏi em nè!' khi modal mở (đang đè thanh nút hành động). Giữ cơ chế 'không hoãn reload khi focus ở ô ghi chú' cho modal (90-boot chỉ áp cho feed).",
+   "category": "ux-fix",
+   "personas": [
+    "sales"
+   ],
+   "value": 3.5,
+   "effort": "S",
+   "risk": "`<dialog>` cần polyfill Safari <15.4 — fallback giữ div; tái dùng code notes đã qua 4 vòng fix realtime nên chạy lại regression notes.",
+   "touches": [
+    "fe"
+   ],
+   "quick_win": true,
+   "sources": [
+    "sales-10",
+    "sales-12"
+   ]
+  },
+  {
+   "id": "P49",
+   "title": "Lưới test: bộ test Firestore Rules trên emulator (tenancy fail-closed) gate trước deploy + smoke thêm view/mobile/vai trò + unit helper + worker selftest fixture",
+   "description": "(1) `~/firebase-s13/rules-test/` dùng `@firebase/rules-unit-testing` + `firebase emulators:exec`: ~30 case — sales brand A không đọc lead/note/outreach_log brand B; không sửa `brand/score/assignee_uid`; không tự nâng role/brand/active; note create sai brand bị chặn; fb_accounts/workers/worker_config non-super bị chặn; TTL field không bị client sửa; khung `leadFrom/leadTo`. Script `deploy-rules.sh` = test PASS mới `firebase deploy --only firestore:rules` (hiện mọi patch Rules đều node-script chèn block rồi deploy thẳng). (2) tools/smoke.js thêm `#history/#scanned/#users/#roi`, viewport 390px cho feed/pipeline/outreach, chạy demo với `CURRENT_ROLE=sales` kiểm nav/palette/router ẩn đúng view super-only, gate 'không CSP violation, không unhandled rejection'. (3) `tools/unit/*.test.mjs` (node:test) cho normPhoneVN/fmtPhoneVN, parseTS, fold, oaMatrixOf/oaCapsOf, pvAgeMs, escJsAttr. (4) `node worker.mjs --selftest` chạy `findCommentEl`/`detectChallengeStrict`/`deepHasTruthy` trên fixture HTML/JSON từ capture. (5) Screenshot diff 17 view trong build.",
+   "category": "platform",
+   "personas": [
+    "engineer"
+   ],
+   "value": 3.5,
+   "effort": "M",
+   "risk": "Case phải cập nhật khi thêm collection mới (kỷ luật như eslint); fixture HTML FB lỗi thời → test xanh giả, ghi ngày capture.",
+   "touches": [
+    "rules",
+    "fe",
+    "worker",
+    "external"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-04",
+    "engineer-17"
+   ]
+  },
+  {
+   "id": "P50",
+   "title": "Đăng nhập được từ in-app browser Zalo/Facebook: Google redirect thay popup + nút 'Mở bằng trình duyệt' + input ≥16px",
+   "description": "live.js: phát hiện in-app webview (UA chứa `Zalo`, `FBAN/FBAV`, hoặc iOS Safari chặn popup) → `signInWithRedirect` + `getRedirectResult` thay `signInWithPopup`; gợi ý 'Mở bằng Safari/Chrome' kèm nút chép link. Tăng input ≥16px ở màn login (80-rbac-auth) để iOS không tự zoom. Không đụng backend (Auth domain đã cấu hình).",
+   "category": "ux-fix",
+   "personas": [
+    "sales"
+   ],
+   "value": 3,
+   "effort": "S",
+   "risk": "Thấp: redirect flow cần `authDomain` khớp + cookie bên thứ 3 — đã dùng domain riêng; test trên Zalo iOS/Android thật.",
+   "touches": [
+    "live",
+    "fe"
+   ],
+   "quick_win": true,
+   "sources": [
+    "sales-15"
+   ]
+  },
+  {
+   "id": "P51",
+   "title": "Next-best-lead cho engine: ưu tiên lead theo score × SLA × có đường tới người thay vì mới nhất + xem trước hàng đợi",
+   "description": "Sửa `stepNickAdspower` (outreach.js): thay `orderBy detected_at desc limit N` bằng nạp 30 lead mới của brand rồi xếp theo điểm ưu tiên = score×w1 + (hot ? bonus) + (author_url ? bonus inbox-able, ~31% lead) + (first_care_at null: chưa ai chạm) − (đã có lead cùng uid/phone chạm 30 ngày, P19) − tuổi lead >72h; bỏ `do_not_contact`. Giữ 20% suất cho warm/cold theo ma trận để không bỏ đói. FE thẻ brand hiện 'Hàng đợi kế tiếp: 5 lead' (dry-run: tên, nhiệt độ, bước sẽ chạy) đọc từ `outreach_queue_preview/{brand}` engine ghi mỗi tick.",
+   "category": "automation",
+   "personas": [
+    "ai"
+   ],
+   "value": 3,
+   "effort": "S",
+   "risk": "Đổi thứ tự có thể bỏ đói lead lạnh mãi → giữ tỉ lệ 20% suất; patch engine bằng lệnh Cloud Shell.",
+   "touches": [
+    "cf",
+    "fe",
+    "live"
+   ],
+   "quick_win": true,
+   "sources": [
+    "ai-15"
+   ]
+  },
+  {
+   "id": "P52",
+   "title": "Auto-tag ngành/dịch vụ theo taxonomy VN chuẩn + chuẩn hoá nguồn theo id → attribution và AOV theo ngành đúng",
+   "description": "Taxonomy 12 ngành × dịch vụ trong `config/public.taxonomy`. Prompt chấm điểm ép `industry`/`service` vào enum (structured output) + `industry_conf`; CF backfill 1 lần map giá trị tự do cũ ('Đa ngành', viết hoa lẫn) sang enum (dry-run + bảng đối chiếu trước). FE: chip ngành đồng nhất, bộ lọc ngành ở feed/pipeline, ROI `industries[]` AOV khớp enum (hết key lệch, hết 'top 12 ngành bị cắt'), chart 'Lead theo nguồn' gắn đúng tên nguồn (hiện nhiều thanh trùng 'Đa ngành'; lead nối nguồn bằng TÊN). Lead ngành khác brand → chip 'ngoài ngành' + gợi ý chuyển brand khác của agency.",
+   "category": "ai",
+   "personas": [
+    "ai"
+   ],
+   "value": 3,
+   "effort": "S",
+   "risk": "Backfill đổi giá trị cũ ảnh hưởng AOV theo ngành đã cấu hình → dry-run trước.",
+   "touches": [
+    "cf",
+    "fe",
+    "live"
+   ],
+   "quick_win": true,
+   "sources": [
+    "ai-16"
+   ]
+  },
+  {
+   "id": "P53",
+   "title": "Gia cố client: CSP bỏ 'unsafe-inline' (event delegation + nonce), App Check, xác minh email + nhãn provider thật, rate-limit CF, helper gọi CF có timeout/retry",
+   "description": "(1) ~11 sink `onclick=\"__slCopy('...')\"` → `data-act=\"copy\" data-v=\"...\"` + 1 listener delegate ở #view (pattern `data-ndel`), bỏ `escJsAttr`; build.mjs chèn nonce cho script inline còn lại; netlify.toml `script-src 'self' https://www.gstatic.com https://apis.google.com` + `require-trusted-types-for 'script'` Report-Only 2 tuần; smoke check 'không CSP violation'. (2) Đăng ký email → `sendEmailVerification`; Rules yêu cầu `email_verified` cho provider password; thẻ Chờ duyệt hiện provider từ `providerData[0].providerId` + badge 'chưa xác minh' (thay suy từ đuôi @gmail). (3) Firebase App Check (reCAPTCHA Enterprise) cho Firestore + CF, monitoring mode 1 tuần trước enforce. (4) `assistantChat` rate-limit 20 lượt/giờ/uid; `manualScan` idempotency key 60s (chống bấm đúp tốn BrightData). (5) live.js helper `cf(name, body, {timeoutMs:20000, retries:1})` AbortController + Bearer + map lỗi (401 re-login, 403 quyền, 5xx 'máy chủ bận', timeout 'mạng chậm') thay 7 chỗ `MANUAL_SCAN_URL.replace(...)` + fetch không timeout; toast lỗi Rules `guard()` kèm tên thao tác; nút disable khi đang bay.",
+   "category": "platform",
+   "personas": [
+    "engineer"
+   ],
+   "value": 3,
+   "effort": "M",
+   "risk": "Sót 1 handler inline → nút chết im (grep `onclick=` + smoke + 17 ảnh view); App Check enforce có thể chặn client cũ; timeout 20s chỉ áp cho bước nhận jobId của manualScan (job nền đã có watchJob).",
+   "touches": [
+    "fe",
+    "live",
+    "rules",
+    "cf",
+    "external"
+   ],
+   "quick_win": false,
+   "sources": [
+    "engineer-14",
+    "engineer-15",
+    "engineer-16"
+   ]
+  },
+  {
+   "id": "P54",
+   "title": "Bold bet: click-to-call Stringee + AI tóm tắt cuộc gọi, callbot gọi lead nóng trong 5 phút (pilot BĐS/giáo dục)",
+   "description": "Giai đoạn 1: card 'Tổng đài' ở Kết nối (P32) → brand nhập API key StringeeX; thẻ lead/pipeline có nút Gọi (WebRTC widget hoặc `tel:` fallback); CF `callWebhook` nhận bản ghi + transcript → OpenAI tóm tắt 3 dòng + kết quả (không nghe/hẹn/không nhu cầu) → note hệ thống + `fu_at` (nối với P07). Giai đoạn 2: lead ≥85 điểm có SĐT + đã tra DNC → callbot tiếng Việt (Stringee/FPT.AI) gọi xác nhận nhu cầu trong 5 phút, kết quả đẩy pipeline + giao sales. Bật theo brand, giờ 8–20h, van ≤N cuộc/ngày; đóng gói add-on trả theo phút.",
+   "category": "feature",
+   "personas": [
+    "strategist"
+   ],
+   "value": 3,
+   "effort": "L",
+   "risk": "Gọi khi chưa có đồng ý = quảng cáo qua điện thoại (NĐ 91/2020, phạt từ 19/8/2026) → chỉ gọi lead có tín hiệu 'cần tư vấn' rõ + tra DNC + kịch bản tư vấn không quảng cáo; chi phí callbot/phút; callbot tiếng Việt vẫn bị cúp máy.",
+   "touches": [
+    "cf",
+    "external",
+    "fe",
+    "live",
+    "rules"
+   ],
+   "quick_win": false,
+   "sources": [
+    "strategist-13"
+   ]
+  }
+ ],
+ "dropped": [
+  {
+   "id": "strategist-15",
+   "reason": "Văn bản định vị/anti-roadmap (docs + landing + slide), không phải hạng mục sản phẩm có thể ước lượng effort/touches như các item khác; nên dùng làm phần mở đầu/bộ lọc ưu tiên của roadmap thay vì 1 dòng trong danh sách. Phần code nhỏ (ticker mặc định, link privacy/terms ở login) đã nằm trong P31 và P46."
+  }
+ ]
+}

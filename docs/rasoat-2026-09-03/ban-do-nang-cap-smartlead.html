@@ -1,0 +1,455 @@
+<title>Bản đồ nâng cấp SmartLead</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;700;800&family=Lora:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F5F6FA; --paper:#FFFFFF; --ink:#141A2F; --ink-2:#3C4460; --ink-3:#6E7691; --line:#DDE1EC; --line-2:#EEF0F6;
+  --brand:#1B2DCC; --brand-soft:#E9ECFF; --brand-ink:#1526A8;
+  --hot:#D8161C; --hot-soft:#FDE9EA; --warm:#C47A05; --warm-soft:#FFF3DC; --ok:#0E8F63; --ok-soft:#E3F6EE; --cold:#3E6FD9; --cold-soft:#E7EEFC;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --disp:'Be Vietnam Pro',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --body:'Lora',Georgia,'Times New Roman',serif;
+  --shadow:0 1px 2px rgba(20,26,47,.06),0 8px 24px -12px rgba(20,26,47,.18);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0E1222; --paper:#161B30; --ink:#EEF0F8; --ink-2:#C4C9DB; --ink-3:#8D95AE; --line:#2A3150; --line-2:#20263F;
+  --brand:#7C8BFF; --brand-soft:#1F2757; --brand-ink:#B9C2FF;
+  --hot:#FF6B70; --hot-soft:#3A1B1F; --warm:#F5B04A; --warm-soft:#3A2D14; --ok:#4FD3A0; --ok-soft:#14352A; --cold:#8AB0FF; --cold-soft:#1B2745;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}}
+:root[data-theme="dark"]{
+  --bg:#0E1222; --paper:#161B30; --ink:#EEF0F8; --ink-2:#C4C9DB; --ink-3:#8D95AE; --line:#2A3150; --line-2:#20263F;
+  --brand:#7C8BFF; --brand-soft:#1F2757; --brand-ink:#B9C2FF;
+  --hot:#FF6B70; --hot-soft:#3A1B1F; --warm:#F5B04A; --warm-soft:#3A2D14; --ok:#4FD3A0; --ok-soft:#14352A; --cold:#8AB0FF; --cold-soft:#1B2745;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--brand-ink);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:currentColor}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;line-height:1.2;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,4.2vw,44px);font-weight:800}
+h2{font-size:clamp(22px,2.6vw,28px);font-weight:800;margin:0 0 6px}
+h3{font-size:18px;font-weight:700;margin:26px 0 10px}
+h4{font-size:15px;font-weight:700;margin:16px 0 6px}
+p{margin:0 0 14px;max-width:70ch}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--line-2);padding:1px 5px;border-radius:5px;color:var(--ink-2)}
+.wrap{display:grid;grid-template-columns:230px minmax(0,880px);gap:40px;max-width:1180px;margin:0 auto;padding:36px 24px 80px}
+@media (max-width:980px){.wrap{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}.toc{display:none}}
+.toc{position:sticky;top:24px;align-self:start;font-family:var(--disp);font-size:13.5px}
+.toc .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px;font-weight:700}
+.toc a{display:block;padding:6px 10px;border-radius:8px;color:var(--ink-2);border:0;font-weight:500}
+.toc a:hover{background:var(--paper);color:var(--ink)}
+.toc a b{display:inline-block;width:20px;color:var(--ink-3);font-weight:700}
+main{min-width:0}
+header.hero{padding:8px 0 28px;border-bottom:1px solid var(--line);margin-bottom:34px}
+.eyebrow{font-family:var(--disp);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand-ink);font-weight:700;margin:0 0 12px}
+.lede{font-size:18px;color:var(--ink-2);max-width:62ch;margin:16px 0 20px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 22px;font-family:var(--disp);font-size:13px;color:var(--ink-3)}
+.meta b{color:var(--ink-2);font-weight:600}
+section{margin:0 0 54px;scroll-margin-top:24px}
+.num{font-family:var(--mono);font-size:13px;color:var(--ink-3);display:block;margin-bottom:4px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:14px 0 18px}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stat .v{font-family:var(--disp);font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.stat .l{font-family:var(--disp);font-size:12.5px;color:var(--ink-3);margin-top:6px}
+.stat .s{font-family:var(--body);font-size:13.5px;color:var(--ink-2);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-family:var(--disp);font-size:14px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+th{text-align:left;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line-2);vertical-align:top;font-family:var(--body);font-size:14.5px}
+tr:last-child td{border-bottom:0}
+td.nm{font-family:var(--disp);font-weight:700;white-space:nowrap}
+.bar{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;white-space:nowrap}
+.bar i{display:inline-block;width:80px;height:8px;border-radius:99px;background:var(--line-2);position:relative;overflow:hidden}
+.bar i::after{content:"";position:absolute;inset:0;width:var(--w);background:var(--brand);border-radius:99px}
+.bar.ok i::after{background:var(--ok)} .bar.warm i::after{background:var(--warm)} .bar.hot i::after{background:var(--hot)}
+.pill{display:inline-block;font-family:var(--disp);font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:99px;white-space:nowrap;vertical-align:middle}
+.pill.hot{background:var(--hot-soft);color:var(--hot)} .pill.warm{background:var(--warm-soft);color:var(--warm)} .pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.cold{background:var(--cold-soft);color:var(--cold)} .pill.b{background:var(--brand-soft);color:var(--brand-ink)} .pill.g{background:var(--line-2);color:var(--ink-2)}
+.iss{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.iss li{background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--warm);border-radius:12px;padding:12px 16px}
+.iss li.hot{border-left-color:var(--hot)} .iss li.low{border-left-color:var(--line)}
+.iss .t{font-family:var(--disp);font-weight:700;font-size:15px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.iss .t .a{font-size:11.5px;color:var(--ink-3);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.iss .w{color:var(--ink-2);font-size:14.5px;margin:6px 0 0}
+.iss .f{font-size:13.5px;color:var(--ink-3);margin:6px 0 0}
+.iss .f b{color:var(--ink-2);font-weight:600;font-family:var(--disp);font-size:12.5px}
+.iss .f code{font-size:12.5px}
+details{border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:0 16px;margin:10px 0}
+summary{cursor:pointer;font-family:var(--disp);font-weight:700;font-size:14.5px;padding:12px 0;list-style:none;display:flex;align-items:center;gap:10px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+";font-family:var(--mono);color:var(--ink-3);width:14px;display:inline-block}
+details[open] summary::before{content:"–"}
+details ul{margin:0 0 14px 18px;padding:0;font-size:14px;color:var(--ink-2)}
+details li{margin:4px 0}
+.callout{border-left:4px solid var(--brand);background:var(--brand-soft);border-radius:0 12px 12px 0;padding:12px 16px;margin:16px 0;font-size:15px}
+.callout.hot{border-left-color:var(--hot);background:var(--hot-soft)} .callout.ok{border-left-color:var(--ok);background:var(--ok-soft)}
+.callout p:last-child{margin:0}
+ol.top{counter-reset:t;list-style:none;padding:0;margin:14px 0 6px;display:grid;gap:10px}
+ol.top li{counter-increment:t;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+ol.top li::before{content:counter(t);font-family:var(--disp);font-weight:800;font-size:18px;color:var(--brand-ink);line-height:1.2}
+ol.top b{font-family:var(--disp);font-weight:700}
+ol.top span{display:block;color:var(--ink-2);font-size:14.5px;margin-top:2px}
+.wave{margin:18px 0 26px}
+.wave h3{display:flex;align-items:center;gap:10px;margin:0 0 4px}
+.wave .why{color:var(--ink-3);font-size:14px;font-family:var(--disp);margin:0 0 12px}
+.rm{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.rm li{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 16px;display:grid;grid-template-columns:52px 1fr;gap:12px}
+.rm .id{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);padding-top:3px}
+.rm .h{font-family:var(--disp);font-weight:700;font-size:15px;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.rm .d{color:var(--ink-2);font-size:14.5px;margin-top:5px}
+.rm .m{font-family:var(--disp);font-size:12.5px;color:var(--ink-3);margin-top:7px;display:flex;flex-wrap:wrap;gap:6px 14px}
+.rm .m b{color:var(--ink-2);font-weight:600}
+.ai{display:grid;gap:12px}
+.ai .card h4{margin:0 0 6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ai .card p{font-size:14.5px;margin:0 0 8px}
+.ai .card .kv{font-family:var(--disp);font-size:13px;color:var(--ink-3);display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.ai .card .kv b{color:var(--ink-2);font-weight:600}
+.q{counter-reset:q;list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.q li{counter-increment:q;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 16px 12px 52px;position:relative;font-size:15px}
+.q li::before{content:"Q" counter(q);position:absolute;left:14px;top:12px;font-family:var(--mono);font-size:13px;color:var(--brand-ink);font-weight:500}
+.q li em{display:block;font-style:normal;color:var(--ink-3);font-size:13.5px;margin-top:4px;font-family:var(--disp)}
+.foot{border-top:1px solid var(--line);padding-top:18px;color:var(--ink-3);font-size:13.5px;font-family:var(--disp)}
+@media (prefers-reduced-motion:no-preference){.bar i::after{transition:width .6s ease}}
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Mục lục">
+  <p class="k">Mục lục</p>
+  <a href="#s1"><b>1</b>Tóm tắt điều hành</a>
+  <a href="#s2"><b>2</b>Scorecard 13 phân hệ</a>
+  <a href="#s3"><b>3</b>Lỗi đã verify</a>
+  <a href="#s4"><b>4</b>Lộ trình 3 đợt</a>
+  <a href="#s5"><b>5</b>Tính năng AI nổi bật</a>
+  <a href="#s6"><b>6</b>Rủi ro &amp; tuân thủ</a>
+  <a href="#s7"><b>7</b>Không nên làm</a>
+  <a href="#s8"><b>8</b>Câu hỏi cần anh chốt</a>
+  <a href="#s9"><b>9</b>Phương pháp</a>
+</nav>
+<main>
+<header class="hero">
+  <p class="eyebrow">SmartLead · Z15 Miracle · rà soát 03/09/2026</p>
+  <h1>Bản đồ nâng cấp SmartLead</h1>
+  <p class="lede">Đánh giá toàn diện bản v119-39-ga-round2 + worker 2026-09-03, và lộ trình để SmartLead thành "siêu giải pháp" săn khách cho SME Việt Nam. Em rà bằng 4 vòng agent đối kháng, mọi lỗi đều được mở code thật để xác nhận trước khi đưa vào đây.</p>
+  <div class="meta">
+    <span>Zip: <b>v119-39-ga-round2</b> (build tái lập byte-identical, smoke 19/19)</span>
+    <span>Worker: <b>2026-09-03</b></span>
+    <span>Agent: <b>13 đọc · 6 đề xuất · 25 lô verify lỗi · 1 gộp · verify đề xuất</b></span>
+    <span>Lỗi verify: <b>152/153 xác nhận</b> · 1 bị bác</span>
+  </div>
+</header>
+
+<section id="s1">
+  <span class="num">01</span>
+  <h2>Tóm tắt điều hành</h2>
+  <div class="grid2">
+    <div class="stat"><div class="v">6,9<span style="font-size:16px;color:var(--ink-3)">/10</span></div><div class="l">điểm trung bình 13 phân hệ</div><div class="s">Cao nhất: Lead feed và automation backend (8,0). Thấp nhất: cụm Cấu hình (5,0).</div></div>
+    <div class="stat"><div class="v">13</div><div class="l">lỗi mức cao đã xác nhận</div><div class="s">9 nhóm: số bịa, mobile không đổi giai đoạn, "đã xử lý" = chốt, không tìm SĐT, nguồn tự bật lại, lead cũ không realtime, đăng ký không xác minh, SA key trên VPS, sales mù automation.</div></div>
+    <div class="stat"><div class="v">54</div><div class="l">đề xuất sau gộp (từ 101)</div><div class="s">Em xếp thành 3 đợt: 16 việc đợt 1 (2–4 tuần), 20 việc đợt 2 (1–2 tháng), 18 việc đợt 3 (3–6 tháng).</div></div>
+    <div class="stat"><div class="v">0</div><div class="l">dòng code đã sửa</div><div class="s">Đúng yêu cầu của anh: chỉ đánh giá và đề xuất. Mọi mục đều ghi chỗ sửa để làm ngay khi anh chốt.</div></div>
+  </div>
+  <p>SmartLead hôm nay là một <b>động cơ vận hành rất chắc</b>: realtime không chớp giật, tenancy fail-closed, automation Facebook có van an toàn theo nick, verify kết quả thật, dò 9 loại checkpoint, scale tới ~3.000 nick, và đã qua 3 vòng rà đối kháng trước GA. Đây là phần khó nhất và không đối thủ Việt Nam nào đang có: tool cào (ATP, MKT) không hiểu nhu cầu, CRM (Getfly, MISA, Base) không có nguồn lead, chatbot (Pancake, AhaChat) chỉ đón inbound.</p>
+  <p>Điểm yếu nằm ở <b>lớp sản phẩm dành cho chủ SME và sales</b>: dashboard hiện số bịa (Bài đã quét = lead × 14, delta cứng), sales trên điện thoại không đổi được giai đoạn và không gọi/nhắn Zalo 1 chạm, không tìm được khách theo SĐT, chuông không phải thông báo, cấu hình toàn cục chỉ Super Admin đụng được, và quan trọng nhất: <b>automation và CRM chưa nối với nhau</b>. Máy react, comment, kết bạn, inbox nhưng sales không thấy dấu vết; khách trả lời trên messenger của nick AdsPower thì không ai trong CRM biết. Toàn bộ giá trị của automation nằm ở lúc khách trả lời, và điểm đó đang hở.</p>
+  <p>Rủi ro lớn nhất không phải kỹ thuật mà là <b>pháp lý</b>: Luật BVDLCN 2026 không có ngoại lệ cho dữ liệu công khai, NĐ 330/2026 vừa có hiệu lực xử phạt, SmartLead là bên xử lý nên không được miễn DPIA, Firebase Singapore là chuyển dữ liệu xuyên biên giới. Nội dung comment công khai gửi nguyên một câu <code>lead.reply</code> cho nhiều bài là tín hiệu spam rõ nhất với Facebook.</p>
+  <div class="callout ok"><p><b>Nếu chỉ làm 5 việc trong tháng này</b>, em đề nghị: (1) thay toàn bộ số bịa bằng số thật + card "Hôm nay"; (2) pipeline và modal dùng được trên điện thoại + thanh Gọi·Zalo·Chép + tìm theo SĐT; (3) chốt/thua rõ nghĩa với giá trị đơn và lý do (để ROI thật); (4) hiện dấu vết máy trên thẻ lead + đọc phản hồi khách trên nick AdsPower; (5) bắt đầu hồ sơ pháp lý (luật sư, DPIA, opt-out + suppression list) và gỡ SA key toàn quyền khỏi VPS.</p></div>
+  <ol class="top">
+    <li><b>Số thật thay số bịa, "Hôm nay" thay KPI tĩnh</b><span>Chủ shop mở app là thấy việc phải làm, không phải 4 con số tăng trưởng giả. FE-only, 3–4 ngày.</span></li>
+    <li><b>Sales làm việc trọn vẹn trên điện thoại</b><span>Đổi giai đoạn, gọi, Zalo, ghi kết quả 1 chạm, tìm khách theo số. Toàn bộ FE, ~1 tuần.</span></li>
+    <li><b>Đóng vòng kín automation ↔ CRM</b><span>Dấu vết máy trên lead, "Dừng máy tôi tiếp quản", worker đọc phản hồi khách → stage Đã phản hồi + chuông. Worker + FE, 2–3 tuần.</span></li>
+    <li><b>Nội dung không lặp, có opt-out, theo giọng brand</b><span>Content Studio + AI 3 biến thể + spam-score thay 1 câu dùng chung. CF + engine, ~1 tuần.</span></li>
+    <li><b>Tuân thủ và an toàn để bán được</b><span>Opt-out/suppression/TTL/xoá theo yêu cầu, gỡ SA key VPS, Rules whitelist, xác minh email, backup + bản sao VN, hồ sơ DPIA. Backend LỆNH + FE, rải trong 2 tháng.</span></li>
+  </ol>
+</section>
+
+<section id="s2">
+  <span class="num">02</span>
+  <h2>Scorecard 13 phân hệ</h2>
+  <p>Điểm /10 là đánh giá của em sau khi đối chiếu code, ảnh chụp và verdict đối kháng. Điểm cao = nền chắc, điểm thấp = cần ưu tiên. Trung bình toàn hệ thống <b>6,9/10</b>: lớp vận hành/realtime/automation rất chắc, lớp "sản phẩm cho chủ SME" chưa hoàn thiện.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Phân hệ</th><th>Điểm</th><th>Điểm mạnh</th><th>Điểm yếu chính</th></tr></thead>
+    <tbody>
+    <tr><td class="nm">Lead feed &amp; ghi chú</td><td><span class="bar ok" style="--w:80%"><i></i>8,0</span></td><td>Diff theo lead.id giữ focus/caret; ghi chú realtime team/riêng; giao lead theo tải, claim transaction; SLA chip; escape kỹ.</td><td>Không tìm theo SĐT; không nút Gọi/Zalo; mobile mất rail; lead đã loại không có dấu hiệu.</td></tr>
+    <tr><td class="nm">Automation backend + worker</td><td><span class="bar ok" style="--w:80%"><i></i>8,0</span></td><td>Fail-closed, verify kết quả thật, 9 loại checkpoint, van/nick, scale 3000 nick, 3 vòng rà đối kháng, nghiệm thu thật.</td><td>VPS giữ SA key toàn quyền; không bắt reply cho AdsPower; nội dung = nguyên lead.reply; lỗi hạ tầng bị tính là lỗi task.</td></tr>
+    <tr><td class="nm">Tiếp cận (UI)</td><td><span class="bar ok" style="--w:75%"><i></i>7,5</span></td><td>Ma trận nhiệt độ×hành động + preset, van hiển thị, sức khoẻ nick, panel VPS realtime, chống chớp.</td><td>Banner/mô tả phễu sai thực tế; log phẳng; cờ nick không realtime; không có timeline theo lead.</td></tr>
+    <tr><td class="nm">live.js (data layer)</td><td><span class="bar ok" style="--w:75%"><i></i>7,5</span></td><td>Cache IndexedDB, dataEpoch, snapErr/fbUp, lazy subscribe, memoize, secret không chạm client.</td><td>Lead ngoài cửa sổ 500 không realtime; notes không giới hạn; config/app lộ cho mọi role; auto-fill bỏ qua cache.</td></tr>
+    <tr><td class="nm">Lịch sử quét · Bài đã quét</td><td><span class="bar" style="--w:70%"><i></i>7,0</span></td><td>Minh bạch quyết định AI (lý do tiếng Việt, tô cụm từ); thread bài↔comment; backfill tiến độ thật.</td><td>"Tổng" chỉ là 1000 lượt gần nhất; Quét ngay không tiến độ + bấm đúp; scanbar "24/7" cứng; getActiveNicks lọc sai field.</td></tr>
+    <tr><td class="nm">Lead modal</td><td><span class="bar" style="--w:70%"><i></i>7,0</span></td><td>Hồ sơ nhu cầu đa nhóm, phân tích AI, độ tin cậy, nhắc hẹn 3/7/14, gợi ý phản hồi AI.</td><td>"Đã xử lý" = Đã chốt; không đổi giai đoạn trung gian; không có ghi chú; không có dấu vết automation; đóng modal sau mỗi thao tác.</td></tr>
+    <tr><td class="nm">RBAC · Người dùng</td><td><span class="bar" style="--w:70%"><i></i>7,0</span></td><td>Tenancy fail-closed, hồ sơ realtime, 2FA TOTP thật, phiên thiết bị, khung lead theo brand/người.</td><td>Đăng ký email không xác minh; không mời thành viên; brand không tự quản team; không audit log; setUserRole mở khoá ngầm.</td></tr>
+    <tr><td class="nm">Bảng điều khiển + shell</td><td><span class="bar warm" style="--w:65%"><i></i>6,5</span></td><td>Realtime repaint chín, banner 2 loại, gating 3 lớp, Cmd-K, widget ngân sách sâu.</td><td>KPI "Bài đã quét" + 4 delta là số bịa; việc cần làm nằm cuối; mobile bị 3 nút nổi che; chuông không phải thông báo.</td></tr>
+    <tr><td class="nm">Pipeline</td><td><span class="bar warm" style="--w:65%"><i></i>6,5</span></td><td>Optimistic + Hoàn tác + ghim 15'; tuổi giai đoạn thật; cap 50/cột; giữ scroll khi realtime.</td><td>Mobile không đổi được giai đoạn; Loại không hoàn tác; không có giá trị deal/lý do thua; "Việc cần chú ý" bỏ sót quá hẹn.</td></tr>
+    <tr><td class="nm">Design system · mobile · a11y</td><td><span class="bar warm" style="--w:60%"><i></i>6,0</span></td><td>Token đủ, nhiệt độ có màu + chữ, số vi-VN, CSP enforce, hash ?v=.</td><td>3 nút nổi chiếm đáy màn; chữ nhãn nhỏ/tương phản thấp; input &lt;16px zoom iOS; modal không dialog/Escape; không PWA.</td></tr>
+    <tr><td class="nm">Giá trị &amp; ROI</td><td><span class="bar warm" style="--w:60%"><i></i>6,0</span></td><td>Công thức minh bạch, 3 tầng tham số, chế độ Đơn giản trung thực, tỉ lệ tự học có ngưỡng mẫu.</td><td>Hero là tiết kiệm giả định; không có doanh thu thật; lead đã loại vẫn tính; 2 số tiết kiệm cho 1 brand; phí gói lưu 2 nơi.</td></tr>
+    <tr><td class="nm">Chuông · tài khoản · công cụ vỏ</td><td><span class="bar warm" style="--w:60%"><i></i>6,0</span></td><td>2FA + phiên thiết bị thật; backfill tiến độ thật; ticker signature-guard; hồ sơ HKD/biên lai.</td><td>Badge chuông = đếm lead nóng; popover tài khoản hardcode; backfill báo xong giả khi 401/500; 2FA không có đường khôi phục.</td></tr>
+    <tr><td class="nm">Cấu hình (nguồn/keyword/scoring/cảnh báo/báo cáo/tích hợp)</td><td><span class="bar hot" style="--w:50%"><i></i>5,0</span></td><td>Lưu realtime config; ghi đè theo nguồn sâu; widget phương thức quét có số thật.</td><td>Toàn bộ cấu hình toàn cục, super-only; Báo cáo trộn số cứng; Cảnh báo không có nhật ký gửi thật; Tích hợp là trang tĩnh; sửa nguồn ép bật lại.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s3">
+  <span class="num">03</span>
+  <h2>Lỗi &amp; điểm cộm đã verify</h2>
+  <p>Vòng 1 báo 153 lỗi mức trung bình/cao. Vòng 2 mở code thật từng lỗi: <b>109 confirmed, 43 partially, 1 refuted</b>. Sau khi chấm lại theo góc nhìn chủ SME/sales, còn <b>13 mức cao</b> (gộp thành 9 nhóm dưới đây), 97 trung bình, 42 nhẹ. Mỗi nhóm kèm chỗ sửa để anh chốt là em làm ngay.</p>
+
+  <h3>Mức cao — sai dữ liệu, mất lead, hoặc không làm được việc trên điện thoại</h3>
+  <ul class="iss">
+    <li class="hot"><div class="t"><span class="a">Dashboard · Báo cáo</span>Số liệu bịa hiển thị cho khách thật</div>
+      <div class="w">KPI "Bài đã quét" = lead hợp lệ × 14; 4 delta "+12,4% / +8,1% / +15,2% / +0,6đ" cứng, luôn xanh; Báo cáo có "TG phản hồi TB 2,4 phút −18%" cứng, cột Chất lượng mặc định 80%, bảng keyword trống ở bản thật. Chủ SME ra quyết định gia hạn/ngân sách trên số giả; phát hiện là mất niềm tin toàn hệ thống.</div>
+      <div class="f"><b>Sửa</b> <code>live.js:129</code> dùng <code>scanStats.totalPosts</code> thật + tính delta 14 ngày này/trước; <code>20-feed.js:116-119</code>, <code>50-config-views.js:387</code> nhận delta từ D.kpi, ẩn chip khi chưa đủ 28 ngày dữ liệu. FE-only, ~1 ngày.</div></li>
+    <li class="hot"><div class="t"><span class="a">Pipeline · Modal</span>Trên điện thoại không đổi được giai đoạn lead</div>
+      <div class="w">Kanban chỉ có HTML5 drag-drop (không chạy trên Chrome Android/touch), modal chỉ có nút "Đánh dấu đã xử lý". Sales chạy ngoài đường không ghi nhận được "Đã inbox / Đã hẹn" → pipeline mobile chỉ xem, không làm việc được.</div>
+      <div class="f"><b>Sửa</b> <code>30-pipeline.js kCardV2</code> thêm nút "→ Bước kế" (đã có <code>pvMoveNext</code>, hiện là code chết) + select giai đoạn gọi <code>pvApplyStage</code>; modal biến thanh 7 giai đoạn thành chip bấm được. FE-only, ~1 ngày.</div></li>
+    <li class="hot"><div class="t"><span class="a">Modal</span>"Đánh dấu đã xử lý" thực chất là "Đã chốt"</div>
+      <div class="w"><code>65-charts-lead-modal.js:153</code> ghi <code>stage:'closed'</code>. Sales bấm cho lead rác/không nhu cầu → KPI tỷ lệ chốt và doanh thu ROI bị thổi phồng.</div>
+      <div class="f"><b>Sửa</b> đổi thành 2 nút rõ nghĩa "✅ Đã chốt" (hỏi giá trị đơn) và "✕ Không thành" (chọn lý do, ghi <code>dropped + lost_reason</code>); ghi <code>stage_at</code> kèm. FE-only, nửa ngày.</div></li>
+    <li class="hot"><div class="t"><span class="a">Feed · Cmd-K</span>Không tìm được lead theo SĐT/email</div>
+      <div class="w"><code>20-feed.js:455</code> và <code>70-shell-tools.js:23</code> chỉ index tên/nội dung/ngành/nguồn. Khách gọi lại, sales có số trên tay nhưng không tra được → chăm sót/trùng.</div>
+      <div class="f"><b>Sửa</b> thêm <code>phone</code> chuẩn hoá (+84→0, bỏ chấm/cách), <code>email</code>, mã lead vào chuỗi index; query toàn số ≥6 ký tự thì so bằng <code>normPhoneVN</code>. FE-only, 2 giờ. Tra cứu toàn kho (ngoài 4.000 lead đang nạp) cần thêm query <code>where('phone','==')</code> ở live.js.</div></li>
+    <li class="hot"><div class="t"><span class="a">Nguồn quét</span>Sửa nguồn luôn ép <code>active:true</code></div>
+      <div class="w"><code>50-config-views.js:114</code>: nguồn đã cố ý tạm dừng bị bật quét lại ngầm chỉ vì ai đó sửa tên/keyword → tốn Bright Data/token và đổ lead không mong muốn.</div>
+      <div class="f"><b>Sửa</b> chỉ ép <code>active:true</code> khi tạo mới; sửa thì giữ nguyên + hiện công tắc trong modal. FE-only, 30 phút.</div></li>
+    <li class="hot"><div class="t"><span class="a">live.js</span>Lead ngoài cửa sổ 500 không realtime</div>
+      <div class="w"><code>loadOlderLeads</code>/auto-fill dùng <code>getDocs</code> → brand &gt;500 lead: đồng nghiệp giao/đóng/loại một lead cũ thì người kia vẫn thấy "new" và gọi khách lần 2.</div>
+      <div class="f"><b>Sửa</b> mỗi trang 500 lead cũ subscribe bằng <code>onSnapshot</code> cùng query (push unsub vào <code>dataUnsub</code>, cập nhật theo <code>docChanges</code>); persistent cache giữ resume token nên F5 gần 0 read. FE-only, 1-2 ngày, cần test kỹ dataEpoch.</div></li>
+    <li class="hot"><div class="t"><span class="a">Đăng nhập</span>Đăng ký email không xác minh, nhãn "qua Google" suy từ đuôi @gmail</div>
+      <div class="w"><code>live.js:584</code> tạo tài khoản không gọi <code>sendEmailVerification</code>; hàng chờ duyệt hiện đúng email nhân viên thật kèm "qua Google" → Super Admin duyệt nhầm kẻ mạo danh là lọt vào brand, thấy toàn bộ SĐT khách.</div>
+      <div class="f"><b>Sửa</b> gửi xác minh email sau đăng ký + chặn màn chờ duyệt tới khi <code>emailVerified</code>; ghi <code>providerId</code> thật vào users doc để hàng chờ hiện đúng "Google / Email". FE-only, nửa ngày; kèm 1 dòng Rules cho field mới.</div></li>
+    <li class="hot"><div class="t"><span class="a">Worker · VPS</span>VPS giữ khoá service account toàn quyền Firestore</div>
+      <div class="w"><code>worker.mjs:38-40</code> nạp <code>serviceAccount.json</code> (Admin SDK) → máy Windows chạy nick FB + proxy là bề mặt tấn công cao nhất hệ thống; bị chiếm là đọc/sửa được lead mọi brand và bảng users.</div>
+      <div class="f"><b>Sửa</b> (backend, LỆNH Cloud Shell) CF <code>workerGateway</code> (claim/finish/log/heartbeat) xác thực bằng token riêng mỗi VPS ở Secret Manager, thu hồi 1 chạm; worker gọi HTTP thay <code>db.*</code>. Tối thiểu trước mắt: SA riêng chỉ có quyền trên các collection <code>outreach_*</code>, <code>fb_accounts</code>, <code>workers</code>. 3-5 ngày.</div></li>
+    <li class="hot"><div class="t"><span class="a">Automation ↔ CRM</span>Sales không thấy dấu vết automation trên lead, không bắt được khách trả lời (AdsPower)</div>
+      <div class="w">Thẻ lead/modal/pipeline không tham chiếu <code>outreach_*</code>; reply chỉ bắt qua funcWebhook (nick func) trong khi kênh chính là AdsPower → khách trả lời trên messenger của nick trên VPS mà không ai trong CRM biết; sales dễ inbox trùng.</div>
+      <div class="f"><b>Sửa</b> worker/engine set <code>leads/{id}.outreach={step,doneSteps,pid,label,lastAt}</code> → feed/modal hiện chip "🤖 đã react·cmt·inbox 14:02 · nick X" + nút "Dừng máy, tôi tiếp quản"; bước 2 worker đọc messenger chưa đọc mỗi phiên → note + stage responded (mục 5). 2-4 ngày worker + 1 ngày FE.</div></li>
+  </ul>
+
+  <h3>Mức trung bình — gây hiểu nhầm hoặc ma sát mỗi ngày (đã gộp theo nhóm)</h3>
+  <details open><summary>Bảng điều khiển &amp; chuông &amp; tài khoản (12)</summary><ul>
+    <li>Badge chuông = tổng lead nóng đang nạp (không bao giờ giảm, hiện cả "0"); panel là lead ≥60 điểm gắn kênh giả "Đa kênh"; "Xem tất cả" đá sales về dashboard. → dựng <code>alerts</code> từ sự kiện thật (giao cho tôi, khách phản hồi, quá hẹn, nick checkpoint) + <code>alertsSeenAt</code>.</li>
+    <li>Popover tài khoản hardcode "admin@z15miracle.vn / Super Admin / Chế độ demo" cho mọi user (<code>70-shell-tools.js:115-120</code>); listener popover chết ở production do <code>applyRoleUI</code> thay <code>.side-user</code>.</li>
+    <li>Phễu chia 0 → "NaN%" cho brand mới; bảng "Lead nóng cần xử lý ngay" không sort theo điểm, không loại lead đã chốt/loại/giao.</li>
+    <li>Việc cần làm nằm cuối trang; mobile 4 KPI xếp 1 cột cao 150px/ô; 3 phần tử nổi (hotline, mascot 84px, bong bóng "Hỏi em nè!") che đáy màn.</li>
+    <li>Realtime repaint gọi <code>go()</code> → đóng drawer mobile + ghi hash mỗi snapshot; <code>refreshAdmin</code> đọc trọn 4 collection mỗi lần repaint overview.</li>
+    <li>Backfill báo "xong: 0 lead" khi backend trả 401/403/500; spinner quay vô hạn khi lỗi mạng. 2FA không có backup code/tool gỡ; "Thoát phiên" chỉ là cờ hợp tác, thiết bị offline mở lại vẫn vào.</li>
+    <li>Ticker mặc định là câu chào nội bộ Z15 cho mọi brand khi chưa cấu hình; 7 chỗ dùng <code>prompt()/confirm()</code> native cho thao tác admin.</li>
+  </ul></details>
+  <details><summary>Feed · Pipeline · Modal (16)</summary><ul>
+    <li>Nút "Loại" không hoàn tác; "Loại ngay" hàng loạt không xác nhận và gom mọi lead junk kể cả đã hẹn/đã chốt; feed không đánh dấu lead đã loại.</li>
+    <li>"Việc cần chú ý" bỏ sót lead QUÁ HẸN; chip "Hẹn hôm nay" loại trừ lead đã quá giờ hẹn; lead đã giao nằm im ở "Lead mới" không bao giờ bị cảnh kẹt.</li>
+    <li>Hoàn tác kéo thẻ đặt <code>stage_at=now</code> và không khôi phục <code>first_care_at</code>; stage đổi bởi funcWebhook/"Đã xử lý" không ghi <code>stage_at</code> → "Kẹt 3 ngày" ngay khi khách vừa trả lời; lead có stage lạ được đếm nhưng không hiện cột nào.</li>
+    <li>Desktop 1440px chỉ thấy 4/7 cột, các cột "ra tiền" phải cuộn ngang; mobile dải funnel bị cắt 2/7.</li>
+    <li>Modal: mọi thao tác đều đóng modal; không có link "Mở bài gốc" cho lead-là-bài; "Sao chép gợi ý" chép chuỗi "undefined" khi thiếu reply; header mobile phình; bong bóng AI đè thanh nút; không Escape/role=dialog.</li>
+    <li>Feed mobile mất rail (Lead của tôi / Hôm nay cần chăm / Chờ giao); không có nút Gọi/Zalo (chỉ chép số; <code>zaloDial</code> là code chết); CSP còn <code>'unsafe-inline'</code> vì 11 inline onclick.</li>
+    <li>Chart "Lead theo nguồn" gắn nhãn theo ngành → nhiều thanh trùng "Đa ngành".</li>
+  </ul></details>
+  <details><summary>ROI (7)</summary><ul>
+    <li>Hero "tiết kiệm 204,5 tr" là suy từ CPL benchmark, dễ hiểu nhầm là tiền thật; cột "Nóng+Ấm/th" trộn số khai báo với số đếm.</li>
+    <li>Lead đã loại vẫn tính vào giá trị pipeline; brand chế độ Đơn giản ra 2 số tiết kiệm khác nhau; fallback lấy toàn bộ lịch sử nhưng dán nhãn "/tháng".</li>
+    <li>Không xoá được AOV theo ngành (merge sâu); phí gói lưu 2 nơi (<code>plan.price</code> vs <code>roi.fee</code>); chỉnh tham số dở dang bị xoá khi có snapshot.</li>
+  </ul></details>
+  <details><summary>Cấu hình &amp; quét (14)</summary><ul>
+    <li>Form nguồn không có ô Brand (phải lưu rồi quay lại chọn); doc id nguồn suy từ tên bằng regex bỏ dấu → tên gần giống trùng id, đè nguồn khác im lặng; lead nối nguồn bằng TÊN → đổi tên nguồn là số lead về 0.</li>
+    <li>Modal nguồn tự mâu thuẫn (quét nick private vs "chỉ group công khai"); <code>getActiveNicks()</code> lọc theo <code>status</code> trong khi fb_accounts dùng <code>active/needLogin/engine</code> → nick tắt/checkpoint/AdsPower vẫn bị gửi làm nick quét.</li>
+    <li>Xoá hết keyword thì buildData fallback gộp keyword các nguồn (không đạt được "để trống"); công tắc kênh cảnh báo đổi class trước khi lưu, không revert khi lỗi.</li>
+    <li>"Quét ngay" không tiến độ, không khoá nút → 2 lượt Bright Data; scanbar "ĐANG TRỰC 24/7" cứng, không đọc trạng thái auto-scan; "Tổng lần quét" thực chất là 1000 lượt gần nhất; TTL bài loại ghi "1 ngày" chỗ khác "7 ngày".</li>
+    <li>Bài đã quét cắt cứng 120 nhóm không "Hiện thêm"/tìm kiếm; số chip lọc không khớp danh sách; link bài→lead so bằng TÊN tác giả ("Ẩn danh" mở nhầm lead).</li>
+    <li>Cấu hình toàn cục 1 doc <code>config/app</code> subscribe cho MỌI role → sales brand khách đọc được ngân sách Bright Data, credit OpenAI, KB trợ lý của agency.</li>
+  </ul></details>
+  <details><summary>Người dùng · bảo mật (8)</summary><ul>
+    <li>Người bị KHOÁ thấy màn "Đang chờ duyệt"; đổi vai trò/brand ghi ngay khi đổi select, không xác nhận, kể cả nâng lên Super Admin; <code>setUserRole</code> ngầm mở khoá tài khoản đang khoá.</li>
+    <li>Khoá/thu hồi không xoá cache IndexedDB → lead + SĐT còn trên máy nhân viên nghỉ; cột "Hoạt động" luôn "-"; Super Admin nhận diện bằng email cứng ở 2 file, không ép 2FA.</li>
+    <li>Rules whitelist field cho <code>leads</code> chưa được kiểm (updateLead pass-through mọi field) — cần LỆNH kiểm Rules.</li>
+  </ul></details>
+  <details><summary>Tiếp cận · worker (10)</summary><ul>
+    <li>Banner "engine đang được kết nối với func.vn" hiện vĩnh viễn; khối "Phễu warm-up" mô tả sai (thiếu Kết bạn, hứa AI xoay biến thể + opt-out trong khi gửi nguyên lead.reply).</li>
+    <li>Log thất bại/checkpoint mượn status "sched" → hiện "◷ Lên lịch" màu lạnh; log phẳng 100 dòng không lọc/không mở lead/không hiện nick; cờ nick không realtime trên tab đang mở.</li>
+    <li>Modal ⚙️ hứa van theo brand nhưng nick func vẫn chạy cap toàn cục, không cảnh báo.</li>
+    <li>Worker: lỗi hạ tầng AdsPower/proxy bị tính là lỗi task → dead-letter lead sau 5 lần; tắt nick/brand không huỷ task đã xếp hàng; tin nhắn có xuống dòng bị <code>keyboard.type</code> biến thành Enter → gửi nhiều tin/comment đôi.</li>
+  </ul></details>
+  <details><summary>Giao diện · mobile · a11y (7)</summary><ul>
+    <li>Chữ nhãn 8–9,5px, tương phản thấp; input &lt;16px gây iOS Safari tự zoom (cả màn đăng nhập); bảng mobile bị cắt không có dấu hiệu cuộn; modal là hộp giữa màn, nút đóng 30px.</li>
+    <li>Modal không role=dialog/focus trap; toggle là <code>div</code> không aria; Google Fonts tải 4 họ nhưng 2 họ không dùng; orb blur + 7 backdrop-filter nặng trên Android tầm trung.</li>
+    <li>Đăng nhập Google chỉ popup → chặn trong in-app browser Zalo/Facebook (sales mở link từ nhóm Zalo).</li>
+  </ul></details>
+  <details><summary>Bị bác (1) và các mục nhẹ (42)</summary><ul>
+    <li><b>Bị bác:</b> "Brand user không tự sửa tham số ROI" — đúng thiết kế hiện tại (Rules <code>brands</code> = superadmin), nên chuyển thành đề xuất self-service ở mục 4 thay vì lỗi.</li>
+    <li>42 mục nhẹ (prompt() native, tooltip hover, code chết promo banner, cột "Hoạt động", 64 class CSS chết, subscribe scanned_posts không unsubscribe…) nằm trong file verdict kèm theo, em gộp vào các đợt dọn dẹp.</li>
+  </ul></details>
+</section>
+
+<section id="s4">
+  <span class="num">04</span>
+  <h2>Lộ trình đề xuất — 3 đợt</h2>
+  <p>Mã P.. là mục trong master list 54 đề xuất (đã gộp từ 101, mỗi mục qua verify kỹ thuật: đã có chưa, khả thi, effort thật, backend cần gì). Thứ tự trong mỗi đợt là thứ tự em khuyên làm. Nhãn: <span class="pill ok">FE-only</span> = chỉ zip; <span class="pill b">+LỆNH</span> = cần Rules/index/CF qua Cloud Shell; <span class="pill warm">worker</span> = giao file .mjs; <span class="pill hot">ngoài code</span>.</p>
+
+  <div class="wave">
+    <h3>Đợt 1 · 2–4 tuần · "đúng số, làm được việc trên điện thoại, an toàn tối thiểu"</h3>
+    <p class="why">Mục tiêu: chủ shop tin số, sales dùng được cả ngày trên phone, đóng các lỗ mức cao. Gần như toàn bộ là FE + 3 LỆNH nhỏ. Kết quả: 1–2 zip + smoke mở rộng.</p>
+    <ul class="rm">
+      <li><span class="id">—</span><div><div class="h">Sửa 9 nhóm lỗi mức cao + các lỗi trung bình "sửa nhanh" <span class="pill ok">FE-only</span> <span class="pill b">+LỆNH</span></div><div class="d">Số thật cho KPI/Báo cáo; nguồn không tự bật lại; form nguồn có ô Brand; doc id nguồn theo group id; backfill/Quét ngay xử lý lỗi + khoá nút; popover tài khoản đúng người; NaN%; lead nóng sort đúng; log outreach status <code>fail/paused</code>; banner + mô tả phễu đúng thực tế; hotline/mascot mobile thu gọn; chữ nhãn ≥10,5px; input ≥16px. LỆNH: kiểm Rules whitelist <code>leads</code>, bật xác minh email.</div><div class="m"><b>Cho ai</b> mọi vai trò · <b>Effort</b> 4–5 ngày · <b>Rủi ro</b> thấp, mỗi sửa có smoke check</div></div></li>
+      <li><span class="id">P10</span><div><div class="h">Card "Hôm nay" đầu Overview cho sales/admin <span class="pill ok">FE-only</span></div><div class="d">Quá hẹn → hẹn hôm nay → lead nóng chưa ai chăm → vừa giao → chốt tuần này, mỗi dòng có Gọi/Zalo/Xong/+Hẹn. Thay 4 KPI delta giả. Bản view <code>today</code> riêng + mặc định mobile để đợt 2.</div><div class="m"><b>Cho ai</b> owner, sales · <b>Effort</b> 1,5–2 ngày · <b>Backend</b> không</div></div></li>
+      <li><span class="id">P11</span><div><div class="h">Pipeline và modal dùng được trên điện thoại <span class="pill ok">FE-only</span></div><div class="d">Nút "→ Bước kế" (hồi sinh <code>pvMoveNext</code>), bottom-sheet "Chuyển sang…", 7 chip giai đoạn bấm được trong modal, tab ngang 7 giai đoạn ở ≤639px thay 7 cột xếp dọc. Đi qua <code>pvApplyStage</code> sẵn có (optimistic + Hoàn tác).</div><div class="m"><b>Cho ai</b> sales · <b>Effort</b> 2 ngày · <b>Rủi ro</b> modal phải re-render khối stage riêng, không đóng</div></div></li>
+      <li><span class="id">P08</span><div><div class="h">Thanh "Chăm khách 1 chạm": Gọi · Zalo · SMS · Chép <span class="pill ok">FE-only</span></div><div class="d"><code>tel:</code>, <code>zalo.me/&lt;số&gt;</code> (ẩn khi <code>phone_has_zalo===false</code>), <code>sms:</code> có mẫu, trên thẻ feed + kanban + modal. Ghi nhật ký chạm vào <code>leads/{id}/contacts</code> (không đụng field <code>touches</code> của scraper).</div><div class="m"><b>Cho ai</b> sales · <b>Effort</b> 1,5–2 ngày · <b>Backend</b> 1 dòng Rules nếu ghi nhật ký</div></div></li>
+      <li><span class="id">P16</span><div><div class="h">Tìm khách theo SĐT/email/mã lead, cả 4 số cuối <span class="pill ok">FE-only</span></div><div class="d">Thêm phone chuẩn hoá/email/id vào chuỗi index feed + Cmd-K; query toàn số → so đuôi; nút 🔍 ở mobile-bar. Tra toàn kho (ngoài 4.000 lead đang nạp) bằng <code>where('phone','==')</code> theo brand.</div><div class="m"><b>Cho ai</b> sales, owner · <b>Effort</b> 1,5–2 ngày</div></div></li>
+      <li><span class="id">P26</span><div><div class="h">"✅ Đã chốt" / "✕ Không thành" + lý do chuẩn VN + Hoàn tác; feed ẩn Rác/Đã loại mặc định <span class="pill ok">FE-only</span></div><div class="d">Thay "Đánh dấu đã xử lý" và "Loại". Lý do: không nghe máy / không nhu cầu / giá cao / chọn bên khác / đã có NCC / spam → <code>dropped, lost_reason, lost_at</code>. "Loại ngay" hàng loạt có confirm và chỉ lead junk chưa ai chăm.</div><div class="m"><b>Cho ai</b> sales, owner · <b>Effort</b> 2 ngày + 0,5 ngày Rules</div></div></li>
+      <li><span class="id">P17</span><div><div class="h">Chuông thành "Hộp việc của tôi hôm nay" <span class="pill ok">FE-only</span></div><div class="d">Danh sách việc suy từ <code>D.leads</code>: mới giao cho tôi, hẹn trong 1h/quá hẹn, khách phản hồi (<code>stage responded</code>), lead nóng chưa ai chăm > SLA. Badge = việc chưa xử lý; "đã xem" theo thiết bị (localStorage) tới khi có notifications thật.</div><div class="m"><b>Cho ai</b> sales, admin · <b>Effort</b> 2 ngày</div></div></li>
+      <li><span class="id">P48</span><div><div class="h">Modal lead: có ghi chú, không văng sau thao tác, Escape/bottom-sheet trên phone <span class="pill ok">FE-only</span></div><div class="d">Tách <code>notesBlock(l)</code> dùng chung feed + modal; chip kết quả nhanh; Shift+Enter xuống dòng; <code>&lt;dialog&gt;</code> cho focus trap; link "Mở bài gốc"; ẩn mascot khi modal mở.</div><div class="m"><b>Cho ai</b> sales · <b>Effort</b> 2 ngày · <b>Rủi ro</b> chạy lại regression notes 3/3</div></div></li>
+      <li><span class="id">P50</span><div><div class="h">Đăng nhập được từ in-app browser Zalo/Facebook <span class="pill ok">FE-only</span></div><div class="d"><code>signInWithRedirect</code> khi UA là webview, nút "Mở bằng trình duyệt", input ≥16px ở màn login.</div><div class="m"><b>Cho ai</b> sales · <b>Effort</b> 1 ngày · <b>Rủi ro</b> test trên Zalo iOS/Android thật</div></div></li>
+      <li><span class="id">—</span><div><div class="h">Lead cũ ngoài cửa sổ 500 realtime <span class="pill ok">FE-only</span></div><div class="d">Mỗi trang 500 lead cũ subscribe bằng <code>onSnapshot</code> (cùng query <code>loadOlderLeads</code>), unsub theo <code>dataUnsub</code>/<code>dataEpoch</code>. Persistent cache giữ resume token nên F5 gần 0 read (tiện thể sửa auto-fill bỏ qua cache).</div><div class="m"><b>Cho ai</b> brand >500 lead · <b>Effort</b> 1–2 ngày · <b>Rủi ro</b> vùng dataEpoch/absorbDropped, test kỹ đổi brand giữa chừng</div></div></li>
+      <li><span class="id">P30</span><div><div class="h">Van an toàn tầng 2 ở worker + nút "⏸ Dừng tất cả" <span class="pill warm">worker</span> <span class="pill ok">FE</span></div><div class="d">Worker kiểm <code>fb_accounts.active</code>, <code>brands.outreach.on</code>, khung giờ, cờ <code>paused</code> toàn hệ trước khi mở nick (task không đủ điều kiện trả <code>queued</code>, không tính tries); phân loại lỗi hạ tầng AdsPower/proxy → không dead-letter lead; gõ tin có xuống dòng bằng Shift+Enter. Circuit breaker mới ở mức cảnh báo.</div><div class="m"><b>Cho ai</b> super, agency · <b>Effort</b> 3 ngày · <b>Backend</b> CF huỷ task khi tắt brand (LỆNH nhỏ)</div></div></li>
+      <li><span class="id">P46a</span><div><div class="h">Khởi động hồ sơ pháp lý <span class="pill hot">ngoài code</span></div><div class="d">Luật sư review cơ sở xử lý dữ liệu; bắt đầu DPIA (dùng kiến trúc hiện có làm phụ lục kỹ thuật); mẫu hợp đồng xử lý dữ liệu với brand; điều khoản rủi ro nick. Trong app: link Chính sách/Điều khoản ở màn login, tick ToS khi bật automation lần đầu.</div><div class="m"><b>Cho ai</b> anh Vinh · <b>Effort</b> code 1 ngày; hồ sơ vài tuần song song</div></div></li>
+    </ul>
+  </div>
+
+  <div class="wave">
+    <h3>Đợt 2 · 1–2 tháng · "đóng vòng kín automation ↔ CRM, nền cho SME trả phí"</h3>
+    <p class="why">Mục tiêu: máy và người nhìn thấy nhau; nội dung không lặp; chủ shop nhận báo cáo không cần mở app; tuân thủ và bảo mật đủ để ký hợp đồng. Đây là đợt tạo khác biệt lớn nhất.</p>
+    <ul class="rm">
+      <li><span class="id">P18</span><div><div class="h">Dấu vết máy trên thẻ lead + Timeline 360° + "Dừng máy, tôi tiếp quản" <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span> <span class="pill warm">worker</span></div><div class="d">Worker/engine set <code>leads/{id}.outreach</code> (bước, nick, giờ, nội dung); modal subscribe <code>outreach_log where leadId</code> (index mới) + notes + contacts + <code>stage_history[]</code> thành 1 dòng thời gian; chip "🤖 đã react·cmt·inbox 14:02" ở feed/pipeline; nút dừng thread.</div><div class="m"><b>Cho ai</b> sales, owner · <b>Effort</b> 5–7 ngày · <b>Rủi ro</b> unsub listener khi đóng modal</div></div></li>
+      <li><span class="id">P03</span><div><div class="h">Bắt phản hồi khách trên nick AdsPower → Hộp thư 2 chiều + AI tóm tắt/gợi ý trả lời <span class="pill warm">worker</span> <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">Giai đoạn A (2 tuần): worker cuối mỗi phiên đọc thread chưa đọc CHỈ trong <code>outreach_threads/outreach_map</code> → note "💬 Khách đã phản hồi", stage responded, dừng AI, chuông. Giai đoạn B (1 tuần): view Hộp thư theo brand/nick, sales trả lời → task <code>send_message</code> qua worker, SLA phản hồi 15'. CF onWrite gọi OpenAI phân loại ý định + 2 câu trả lời theo giọng brand.</div><div class="m"><b>Cho ai</b> owner, sales · <b>Effort</b> 15–22 ngày (chia 2 giai đoạn) · <b>Rủi ro</b> DOM messenger đổi → fail-closed; FB đánh dấu đã xem</div></div></li>
+      <li><span class="id">P06</span><div><div class="h">Content Studio theo brand: persona + mẫu × bước × kênh + AI 3 biến thể + spam-score <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span> <span class="pill warm">worker</span></div><div class="d"><code>brands.content</code> {xưng hô, giọng, mẫu comment/inbox/zalo, dòng opt-out}; CF <code>genVariants</code> lúc chấm điểm (chỉ hot/warm) → <code>lead.replies</code> × 3; comment = ngắn, đồng cảm, không chào bán; inbox = tên + nhu cầu + opt-out; engine chọn biến thể ít dùng nhất; sales "Viết lại" ≤5 lượt/ngày. Thay "Sao chép gợi ý" bằng chọn bản theo kênh.</div><div class="m"><b>Cho ai</b> owner, sales, super · <b>Effort</b> 6–9 ngày · <b>Rủi ro</b> token ×3 (cache), biến thể lệch giọng → có bản người duyệt</div></div></li>
+      <li><span class="id">P01</span><div><div class="h">Gói tuân thủ: opt-out/do_not_contact + suppression list + AI phân loại "đừng nhắn" + TTL lead lạnh + xoá theo yêu cầu <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span> <span class="pill warm">worker</span></div><div class="d">Nút 🚫 trên thẻ/modal; <code>suppression/{brand}__{hash}</code> engine + worker tra trước MỖI bước; reply "không quan tâm/đừng nhắn" → tự set cờ + dừng thread; <code>brands.retention</code> → CF đêm đóng dấu <code>expireAt</code> cho lead lạnh không tương tác (TTL policy như outreach_log); CF <code>eraseSubject</code> xoá cascade theo SĐT/uid trong brand + biên bản; tab Tuân thủ.</div><div class="m"><b>Cho ai</b> mọi brand, 6/6 persona đề xuất · <b>Effort</b> 12–18 ngày · <b>Rủi ro</b> xoá sai tenant → khoá theo brand + confirm 2 bước</div></div></li>
+      <li><span class="id">P34</span><div><div class="h">Tiền trong phễu: giá trị đơn khi chốt + tổng cột kanban + doanh thu trên Overview + ROI realized thật <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d">Bottom-sheet khi kéo sang Đã chốt: chip gợi ý (AOV ngành, ngân sách khách nêu), "Nhập sau" + nhắc ở Hôm nay → <code>deal_value, closed_at, deal_by</code>. Header cột hiện tổng (CSS <code>.pv2-kval</code> đã có). ROI đổi <code>realized</code> sang Σ deal_value thật, nhãn "ước tính" khi chưa có.</div><div class="m"><b>Cho ai</b> owner · <b>Effort</b> 4–5 ngày · <b>Backend</b> Rules mở 3 field</div></div></li>
+      <li><span class="id">P27</span><div><div class="h">Chế độ "Chủ shop": 3 con số + 1 câu kết luận + "Giải thích cho tôi" <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d">Tiền thu về (thật/ước tính) · Tiền trả SmartLead (1 nguồn phí, gộp <code>plan.price</code> và <code>roi.fee</code>) · Lời/lỗ; ẩn tham số/CPL benchmark; ẩn phí hợp đồng với sales. Nút gọi <code>assistantChat</code> với đúng các số đã tính (AI chỉ diễn giải) + rate-limit.</div><div class="m"><b>Cho ai</b> owner · <b>Effort</b> 2–3 ngày</div></div></li>
+      <li><span class="id">P07</span><div><div class="h">Sau khi Gọi/Zalo → hỏi kết quả 1 chạm → tự ghi note + đặt hẹn kế <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d"><code>pendingTouch</code> khi rời app từ nút Gọi/Zalo; quay lại ≥20s → sheet 5 chip (Không nghe máy · Hẹn lại · Quan tâm · Không nhu cầu · Sai số) → note hệ thống + <code>fu_at</code> theo nhịp + call log. Tuỳ chọn "nói 20 giây" → Whisper qua CF.</div><div class="m"><b>Cho ai</b> sales, owner · <b>Effort</b> 4–6 ngày · <b>Rủi ro</b> iOS visibilitychange không ổn định → fallback khi mở lại thẻ</div></div></li>
+      <li><span class="id">P02 + P35</span><div><div class="h">Counter ngày <code>daily_stats</code> + Bản tin sáng 7h30 theo vai trò (Telegram/email trước, Zalo ZBS sau) + bảng so sánh brand cho agency <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">CF trigger onWrite leads/notes tăng <code>daily_stats/{brand}__{ngày}</code> (pattern outreach_stats đã chứng minh); CF <code>dailyBrief</code> 7:30 VN dựng 5 dòng + top 3 lead nên gọi + deep-link, AI chỉ diễn giải số; <code>notify_log</code>. Overview cho owner/super = bảng brand 7/30 ngày chính xác mọi quy mô. Card "Thông báo cá nhân" nối thật.</div><div class="m"><b>Cho ai</b> owner, agency, sales · <b>Effort</b> 11–15 ngày · <b>Rủi ro</b> ZBS quota 1 tin hậu mãi/user/ngày, OA gói Tăng trưởng; không gửi SĐT qua kênh ngoài</div></div></li>
+      <li><span class="id">P36</span><div><div class="h">Bỏ <code>serviceAccount.json</code> trên VPS: mã ghép + custom token + Rules scope <code>outreach_*</code> <span class="pill b">+LỆNH</span> <span class="pill warm">worker</span></div><div class="d">Web tạo mã ghép 6 số → CF <code>workerPair</code> cấp custom token claims {worker, workerId}; worker sang client SDK (Node) với Rules chỉ cho <code>outreach_tasks/threads/log/stats</code>, <code>fb_accounts</code>, <code>workers</code>; thu hồi 1 chạm. Bước tối thiểu trước: SA riêng chỉ có quyền các collection đó.</div><div class="m"><b>Cho ai</b> super · <b>Effort</b> 5–7 ngày · <b>Rủi ro</b> transaction client khác Admin → test lại claim/reaper chống chạy trùng</div></div></li>
+      <li><span class="id">P14</span><div><div class="h">Nhắc hẹn 15' trước giờ + SLA theo giai đoạn + leo thang lead nóng bỏ quên <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">CF scheduler 5' (pattern outreachTick) quét <code>fu_at</code> sắp tới + hot chưa chăm > SLA → Telegram/Zalo OA cho sales, quá 2× SLA → chủ brand + gợi ý chuyển người rảnh. KPI "% chăm trong 15 phút" theo sales.</div><div class="m"><b>Cho ai</b> owner, agency · <b>Effort</b> 6–8 ngày · <b>Backend</b> index leads(brand, fu_at); "first_care_at null" phải lọc trong code</div></div></li>
+      <li><span class="id">P22</span><div><div class="h">Mời sales bằng link/QR Zalo (tự duyệt) + admin brand tự quản team trong brand <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">CF <code>createInvite</code> → <code>invites/{token}</code> 48h; người nhận đăng nhập là vào đúng brand + Zalo báo. Mở view Người dùng cho admin ở scope brand (chỉ role sales/viewer, khoá/mở, khung lead). Rules users update AND đủ 4 điều kiện.</div><div class="m"><b>Cho ai</b> owner, agency · <b>Effort</b> 5–7 ngày · <b>Rủi ro</b> điểm nhạy nhất tenancy → cần P49 test leo thang quyền</div></div></li>
+      <li><span class="id">P04</span><div><div class="h">Wizard "Brand mới + lead đầu tiên trong 15 phút" + checklist thay KPI 0 <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d">6 bước trong 1 modal (mã/logo/gói → preset ngành → 3 group gợi ý + keyword mẫu → SLA + ma trận → mời sales → quét thử 15 bài). Brand 0 lead thấy checklist tick tự động thay NaN%.</div><div class="m"><b>Cho ai</b> owner, agency · <b>Effort</b> 5–7 ngày · <b>Backend</b> manualScan nhận <code>sourceIds[] + limit</code>, khoá 1 lần/giờ</div></div></li>
+      <li><span class="id">P24 + P25 + P20</span><div><div class="h">Rules whitelist theo vai trò + custom claims · khoá tài khoản có hiệu lực thật + offboarding "Khoá & bàn giao" + ép 2FA admin/super · audit log bất biến <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">Whitelist field <code>leads</code> theo role, note đối chiếu brand của lead; CF <code>adminUserAction</code> (revokeRefreshTokens, disable, gỡ 2FA, reset mật khẩu), <code>tokensValidAfter</code> trong Rules, xoá cache IndexedDB khi bị khoá, chuyển giao lead của người nghỉ; CF trigger ghi <code>audit_log</code> (chỉ field nhạy, TTL 12 tháng) + tab Nhật ký; confirm + re-auth khi nâng lên Super Admin; sửa SĐT/tên lead trong modal khi AI trích sai.</div><div class="m"><b>Cho ai</b> super, agency · <b>Effort</b> 14–20 ngày gộp · <b>Rủi ro</b> whitelist thiếu field → thao tác chết im; test emulator trước</div></div></li>
+      <li><span class="id">P45</span><div><div class="h">Chi phí Firestore: aggregation query cho KPI, giới hạn ghi chú, avatar ra Storage <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d"><code>getCountFromServer</code> theo brand/khung cho tổng/nóng/ấm/lạnh/stage (1 read/1.000 doc); notes chỉ subscribe lead đang mở + 30 ngày cho rail (cần index COLLECTION_GROUP notes có <code>at</code>); avatar → Storage. Đóng lỗ "sales >4.000 lead không biết KPI tính trên subset".</div><div class="m"><b>Cho ai</b> mọi brand lớn · <b>Effort</b> 5–7 ngày · <b>Rủi ro</b> notes là vùng đã 4 vòng fix → chạy regression notes + smoke</div></div></li>
+      <li><span class="id">P29 + P52</span><div><div class="h">Thư viện keyword/nguồn/mẫu theo ngành VN + dán hàng loạt + nhân bản brand · taxonomy ngành chuẩn <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d"><code>brand_templates/{ngành}</code> Super Admin soạn 1 lần (spa, F&amp;B, BĐS, giáo dục, mẹ&amp;bé, thời trang); thay <code>prompt()</code> bằng textarea dán hàng loạt; "Nhân bản từ brand X". Prompt chấm điểm ép <code>industry/service</code> vào enum 12 ngành (backfill dry-run) → AOV theo ngành và chart nguồn đúng.</div><div class="m"><b>Cho ai</b> agency, super · <b>Effort</b> 4–5 ngày · <b>Lưu ý</b> keyword hiện toàn cục → chờ P23 mới thành theo brand</div></div></li>
+      <li><span class="id">P44 + P28</span><div><div class="h">Backup/DR + bản sao VN · monitoring chủ động <span class="pill b">+LỆNH</span> <span class="pill hot">ngoài code</span></div><div class="d">Bật PITR 7 ngày; CF <code>dailyExport</code> → bucket asia-southeast1 (IAM chặt, SA riêng) → sync sang object storage đặt tại VN (NĐ 53/2022); runbook RESTORE. Cloud Monitoring alert cho CF/scheduler chết im; CF <code>healthTick</code> 10' (VPS offline, nick challenge, dead-letter tăng, BrightData ≥80%, auto-scan im >30') → <code>system_alerts</code> + Telegram, có cooldown.</div><div class="m"><b>Cho ai</b> super · <b>Effort</b> 8–13 ngày, phần lớn là LỆNH</div></div></li>
+      <li><span class="id">P19</span><div><div class="h">Hồ sơ khách theo SĐT/author_url: "đã có trong CRM", gộp hồ sơ, chặn giao trùng <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d">Client index phone/author → chip "Khách cũ · 2 lead · #211 Đã chốt (Ngọc)" + cảnh báo khi giao cho người khác; CF <code>contacts/{brand}__{norm}</code>; nút Gộp (<code>merged_into</code>); chỉ tự gộp theo SĐT chuẩn hoặc uid số, username chỉ gợi ý.</div><div class="m"><b>Cho ai</b> sales, AI · <b>Effort</b> 6–8 ngày</div></div></li>
+      <li><span class="id">P31 + P33 + P51</span><div><div class="h">White-label shell theo brand · nhóm Zalo hỗ trợ + nút "Báo lỗi" có ngữ cảnh + "Xem như user X" · engine ưu tiên lead theo điểm × SLA × có đường tới người <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d">Ba việc nhỏ có giá trị bán hàng rõ: hotline/tên tab/mascot/ticker theo <code>brands.support</code>; ticket lỗi tự đính brand/role/view/ảnh; Super Admin xem như user để trả lời "sao em không thấy lead"; engine bốc 30 lead rồi xếp ưu tiên thay vì mới nhất, giữ 20% suất cho ấm/lạnh.</div><div class="m"><b>Cho ai</b> agency, super · <b>Effort</b> 7–9 ngày gộp</div></div></li>
+      <li><span class="id">P49</span><div><div class="h">Lưới test: Rules trên emulator (tenancy fail-closed) gate trước deploy + smoke thêm view/mobile/vai trò <span class="pill b">+LỆNH</span> <span class="pill ok">tools</span></div><div class="d">~30 case rules-unit-testing (brand A không đọc B, không tự nâng role, note sai brand bị chặn…), <code>deploy-rules.sh</code> PASS mới deploy; smoke phủ history/scanned/roi/users + viewport 390px + role sales. Bắt buộc trước P12/P22/P23.</div><div class="m"><b>Cho ai</b> kỹ thuật · <b>Effort</b> 5–7 ngày · <b>Rủi ro</b> emulator trên Cloud Shell nặng → em chạy, anh chỉ dán LỆNH deploy</div></div></li>
+    </ul>
+  </div>
+
+  <div class="wave">
+    <h3>Đợt 3 · 3–6 tháng · "siêu giải pháp": Zalo, agency nhiều brand, self-service, AI học, tích hợp</h3>
+    <p class="why">Mục tiêu: khác biệt không đối thủ nào có + nền tảng bán theo gói cho hàng chục brand. Mỗi mục là 2–4 tuần, chọn theo tín hiệu khách thật sau đợt 2.</p>
+    <ul class="rm">
+      <li><span class="id">P09</span><div><div class="h">Kênh Zalo trong Tiếp cận: OA + ZBS cho lead đã phản hồi (hợp lệ) + Zalo cá nhân qua func ở van thấp <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">Brand kết nối OA (OAuth qua CF, token Secret Manager) → lead có SĐT đã <code>responded/booked</code> nhận mẫu Giao dịch/Hậu mãi (xác nhận lịch, nhắc, ưu đãi); webhook OA reply → note + pipeline. Lớp phụ: nick Zalo func FIND_USER → REQUEST_FRIEND → tin mở đầu, ≤10 mời/ngày/nick, chỉ lead nóng.</div><div class="m"><b>Cho ai</b> owner · <b>Effort</b> OA/ZBS 8–10 ngày (dùng 1 OA chung: 4–5) + Zalo cá nhân 8–10 ngày · <b>Rủi ro</b> ToS Zalo, quota ZBS, cần điều khoản rủi ro nick</div></div></li>
+      <li><span class="id">P12</span><div><div class="h">Workspace agency: 1 tài khoản – nhiều brand, vai trò <code>owner</code>, brand switcher + tổng quan gộp <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d"><code>users.brands[]</code> + <code>brandRoles</code>; sidebar dropdown đổi brand (dataKey đổi → startData nạp lại, cơ chế đã có); Rules <code>resource.data.brand in userBrands()</code>; hết hard-code SUPER_EMAIL là đường duy nhất xem nhiều brand.</div><div class="m"><b>Cho ai</b> agency · <b>Effort</b> 6–8 ngày switcher + 6–8 ngày view gộp · <b>Rủi ro</b> đụng Rules toàn hệ → P49 trước, migration</div></div></li>
+      <li><span class="id">P23</span><div><div class="h">Self-service admin brand: cấu hình THEO BRAND (nguồn/keyword/kênh/lịch quét/trần ngân sách/Tiếp cận) + tách config public/private <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">3 tầng config; <code>brands.cfg</code> merge với global ở backend scan; trần ngân sách VND/brand → 80% chuyển saver, 100% tạm dừng nguồn; lịch quét thích ứng theo nhịp nguồn (0 bài mới → giãn 8'→16'→30', đêm giãn đôi) cắt phí BrightData lớn nhất của SME nhỏ.</div><div class="m"><b>Cho ai</b> agency, owner · <b>Effort</b> 15–20 ngày · <b>Rủi ro</b> đụng lõi quét backend (em chưa thấy code) → cần LỆNH DUMP + "chạy thử" trước khi bật</div></div></li>
+      <li><span class="id">P05</span><div><div class="h">PWA cài lên màn hình chính + bottom tab theo vai trò + Web Push (FCM) + chỉ báo offline <span class="pill ok">FE</span> <span class="pill b">+LỆNH</span></div><div class="d">manifest + service worker precache theo danh sách hash do build.mjs sinh; bottom tab Hôm nay · Lead · Pipeline · Tìm · Tôi; push khi lead nóng giao cho tôi/khách phản hồi/tới giờ hẹn (iOS cần cài PWA); chip "Ngoại tuyến · N thay đổi chờ đồng bộ".</div><div class="m"><b>Cho ai</b> sales · <b>Effort</b> 12–16 ngày · <b>Rủi ro</b> SW cache sai kẹt bản cũ → precache từ cùng hash build</div></div></li>
+      <li><span class="id">P15</span><div><div class="h">Báo cáo white-label tuần/tháng: PDF + link + Zalo OA/Email, logo brand, nhắc gia hạn <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">CF <code>brandReport</code> (Puppeteer, ~1GB RAM) dựng 1 trang: lead/nóng/chốt, doanh thu thật (P34), chi phí/lead, so kỳ trước, top nguồn, SLA, Tiếp cận, 3 việc đề xuất; header = logo brand + tên agency; lưu Storage + gửi.</div><div class="m"><b>Cho ai</b> agency, owner · <b>Effort</b> 12–18 ngày · <b>Phụ thuộc</b> P34, P35 (số thật)</div></div></li>
+      <li><span class="id">P13</span><div><div class="h">Gói giá phẳng theo brand + trial 14 ngày + 1 nguồn phí + enforce entitlement + tự tạm dừng <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d"><code>brands.plan</code> {tier, status, nicks, sources, users, trialEndsAt, nextDueAt}; CF <code>enforcePlan</code> đêm: hết hạn + grace → tắt nguồn/outreach (cờ <code>pausedByPlan</code> để bật lại đúng cái đã tắt); nhắc gia hạn 7 ngày trước.</div><div class="m"><b>Cho ai</b> anh Vinh · <b>Effort</b> 5–7 ngày · <b>Cần chốt</b> câu hỏi 6</div></div></li>
+      <li><span class="id">P32</span><div><div class="h">Trang Kết nối thật: Google Sheet theo brand, Zalo OA, Webhook n8n, KiotViet/Sapo + xuất CSV/Excel có audit <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">Thay 4 card tĩnh; Sheet sync gom từ codebase2 về s13 + tham số theo brand; webhook có Gửi thử + log; lead <code>responded/booked</code> có SĐT → tạo khách trong KiotViet/Sapo (SME đã có POS). Xuất SĐT chỉ owner/admin + <code>export_log</code>.</div><div class="m"><b>Cho ai</b> agency, owner · <b>Effort</b> 15–20 ngày · <b>Rủi ro</b> API đối tác, PII khi xuất</div></div></li>
+      <li><span class="id">P37 + P39 + P41</span><div><div class="h">AI học theo brand (👍/👎 + kết quả chốt/thua → few-shot, "khách lý tưởng" tiếng Việt, đề xuất keyword tuần) · Next-Best-Action có nút hành động · dự báo pipeline tự học <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">Chi tiết ở mục 5. Gate ≥15–30 mẫu/brand, Super Admin duyệt, NBA bằng rule tường minh (LLM chỉ soạn tin/tóm tắt).</div><div class="m"><b>Cho ai</b> owner, sales · <b>Effort</b> 16–22 ngày gộp · <b>Phụ thuộc</b> P26, P34 (nhãn kết quả)</div></div></li>
+      <li><span class="id">P47</span><div><div class="h">Safety Score nick 0–100 + ramp-up nick mới + tự hạ cap khi RATE_LIMIT, hiện cho khách như số liệu quản trị <span class="pill warm">worker</span> <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">Từ tuổi nick, challenge/needLogin, tỷ lệ bước thành công 7 ngày, % cap dùng, proxy; nick mới tuần 1 = 20% cap; RATE_LIMIT → hạ 50% 3 ngày. Tách "lỗi nick" khỏi "lỗi FB đổi doc_id" để không false-red.</div><div class="m"><b>Cho ai</b> super, owner · <b>Effort</b> 5–7 ngày · <b>Rủi ro</b> calibrate vài tuần trước khi hiện cho khách</div></div></li>
+      <li><span class="id">P40 + P42</span><div><div class="h">Copilot hành động (function-calling) + thanh lệnh tiếng Việt · AI đón inbound Zalo OA/Facebook Page 24/7, bàn giao người khi nóng <span class="pill b">+LỆNH</span> <span class="pill ok">FE</span></div><div class="d">assistantChat trả <code>actions[]</code> (openLead, filterFeed, assignLead, setFollowUp, addNote, draftMessage) có thẻ xác nhận + Hoàn tác; webhook OA/Page → khớp lead theo SĐT/psid → LLM trả lời theo Hồ sơ AI + FAQ với guardrail, đạt "nóng" → dừng bot, giao sales.</div><div class="m"><b>Cho ai</b> sales, owner · <b>Effort</b> 25–34 ngày gộp · <b>Rủi ro</b> hành động/trả lời sai → mặc định "gợi ý cho người"</div></div></li>
+      <li><span class="id">P21 + P38 + P43 + P53</span><div><div class="h">Đo lift (holdout opt-in) + attribution bot→rep→chốt + CPL thực VND · chi phí/biên theo brand và nguồn · che SĐT theo vai trò + pii_log · CSP bỏ unsafe-inline + App Check + rate-limit CF</div><div class="d">Nhóm "đo được và cứng hơn": biết automation có thêm khách thật không, nguồn nào đáng tiền, ai xem SĐT khi nào; gia cố client sau khi các sink onclick chuyển sang delegate.</div><div class="m"><b>Cho ai</b> agency, super · <b>Effort</b> 22–30 ngày gộp</div></div></li>
+      <li><span class="id">P54</span><div><div class="h">Bold bet: click-to-call Stringee + AI tóm tắt cuộc gọi; callbot gọi lead nóng trong 5 phút (pilot BĐS/giáo dục) <span class="pill b">+LỆNH</span> <span class="pill hot">pháp lý</span></div><div class="d">Giai đoạn 1 nút Gọi WebRTC + transcript → note + kết quả; giai đoạn 2 callbot chỉ lead ≥85 điểm có tín hiệu "cần tư vấn", đã tra DNC 5656, kịch bản tư vấn không quảng cáo.</div><div class="m"><b>Cho ai</b> owner BĐS/giáo dục · <b>Effort</b> 15–20 ngày · <b>Rủi ro</b> NĐ 91/2020 + NĐ 330/2026 → chỉ pilot có luật sư duyệt kịch bản</div></div></li>
+    </ul>
+  </div>
+</section>
+<section id="s5">
+  <span class="num">05</span>
+  <h2>Tính năng thông minh (AI) nổi bật</h2>
+  <p>Nguyên tắc chung em đề nghị: <b>AI diễn giải và soạn, rule quyết định</b>. Số liệu do code tính, AI chỉ chuyển thành tiếng người; hành động ghi dữ liệu luôn có thẻ xác nhận + Hoàn tác; mọi mô hình "học" chỉ bật khi đủ mẫu và Super Admin duyệt. Đây là cách giữ điểm mạnh minh bạch hiện có (lý do AI tiếng Việt, công thức ROI) khi thêm trí tuệ.</p>
+  <div class="ai">
+    <div class="card"><h4>Content Studio + AI 3 biến thể + spam-score <span class="pill b">P06</span> <span class="pill ok">đợt 2</span></h4>
+      <p>Thay 1 câu <code>lead.reply</code> dùng chung bằng bộ nội dung theo bước và kênh, sinh từ bài đăng + nhu cầu + persona brand. Comment công khai ngắn và đồng cảm, inbox có tên + nhu cầu + opt-out, Zalo thân mật. Engine chọn biến thể ít dùng nhất; spam-score chặn câu có từ khoá bán hàng/link/lặp.</p>
+      <div class="kv"><b>Dữ liệu</b><span><code>lead.text/need/intent</code>, <code>brands.ai</code> (giọng, dịch vụ, khách), 3 ghi chú gần nhất</span><b>Chạy ở</b><span>CF <code>genVariants</code> lúc chấm điểm (chỉ hot/warm, cache <code>lead.replies</code>), engine chọn <code>variantId</code>, FE chọn bản theo kênh</span><b>Đo</b><span>reply-rate theo biến thể (P21), tỷ lệ checkpoint/nick trước và sau, số comment bị xoá/báo cáo</span></div></div>
+    <div class="card"><h4>Hộp thư 2 chiều + AI phân loại ý định, tóm tắt và gợi ý trả lời <span class="pill b">P03</span> <span class="pill ok">đợt 2</span></h4>
+      <p>Khách trả lời trên messenger nick AdsPower → worker đọc về → AI gắn nhãn (từ chối / quan tâm / hỏi giá / hẹn), tóm tắt 3 dòng, soạn 2 câu trả lời theo giọng brand. "Từ chối" tự dừng máy + vào suppression list. Sales trả lời từ SmartLead, máy gửi.</p>
+      <div class="kv"><b>Dữ liệu</b><span><code>conversations/{leadId}</code> (TTL, Rules theo brand), <code>outreach_threads</code></span><b>Chạy ở</b><span>worker (đọc/gửi, fail-closed), CF onWrite gọi OpenAI, FE view Hộp thư</span><b>Đo</b><span>thời gian phản hồi của sales sau khi khách nhắn, % thread thành hẹn, số "từ chối" tự bắt đúng (sales gỡ cờ = sai)</span></div></div>
+    <div class="card"><h4>AI chấm điểm học theo brand: 👍/👎 + kết quả chốt/thua → few-shot; "khách lý tưởng" bằng tiếng Việt <span class="pill b">P37</span> <span class="pill g">đợt 3</span></h4>
+      <p>Chủ shop gõ "khách lý tưởng: spa Q7 ngân sách >20tr, cần gấp, không nhận sinh viên/CTV" → AI sinh trọng số + rule + few-shot; nút "Thử chấm lại 10 bài gần nhất" hiện điểm cũ/mới trước khi áp. Feedback 👍/👎 và kết quả thật (P26/P34) nuôi độ chính xác theo brand; đề xuất keyword/loại trừ hằng tuần cho Super Admin duyệt.</p>
+      <div class="kv"><b>Dữ liệu</b><span><code>lead_feedback</code>, <code>deal_value/lost_reason</code>, <code>scanned_posts.decision</code></span><b>Chạy ở</b><span>CF gom mẫu → prompt chấm điểm theo brand (backend scan cần nhận tham số brand)</span><b>Đo</b><span>precision lead nóng 30 ngày theo brand, tỷ lệ 👎, lead AI bỏ sót được "Nhận làm lead"</span></div></div>
+    <div class="card"><h4>Next-Best-Action theo giai đoạn × nhiệt độ × lịch sử, có nút hành động sẵn <span class="pill b">P39</span> <span class="pill g">đợt 3</span></h4>
+      <p>Thay hint tĩnh bằng ma trận ngữ cảnh: "khách rep 2h trước chưa ai trả lời → gửi kịch bản chốt lịch", "bot đã inbox 48h chưa rep → gọi", "có Zalo chưa nhắn → Zalo". Mỗi gợi ý kèm 1 nút; lead ≥5 ghi chú có "Tóm tắt & bước kế".</p>
+      <div class="kv"><b>Dữ liệu</b><span>stage, temp, <code>fu_at</code>, <code>outreach_replied</code>, <code>doneSteps</code>, notes</span><b>Chạy ở</b><span>rule client-side; LLM chỉ cho tóm tắt/soạn tin</span><b>Đo</b><span>% gợi ý được bấm, thời gian từ gợi ý → hành động, tỷ lệ chốt lead có NBA</span></div></div>
+    <div class="card"><h4>Bản tin sáng AI diễn giải + card "Hôm nay" <span class="pill b">P02 · P10</span> <span class="pill ok">đợt 1–2</span></h4>
+      <p>7h30 mỗi brand nhận 5 dòng: hôm qua bao nhiêu lead, mấy nóng chưa ai chăm, hẹn hôm nay, đã chốt, 3 lead nên gọi kèm link. AI chỉ chuyển số đã tính thành câu, không tự tính. Sales nhận "việc của tôi"; agency nhận bản gộp.</p>
+      <div class="kv"><b>Dữ liệu</b><span><code>daily_stats</code> counter (increment), <code>fu_at</code>, <code>first_care_at</code></span><b>Chạy ở</b><span>CF scheduler 7:30 VN; kênh Telegram/email trước, Zalo OA/ZBS sau</span><b>Đo</b><span>tỷ lệ mở deep-link, lead nóng được chăm trong 15' sau bản tin, churn brand</span></div></div>
+    <div class="card"><h4>Copilot hành động trong Cmd-K: "giao lead 0938 cho Ngọc", "hẹn mai 9h lead #10" <span class="pill b">P40</span> <span class="pill g">đợt 3</span></h4>
+      <p>Trợ lý hiện tại chỉ hỏi-đáp. Nâng thành function-calling: CF trả <code>actions[]</code>, FE hiện thẻ xác nhận rồi thực thi qua SL_FB, Hoàn tác 6s. 5 lệnh phổ biến parse bằng regex không tốn AI.</p>
+      <div class="kv"><b>Dữ liệu</b><span>view hiện tại, leadId đang mở, brand, 12 lượt hội thoại</span><b>Chạy ở</b><span>CF <code>assistantChat</code> tool-schema; FE 90-boot render nút</span><b>Đo</b><span>% hành động được xác nhận, số thao tác tiết kiệm/ngày, lỗi Hoàn tác</span></div></div>
+    <div class="card"><h4>Dự báo pipeline & cảnh báo thiếu pipeline theo mục tiêu <span class="pill b">P41</span> <span class="pill g">đợt 3</span></h4>
+      <p>Xác suất chốt theo giai đoạn học từ kết quả thật 90 ngày (hồi quy logistic đơn giản: nhiệt độ, nguồn, có Zalo, phút phản hồi đầu, tuổi stage, số lần bot chạm) thay 7 con số cứng 5/10/…/100%. Chủ nhập mục tiêu tháng → "dự kiến đạt 68%, cần thêm ~14 lead nóng".</p>
+      <div class="kv"><b>Dữ liệu</b><span><code>closed_at/lost_reason/deal_value</code> (cần P26/P34)</span><b>Chạy ở</b><span>CF job đêm → <code>brands.model</code>; bật khi n ≥ 30 và AUC ≥ 0,65, tag "TỰ HỌC"</span><b>Đo</b><span>sai số dự báo cuối tháng, calibration theo giai đoạn</span></div></div>
+    <div class="card"><h4>AI đón inbound Zalo OA & Facebook Page (API hợp lệ) <span class="pill b">P42</span> <span class="pill g">đợt 3</span></h4>
+      <p>Khách nhắn OA/Page → trả lời 24/7 theo Hồ sơ AI + FAQ brand với guardrail (không hứa giá ngoài bảng, không tư vấn y tế); mỗi lượt chấm ý định, đạt "nóng" (hỏi giá/hẹn/để lại SĐT) → dừng bot, tạo/khớp lead, giao sales rảnh nhất, chuông. Mặc định "gợi ý cho người".</p>
+      <div class="kv"><b>Dữ liệu</b><span>webhook OA/Page, <code>brands.ai</code>, FAQ, <code>contacts</code> khớp SĐT/psid</span><b>Chạy ở</b><span>CF <code>inboundWebhook</code> + Secret Manager; cần OA gói Tiêu chuẩn trở lên</span><b>Đo</b><span>% hội thoại bot xử lý trọn, thời gian tới lần người tiếp quản, khiếu nại</span></div></div>
+    <div class="card"><h4>Safety Score nick + ramp-up tự động <span class="pill b">P47</span> <span class="pill g">đợt 3</span></h4>
+      <p>Điểm 0–100/nick từ tuổi, challenge/needLogin, tỷ lệ bước thành công 7 ngày, % cap dùng, proxy ổn định; nick mới tuần 1 chỉ 20% cap, RATE_LIMIT → hạ 50% 3 ngày; hiển thị cho khách như "số liệu quản trị rủi ro" — không tool VN nào có.</p>
+      <div class="kv"><b>Dữ liệu</b><span><code>outreach_log/usage</code>, <code>fb_accounts</code> cờ, apiOkRate từ worker</span><b>Chạy ở</b><span>worker ghi thống kê, CF nightly tính điểm, engine đọc cap = f(score)</span><b>Đo</b><span>số nick bay/tháng, false-red (nick khoẻ bị hạ cap oan), thời gian phát hiện nick yếu</span></div></div>
+    <div class="card"><h4>Đo lift thật: holdout opt-in + attribution bot chạm → rep → hẹn → chốt <span class="pill b">P21</span> <span class="pill g">đợt 3</span></h4>
+      <p>Trả lời câu hỏi duy nhất chủ shop hỏi: "bật cái này có thêm khách không, tốn bao nhiêu, cháy mấy nick". Holdout 10% chỉ khi brand bật, tự tắt khi đủ mẫu; CPL thực VND theo brand/nick/biến thể/nhiệt độ.</p>
+      <div class="kv"><b>Dữ liệu</b><span><code>lead.exp_group</code>, <code>outreach_threads.variant</code>, stage/deal_value, chi phí nhập tay</span><b>Chạy ở</b><span>engine gán nhóm, CF job đêm → <code>outreach_attr</code>, FE bảng + bản tin</span><b>Đo</b><span>lift tỷ lệ chốt auto vs holdout, CPL lead phản hồi</span></div></div>
+  </div>
+</section>
+<section id="s6">
+  <span class="num">06</span>
+  <h2>Rủi ro &amp; tuân thủ</h2>
+  <h3>Bay nick — rủi ro đến từ hành vi, không từ tool</h3>
+  <p>Hệ thống đã làm đúng triết lý: checkpoint là tín hiệu DỪNG, không tự "vượt"; verify kết quả thật; van cố định. Bốn kẽ hở còn lại đều nằm ở lớp hành vi:</p>
+  <ul>
+    <li><b>Nội dung lặp:</b> comment công khai và inbox đều gửi nguyên <code>lead.reply</code> — nhiều bài trong cùng group nhận câu chào bán giống nhau là tín hiệu spam rõ nhất với cả Facebook lẫn admin group. Cần Content Studio + xoay biến thể (mục 5).</li>
+    <li><b>Nick mới chạy cap như nick 8 năm tuổi:</b> chưa có ramp-up/trust ladder; khung giờ 8–22h cứng toàn hệ thống, worker không kiểm giờ khi task được reaper trả lại.</li>
+    <li><b>Lỗi hạ tầng bị coi là lỗi task:</b> AdsPower tắt/proxy chết 1 giờ → hàng loạt lead dead-letter và nick bị "đói" oan; web vẫn hiện VPS 🟢.</li>
+    <li><b>Tắt công tắc không huỷ task đã xếp hàng:</b> nick vừa bị dừng vì nghi checkpoint vẫn có thể bị mở chạy comment/inbox vài phút sau.</li>
+  </ul>
+  <h3>Pháp lý — đây là rủi ro lớn nhất của mô hình, không phải kỹ thuật</h3>
+  <div class="callout hot"><p><b>Luật Bảo vệ dữ liệu cá nhân 91/2025 (hiệu lực 1/1/2026) + NĐ 356/2025 + NĐ 330/2026 (xử phạt, hiệu lực 19/8/2026)</b>: Điều 19 chỉ có 5 ngoại lệ không cần đồng ý và <b>không có ngoại lệ "dữ liệu đã công khai"</b> kiểu GDPR. Xử lý không đồng ý: phạt 30–50 triệu + buộc xoá dữ liệu; vi phạm nghiêm trọng tới 1–5% doanh thu. Lead quét từ group chưa có đồng ý → em khuyến nghị anh <b>lấy ý kiến luật sư riêng</b> trước khi mở rộng cho khách trả phí.</p></div>
+  <ul>
+    <li><b>SmartLead là "bên xử lý" cho brand:</b> phải nộp hồ sơ đánh giá tác động (DPIA) lên A05 trong 60 ngày; ân hạn 5 năm cho doanh nghiệp nhỏ <b>không áp dụng</b> cho bên cung cấp dịch vụ xử lý dữ liệu. Cần hợp đồng xử lý dữ liệu với từng brand (brand = bên kiểm soát).</li>
+    <li><b>Firebase asia-southeast1 (Singapore) = chuyển dữ liệu xuyên biên giới:</b> Mẫu 09 + thông báo Bộ Công an trong 60 ngày; NĐ 53/2022 chấp nhận bản gốc nước ngoài + bản sao tại VN → thêm backup định kỳ về cloud VN.</li>
+    <li><b>Tin nhắn/cuộc gọi quảng cáo (NĐ 91/2020 + NĐ 330/2026):</b> từ 19/8/2026 gửi tin/gọi chưa được đồng ý phạt tới 40 triệu (tổ chức), gọi số trong DNC 5656 phạt 80–100 triệu. Inbox mở đầu phải là "tư vấn theo nhu cầu bạn đăng", có opt-out; trước khi gọi/SMS phải tra DNC.</li>
+    <li><b>Hiện trạng trong code:</b> không có cờ <code>do_not_contact</code>/opt-out trên lead, không suppression list, không TTL cho leads/notes (chỉ outreach_log có), <code>logLeadView</code> rải email nhân viên vào mọi lead, không có nút "xoá dữ liệu theo yêu cầu chủ thể", không có nhật ký truy cập SĐT. Mục 4 đưa "Trung tâm tuân thủ" vào đợt 1-2 vì đây vừa là nghĩa vụ vừa là lợi thế bán hàng ("compliance-by-design" chưa đối thủ VN nào làm).</li>
+    <li><b>Nền tảng:</b> Zalo cấm tìm/nhắn/kết bạn người lạ bằng công cụ (func/zca-js đều ngoài ToS, khoá số là mất dữ liệu 30 ngày); Meta gỡ Groups API từ 4/2024 nên mọi tool group đều scrape; Meta thua kiện Bright Data (cào công khai không đăng nhập) nhưng cào khi đăng nhập vẫn bị xử lý. Cần điều khoản rõ với khách về <b>ai chịu rủi ro nick</b>.</li>
+  </ul>
+  <h3>Chi phí Firestore &amp; vận hành</h3>
+  <ul>
+    <li>Ghi chú collectionGroup không giới hạn (super/admin nạp toàn bộ lịch sử); auto-fill dùng <code>getDocs</code> bỏ qua cache (tới 3.500 read mỗi F5 super); <code>refreshAdmin</code> đọc 4 collection mỗi repaint; <code>scanned_posts</code> 5.000 doc không unsubscribe. Ở 50 brand × 2.000 lead, đây là khoản phí đáng kể và app nặng dần — đợt 1-2 có aggregation query + counter ngày.</li>
+    <li>VPS giữ SA key toàn quyền (mức cao ở mục 3); 2FA không có đường khôi phục; thu hồi phiên chỉ là cờ hợp tác; Super Admin là 1 email cứng không ép 2FA; chưa có backup/DR định kỳ; smoke test 19 check chưa phủ Lịch sử quét/Bài đã quét/ROI/Người dùng.</li>
+    <li>Kênh func.vn: nick rớt session liên tục, cap toàn cục chưa gate theo ma trận; giữ làm dự phòng, AdsPower là kênh chính.</li>
+  </ul>
+</section>
+<section id="s7">
+  <span class="num">07</span>
+  <h2>Những gì KHÔNG nên làm</h2>
+  <ul>
+    <li><b>Không làm POS / hoá đơn điện tử / kế toán.</b> NĐ 70/2025 đang kéo SME vào KiotViet/Sapo/MISA — họ đã có "hệ thống ghi nhận". SmartLead là phễu đầu vào; làm sync 2 chiều, không cạnh tranh.</li>
+    <li><b>Không xây chatbot đa page kiểu Pancake/AhaChat/Fchat.</b> Thị trường đã bão hoà ở 199–700k/tháng; SmartLead thắng ở "hiểu nhu cầu từ bài đăng + phễu có van", không ở inbox đa kênh. Hộp thư SmartLead (mục 5) chỉ phục vụ thread do automation mở.</li>
+    <li><b>Không cold-Zalo hàng loạt bằng Zalo cá nhân.</b> Tin người lạ rơi vào "Tin nhắn từ người lạ" (người dùng tắt được), ToS cấm, khoá số là mất 30 ngày dữ liệu. Zalo cá nhân chỉ dùng cho lead nóng có SĐT ở van rất thấp; Zalo OA + ZBS (Giao dịch/Hậu mãi) cho khách đã phản hồi.</li>
+    <li><b>Không "vượt" checkpoint/CAPTCHA/selfie tự động, không spoof fingerprint, không xoay proxy để né.</b> Giữ đúng triết lý hiện tại: challenge = dừng + giao chủ nick. Không lưu OTP/mật khẩu/CCCD.</li>
+    <li><b>Không đổi AdsPower sang iOS/mobile mode</b> (đã research 31/08): vỡ toàn bộ selector + doc_id, lợi ích chỉ là niềm tin thị trường.</li>
+    <li><b>Không tự host engine giả lập trình duyệt thay func giai đoạn này</b> và <b>không nhập 3000 nick hàng loạt</b> (anh đã chốt bỏ 01/09) — team nhập tay, chăm kỹ từng khách, nick chính chủ.</li>
+    <li><b>Không giữ mô hình "gửi nguyên lead.reply cho comment công khai"</b> khi mở cho khách trả phí — đây là tín hiệu spam rõ nhất và cũng là điểm chủ shop mất uy tín trong group của họ.</li>
+    <li><b>Không bán per-user kèm setup fee.</b> SME ghét setup fee (bài học Getfly/SlimCRM); giá phẳng theo brand + phụ phí theo nick automation hợp thói quen KiotViet/Sapo/Nhanh hơn.</li>
+    <li><b>Không "làm hết một lần".</b> 101 đề xuất thô → giữ ~40; đợt 1 chỉ là sửa số bịa + mobile làm việc được + tìm SĐT + tuân thủ tối thiểu. Mọi thứ khác xếp sau khi có 3-5 brand khách trả phí dùng thật.</li>
+  </ul>
+</section>
+<section id="s8">
+  <span class="num">08</span>
+  <h2>Câu hỏi cần anh chốt</h2>
+  <ol class="q">
+    <li>Anh có đồng ý <b>đầu tư hồ sơ pháp lý trước khi mở rộng cho khách trả phí</b> (luật sư review cơ sở xử lý dữ liệu, DPIA nộp A05, hợp đồng xử lý dữ liệu với brand, Mẫu 09 cho Firebase SG)? Và điều khoản "ai chịu rủi ro nick" sẽ ghi thế nào?<em>Ảnh hưởng P46, P01, P44 và cách em viết mọi tin inbox mở đầu.</em></li>
+    <li>Đợt 1 anh muốn em làm <b>FE-only (1 zip)</b> trước, hay gộp luôn 3 LỆNH backend nhỏ (kiểm Rules whitelist <code>leads</code>, xác minh email, gỡ SA key VPS)?<em>FE-only ra zip sau ~1 tuần; gộp backend thì thêm ~1 tuần nghiệm thu.</em></li>
+    <li>Cho phép em <b>thay nguyên văn <code>lead.reply</code> bằng biến thể AI</b> cho comment công khai (ngắn, đồng cảm, không chào bán) và giữ bản có opt-out cho inbox? Đây là đổi hành vi engine anh đã chốt ở LỆNH I.<em>Không đổi thì spam-score và ramp-up nick chỉ giảm được một phần rủi ro.</em></li>
+    <li>Chấp nhận <b>worker đọc messenger.com mỗi phiên</b> (thêm 20–40 giây, FB đánh dấu "đã xem" nên sales phải trả lời trong 15 phút) để bắt phản hồi khách trên nick AdsPower?<em>Không có bước này thì KPI "Lead phản hồi" mãi bằng 0 và hộp thư không xây được.</em></li>
+    <li>Zalo: đi trước bằng <b>Zalo OA + ZBS cho lead đã phản hồi</b> (hợp lệ, cần OA gói Tăng trưởng 2,5tr/năm + mẫu duyệt) hay Zalo cá nhân qua func ở van thấp (ngoài ToS, hiệu quả có trần)?<em>Em khuyến nghị OA/ZBS trước; Zalo cá nhân chỉ cho lead nóng có SĐT, ≤10 mời/ngày/nick.</em></li>
+    <li>Mô hình bán: <b>giá phẳng theo brand</b> (đề xuất Starter 490k · Growth 990k · Agency 2,5tr/5 brand, +150k/nick, trial 14 ngày, không setup fee) có khớp ý anh không? Admin brand được tự phục vụ tới mức nào (nguồn, keyword, kênh cảnh báo, bật/tắt automation)?<em>Quyết định này kéo theo Rules và tách config public/private (P13, P23).</em></li>
+    <li>Agency nhiều brand: cần <b>1 tài khoản – nhiều brand</b> ngay (đổi model <code>users.brand</code> string → mảng, đụng Rules toàn hệ) hay để đợt 3 và trước mắt dùng Super Admin cho anh?<em>P12 là việc lớn nhất về tenancy, cần lưới test Rules (P49) đi trước.</em></li>
+    <li>Sales của brand có sẵn sàng <b>nhập giá trị đơn khi chốt</b> và chọn lý do khi mất khách? Nếu không, ROI mãi là ước tính và AI không học được gì.<em>Em thiết kế "Nhập sau" + nhắc trên card Hôm nay để giảm ma sát.</em></li>
+  </ol>
+</section>
+<section id="s9">
+  <span class="num">09</span>
+  <h2>Phương pháp &amp; giới hạn</h2>
+  <div class="grid2">
+    <div class="stat"><div class="v">13</div><div class="l">agent đọc phân hệ (vòng 1)</div><div class="s">Mỗi agent 1 phân hệ: đọc code thật + ảnh chụp demo desktop/mobile → 119 tính năng, 105 lỗi UX, 120 lỗi kỹ thuật, 104 khoảng trống, 127 ý tưởng.</div></div>
+    <div class="stat"><div class="v">25</div><div class="l">lô refute lỗi (vòng 2)</div><div class="s">153 lỗi mức trung bình/cao, mỗi lô 4–8 lỗi cùng phân hệ, agent bắt buộc mở code và thử BÁC BỎ; mặc định "không xác minh được" nếu thiếu bằng chứng. Em spot-check lại 13 điểm bằng grep: khớp 13/13.</div></div>
+    <div class="stat"><div class="v">6 → 1 → 2×</div><div class="l">persona đề xuất → gộp → verify</div><div class="s">Chủ SME, sales, agency, AI/growth, kỹ sư reliability/compliance, chiến lược gia thị trường → 101 đề xuất thô → gộp/dedupe → mỗi mục qua 2 lens: kỹ thuật (đã có? khả thi? effort thật) và giá trị (skeptic, so đối thủ, luật).</div></div>
+    <div class="stat"><div class="v">1</div><div class="l">agent nghiên cứu thị trường</div><div class="s">Getfly, Base, MISA, CRMViet, Bitrix24, Pancake, Sapo, Haravan, Nhanh, KiotViet, AhaChat, Fchat, ATP/Simple FB, func.vn; Zalo OA/ZBS 2026; Luật BVDLCN + 3 nghị định; pricing. Proxy chặn WebFetch tới domain VN nên số liệu lấy từ snippet có nguồn, chỗ mâu thuẫn ghi cả hai.</div></div>
+  </div>
+  <p><b>Giới hạn em muốn anh biết:</b> (1) Backend (<code>outreach.js</code>, Rules, manualScan) em chỉ đọc qua CLAUDE.md, chưa dump code thật — các nhận định về engine cần LỆNH DUMP xác nhận trước khi sửa. (2) Ảnh chụp là MODE demo, chưa phải dữ liệu thật của anh; hành vi realtime/Rules em suy từ code. (3) Điểm scorecard là đánh giá chuyên môn, không phải đo lường người dùng thật — nên nghiệm thu với 2-3 sales của một brand khách trước khi chốt ưu tiên đợt 2. (4) Em chưa viết dòng code nào theo đúng yêu cầu của anh; mọi mục ở đây đều có chỗ sửa cụ thể để làm ngay khi anh chốt.</p>
+  <p class="foot">File kèm theo trong phiên: <code>understand.json</code> (bản đồ 13 phân hệ), <code>verdicts-all.json</code> (153 verdict có file:line + cách sửa), <code>market.md</code> (nghiên cứu thị trường), 25 ảnh chụp desktop/mobile. Em có thể xuất bất kỳ phần nào thành LỆNH/zip theo quy trình quen thuộc.</p>
+</section>
+</main>
+</div>

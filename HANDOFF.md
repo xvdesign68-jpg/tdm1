@@ -57,6 +57,7 @@ Sau khi giải nén zip: phiên mới cài 1 lần `npm i playwright-core` (Chro
 - **Engine (asia-southeast1, đã deploy):** `outreachTick` (tick song song p-limit, maxInstances:1, RAM 512Mi), `funcWebhook`, `fbaccounts` (saveFbAccount/deleteFbAccount), `manualScan`… + comment-lead (`commentIdOf`/`commentUrlOf` + payload `kind:'comment'`).
 - **Firestore:** Rules cho `outreach_log`/`outreach_stats`/`workers`/`worker_config`/`fb_accounts`/`brands` đã có. TTL `outreach_log.expireAt` = **ACTIVE** (xoá log >60 ngày). Index: `outreach_tasks(workerId,status,createdAt)`=CICAgNiroIEK; `outreach_threads(pid,active,nextAt)`; `outreach_log(brandCode,at)`; `leads(brand,detected_at)`; `notes` collectionGroup (brand/vis/by_uid).
 - **Đã qua 3 lượt rà đối kháng** (v119-36, GA#1 v119-38, GA#2 v119-39) — nền chắc để mở cho khách.
+- **03/09/2026 — rà soát toàn diện "siêu giải pháp" (chỉ đánh giá, 0 dòng code sửa):** artifact "Bản đồ nâng cấp SmartLead" + mục mới trong CLAUDE.md (scorecard 6,9/10, 13 lỗi cao đã verify, lộ trình 3 đợt 54 đề xuất, 8 câu hỏi chờ anh chốt). Phiên kế tiếp: đọc mục đó, hỏi anh đã chốt câu nào, rồi làm đợt 1 (FE-only ~1 tuần → 1 zip).
 - **Đang chờ NGHIỆM THU thật:** luồng **comment-lead** (lead là 1 bình luận → tym + reply đúng comment) trên 1 lead-comment thật; van/KPI **Kết bạn** trên thẻ brand. Còn tồn không-chặn-GA: zombie chưa cancel cứng (rất hiếm), `findCommentEl` fail-closed (sai chỉ là bỏ lỡ, không nhầm chỗ) — chi tiết ở mục v119-39 trong CLAUDE.md.
 
 ## 6. Cách phiên mới KHỞI ĐỘNG hiệu quả

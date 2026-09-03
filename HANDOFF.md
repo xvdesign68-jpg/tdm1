@@ -22,8 +22,8 @@
 ## 2. File anh cần chuẩn bị đưa cho phiên mới (checklist)
 1. ☐ **`CLAUDE.md`** — nếu phiên mới không cùng repo, copy file này.
 2. ☐ **`HANDOFF.md`** — file này.
-3. ☐ **Zip frontend MỚI NHẤT** = `smartleads17deploy-v119-39-ga-round2.zip` (đã gửi anh). Đây là snapshot source đầy đủ, phiên mới giải nén ra là sửa được ngay.
-4. ☐ **`worker.mjs` bản `2026-09-03`** (đã gửi anh) — nếu định sửa worker.
+3. ☐ **Zip frontend MỚI NHẤT** = `smartleads17deploy-v119-40-dot1.zip` (đã gửi anh 03/09 — Đợt 1). Đây là snapshot source đầy đủ, phiên mới giải nén ra là sửa được ngay.
+4. ☐ **`worker.mjs` bản `2026-09-04`** (đã gửi anh 03/09) — nếu định sửa worker.
 5. ☐ (tuỳ) **`config.json`** của worker (có `graphql.reactDocId/commentDocId/friendDocId/friendDocId` — KHÔNG phải secret) — để phiên mới biết doc_id hiện tại.
 6. ☐ (tuỳ) Ảnh `errors/*.png` trên VPS nếu đang debug selector.
 
@@ -52,12 +52,12 @@ Sau khi giải nén zip: phiên mới cài 1 lần `npm i playwright-core` (Chro
 > ⚠ **Cần làm:** anh đã lỡ dán **2 func token + 1 webhook secret** vào chat trước đây → **regenerate** cả 3 khi rảnh.
 
 ## 5. Trạng thái deploy hiện tại (tính đến 03/09/2026)
-- **FE:** zip mới nhất cần deploy = **v119-39-ga-round2** (nếu chưa kéo-thả Netlify thì làm).
-- **Worker:** bản **2026-09-03** (chép đè MỌI VPS + restart nếu chưa).
+- **FE:** zip mới nhất cần deploy = **v119-40-dot1** (Đợt 1: số thật, Hôm nay, Hộp việc, Gọi·Zalo·SMS, tìm SĐT, chốt/không thành, modal mới, pipeline mobile, lead cũ realtime, Dừng tất cả).
+- **Worker:** bản **2026-09-04** (chép đè MỌI VPS + restart): gate/van tầng 2/lỗi hạ tầng/newline/log status/stamp lead/đọc phản hồi (tắt mặc định).
 - **Engine (asia-southeast1, đã deploy):** `outreachTick` (tick song song p-limit, maxInstances:1, RAM 512Mi), `funcWebhook`, `fbaccounts` (saveFbAccount/deleteFbAccount), `manualScan`… + comment-lead (`commentIdOf`/`commentUrlOf` + payload `kind:'comment'`).
 - **Firestore:** Rules cho `outreach_log`/`outreach_stats`/`workers`/`worker_config`/`fb_accounts`/`brands` đã có. TTL `outreach_log.expireAt` = **ACTIVE** (xoá log >60 ngày). Index: `outreach_tasks(workerId,status,createdAt)`=CICAgNiroIEK; `outreach_threads(pid,active,nextAt)`; `outreach_log(brandCode,at)`; `leads(brand,detected_at)`; `notes` collectionGroup (brand/vis/by_uid).
 - **Đã qua 3 lượt rà đối kháng** (v119-36, GA#1 v119-38, GA#2 v119-39) — nền chắc để mở cho khách.
-- **03/09/2026 — rà soát toàn diện "siêu giải pháp" (chỉ đánh giá, 0 dòng code sửa):** artifact "Bản đồ nâng cấp SmartLead" + mục mới trong CLAUDE.md (scorecard 6,9/10, 13 lỗi cao đã verify, lộ trình 3 đợt 54 đề xuất, 8 câu hỏi chờ anh chốt). Phiên kế tiếp: đọc mục đó, hỏi anh đã chốt câu nào, rồi làm đợt 1 (FE-only ~1 tuần → 1 zip).
+- **03/09/2026 — rà soát toàn diện "siêu giải pháp" (chỉ đánh giá, 0 dòng code sửa):** artifact "Bản đồ nâng cấp SmartLead" + mục mới trong CLAUDE.md (scorecard 6,9/10, 13 lỗi cao đã verify, lộ trình 3 đợt 54 đề xuất, 8 câu hỏi chờ anh chốt). Anh đã chốt 8 câu → **Đợt 1 đã làm xong** (mục v119-40-dot1 trong CLAUDE.md). Chờ anh: deploy zip + chép worker + chạy LỆNH #1 dump Rules; kế tiếp Đợt 2.
 - **Đang chờ NGHIỆM THU thật:** luồng **comment-lead** (lead là 1 bình luận → tym + reply đúng comment) trên 1 lead-comment thật; van/KPI **Kết bạn** trên thẻ brand. Còn tồn không-chặn-GA: zombie chưa cancel cứng (rất hiếm), `findCommentEl` fail-closed (sai chỉ là bỏ lỡ, không nhầm chỗ) — chi tiết ở mục v119-39 trong CLAUDE.md.
 
 ## 6. Cách phiên mới KHỞI ĐỘNG hiệu quả

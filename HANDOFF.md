@@ -22,7 +22,7 @@
 ## 2. File anh cần chuẩn bị đưa cho phiên mới (checklist)
 1. ☐ **`CLAUDE.md`** — nếu phiên mới không cùng repo, copy file này.
 2. ☐ **`HANDOFF.md`** — file này.
-3. ☐ **Zip frontend MỚI NHẤT** = `smartleads17deploy-v119-41-dot2.zip` (đã gửi anh 03/09 — Đợt 2 FE). Đây là snapshot source đầy đủ, phiên mới giải nén ra là sửa được ngay.
+3. ☐ **Zip frontend MỚI NHẤT** = `smartleads17deploy-v119-41b.zip` (đã gửi anh 04/09 — Đợt 2 FE + hiện model ở Sinh thử). Đây là snapshot source đầy đủ, phiên mới giải nén ra là sửa được ngay.
 4. ☐ **`worker.mjs` bản `2026-09-04`** (đã gửi anh 03/09) — nếu định sửa worker.
 5. ☐ (tuỳ) **`config.json`** của worker (có `graphql.reactDocId/commentDocId/friendDocId/friendDocId` — KHÔNG phải secret) — để phiên mới biết doc_id hiện tại.
 6. ☐ (tuỳ) Ảnh `errors/*.png` trên VPS nếu đang debug selector.
@@ -52,7 +52,7 @@ Sau khi giải nén zip: phiên mới cài 1 lần `npm i playwright-core` (Chro
 > ⚠ **Cần làm:** anh đã lỡ dán **2 func token + 1 webhook secret** vào chat trước đây → **regenerate** cả 3 khi rảnh.
 
 ## 5. Trạng thái deploy hiện tại (tính đến 03/09/2026)
-- **FE:** zip mới nhất cần deploy = **v119-41-dot2** (Đợt 1: số thật, Hôm nay, Hộp việc, Gọi·Zalo·SMS, tìm SĐT, chốt/không thành, modal mới, pipeline mobile, lead cũ realtime, Dừng tất cả).
+- **FE:** zip mới nhất cần deploy = **v119-41b** (Đợt 1: số thật, Hôm nay, Hộp việc, Gọi·Zalo·SMS, tìm SĐT, chốt/không thành, modal mới, pipeline mobile, lead cũ realtime, Dừng tất cả).
 - **Worker:** bản **2026-09-04** (chép đè MỌI VPS + restart): gate/van tầng 2/lỗi hạ tầng/newline/log status/stamp lead/đọc phản hồi (tắt mặc định).
 - **Engine (asia-southeast1, đã deploy):** `outreachTick` (tick song song p-limit, maxInstances:1, RAM 512Mi; 04/09: dùng `genForLead` từ `content.js` cho comment/inbox riêng theo brand.content), `genContent` (Content Studio "Sinh thử"), `funcWebhook`, `fbaccounts` (saveFbAccount/deleteFbAccount), `manualScan`… + comment-lead (`commentIdOf`/`commentUrlOf` + payload `kind:'comment'`).
 - **Firestore:** Rules cho `outreach_log`/`outreach_stats`/`workers`/`worker_config`/`fb_accounts`/`brands` đã có. TTL `outreach_log.expireAt` = **ACTIVE** (xoá log >60 ngày). Index: `leads(brand,phone,detected_at desc)`=CICAgJjFqZMK (tìm SĐT, v119-40d); `outreach_tasks(workerId,status,createdAt)`=CICAgNiroIEK; `outreach_threads(pid,active,nextAt)`; `outreach_log(brandCode,at)`; `leads(brand,detected_at)`; `notes` collectionGroup (brand/vis/by_uid).

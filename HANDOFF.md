@@ -13,8 +13,9 @@
 |---|---|---|---|
 | Bộ nhớ dự án (`CLAUDE.md` + `HANDOFF.md`) | git repo `xvdesign68-jpg/tdm1` | ✅ CÓ | Tự có nếu nối cùng repo; không thì copy 2 file |
 | **Frontend SmartLead** (app.html, `src/app/*.js`, `assets/js/live.js`, `assets/css/*`, `tools/build.mjs`, `tools/smoke.js`, eslint, _redirects…) | Máy anh (source gốc) + **zip khứ hồi** (zip CHỨA nguyên source) | ❌ KHÔNG | Anh đưa **zip mới nhất**, phiên mới giải nén vào thư mục làm việc |
-| **Worker AdsPower** (`worker.mjs`, `config.json`, `run.bat`, `capture.mjs`, `install-autostart.bat`) | Trên VPS Windows + file đã gửi anh | ❌ KHÔNG | Anh đưa lại **worker.mjs 2026-09-03** (+ config.json) |
-| **Engine backend** (`outreach.js`, `fbaccounts.js`, `index.js`, `firestore.rules`, `.env`) | Cloud Shell `~/firebase-s13/functions` | ❌ KHÔNG | Phiên mới **dump qua LỆNH** (xem §6) — không cần gửi file |
+| **Worker AdsPower** (`worker.mjs`, `config.json`, `run.bat`, `capture.mjs`, `install-autostart.bat`) | Trên VPS Windows + file đã gửi anh | ❌ KHÔNG | Anh đưa lại **worker.mjs 2026-09-04b** (+ config.json) |
+| **Engine backend** (`outreach.js`, `content.js`, `push.js`, `admin.js`, `cfgpriv.js`, `fbaccounts.js`, `index.js`, `firestore.rules`, `.env`) | Cloud Shell `~/firebase-s13/functions` | ❌ KHÔNG | Phiên mới **dump qua LỆNH** (xem §6) — không cần gửi file |
+| **Các LỆNH đã chạy** (`docs/lenh-2026-09-04-*.md`) + báo cáo rà soát (`docs/rasoat-2026-09-03/`) | git repo `tdm1` | ✅ CÓ | Tự có — nguồn để phiên mới soạn LỆNH mới đúng pattern |
 | Secrets (func token, OPENAI_API_KEY, FUNC_WEBHOOK_SECRET, serviceAccount.json, BrightData/Telegram) | Secret Manager / functions/.env / VPS | ❌ KHÔNG (đúng) | Không cần — phiên mới chỉ thao tác *tham chiếu* |
 
 > ⚠ **Lưu ý repo tdm1 có rác cũ:** `index.html`, `css/styles.css`, `js/main.js`, `fb-worker/*` trong repo là **scaffold v0.1 CŨ / không dùng** — KHÔNG phải app thật. App thật = zip frontend; worker thật = `worker.mjs` (không phải `fb-worker/worker.js`).
@@ -23,8 +24,8 @@
 1. ☐ **`CLAUDE.md`** — nếu phiên mới không cùng repo, copy file này.
 2. ☐ **`HANDOFF.md`** — file này.
 3. ☐ **Zip frontend MỚI NHẤT** = `smartleads17deploy-v119-48.zip` (= v119-47 + thông báo đứng lại/nút Mở lead/rung + D.cfg; v119-47 = v119-46 + tự đăng ký lại listener sau lỗi kênh; v119-46 = v119-45 + thông báo hệ thống khi tab không focus; v119-45 = v119-44 + enablePush bền hơn; v119-44 = v119-43 + VAPID_KEY; trước đó `smartleads17deploy-v119-43.zip` (đã gửi anh 04/09 — v119-42 (việc nhỏ + Đợt 3 FE) + PWA/sw.js/manifest + thanh tab dưới + push FCM FE + badge Safety Score). Worker mới nhất `worker.mjs 2026-09-04b`. Đây là snapshot source đầy đủ, phiên mới giải nén ra là sửa được ngay.
-4. ☐ **`worker.mjs` bản `2026-09-04`** (đã gửi anh 03/09) — nếu định sửa worker.
-5. ☐ (tuỳ) **`config.json`** của worker (có `graphql.reactDocId/commentDocId/friendDocId/friendDocId` — KHÔNG phải secret) — để phiên mới biết doc_id hiện tại.
+4. ☐ **`worker.mjs` bản `2026-09-04b`** (đã gửi anh 04/09, có Safety Score) — nếu định sửa worker.
+5. ☐ (tuỳ) **`config.json`** của worker (có `graphql.reactDocId/commentDocId/friendDocId`, `hardCaps`, `inbox`, `safety` — KHÔNG phải secret) — để phiên mới biết doc_id + ngưỡng hiện tại.
 6. ☐ (tuỳ) Ảnh `errors/*.png` trên VPS nếu đang debug selector.
 
 Sau khi giải nén zip: phiên mới cài 1 lần `npm i playwright-core` (Chromium sẵn ở `/opt/pw-browsers` trên môi trường web) để chạy smoke test.
@@ -47,13 +48,15 @@ Sau khi giải nén zip: phiên mới cài 1 lần `npm i playwright-core` (Chro
 | FUNC_WEBHOOK_SECRET | `~/firebase-s13/functions/.env` | verify webhook func |
 | serviceAccount.json | trên VPS (cạnh worker.mjs) | worker đọc/ghi Firestore (Admin SDK) |
 | BrightData / Telegram | backend | scan/notify |
-| Firebase web apiKey | công khai trong FE | **KHÔNG phải secret** (hợp lệ) |
+| Firebase web apiKey · VAPID_KEY (Web Push) | công khai trong FE (`firebase-config.js`) | **KHÔNG phải secret** (hợp lệ) |
+| LLM_API_KEY / LLM_BASE_URL / LLM_MODEL (gpt-5.6-sol) | `~/firebase-s13/functions/.env` | scanner + content.js + aiText; đổi key = sed .env + deploy cả bộ functions |
 
 > ⚠ **Cần làm:** anh đã lỡ dán **2 func token + 1 webhook secret** vào chat trước đây → **regenerate** cả 3 khi rảnh.
 
-## 5. Trạng thái deploy hiện tại (tính đến 03/09/2026)
+## 5. Trạng thái deploy hiện tại (tính đến 04/09/2026)
 - **FE:** zip mới nhất cần deploy = **v119-48** (push đã nghiệm thu chạy đúng tới Chrome Windows 04/09; điện thoại cần tự bấm Bật thông báo) (worker 2026-09-04b chép đè mọi VPS; LỆNH #7–#11 backend ĐÃ CHẠY XONG 04/09 — config/private, Rules whitelist+audit_log, index notes, backup+alert, setUserLock, push CF; VAPID public key đã nhét vào v119-44 → push FE bật được). Trước đó v119-42 (backend đi kèm: LỆNH #7–#10 chưa chạy → khoá tài khoản tạm là khoá mềm, audit_log ghi nhưng chưa đọc được, notes fallback không giới hạn, config/private chưa tách). Trước đó v119-41b (Đợt 1: số thật, Hôm nay, Hộp việc, Gọi·Zalo·SMS, tìm SĐT, chốt/không thành, modal mới, pipeline mobile, lead cũ realtime, Dừng tất cả).
-- **Worker:** bản **2026-09-04** (chép đè MỌI VPS + restart): gate/van tầng 2/lỗi hạ tầng/newline/log status/stamp lead/đọc phản hồi (tắt mặc định).
+- **Worker:** bản **2026-09-04b** (chép đè MỌI VPS + restart): gate/van tầng 2/lỗi hạ tầng/newline/log status/stamp lead/đọc phản hồi (tắt mặc định) + **Safety Score nick** (bộ đếm trên fb_accounts, <60 giãn nhịp qua nextFreeAt, <30 tự tạm dừng, FE chip 🛡).
+- **Backend 04/09 (LỆNH #7–#16, xem `docs/lenh-2026-09-04-*.md`):** `config/private` (chỉ super; `cfgpriv.js` đọc private trước) · Rules `leads` whitelist 31 field cho non-super + `audit_log` · index notes CG (`at` + 3 composite) · backup Firestore hằng ngày 7 ngày + alert email lỗi function · CF `setUserLock` (khoá thật) · CF `pushOnLead` + `pushDueFollowups` (push FCM data-only, super luôn nhận) · TTL backfill + dọn rác (LỆNH #16, anh đang chạy).
 - **Engine (asia-southeast1, đã deploy):** `outreachTick` (tick song song p-limit, maxInstances:1, RAM 512Mi; 04/09: dùng `genForLead` từ `content.js` cho comment/inbox riêng theo brand.content), `genContent` (Content Studio "Sinh thử"), `funcWebhook`, `fbaccounts` (saveFbAccount/deleteFbAccount), `manualScan`… + comment-lead (`commentIdOf`/`commentUrlOf` + payload `kind:'comment'`).
 - **Firestore:** Rules cho `outreach_log`/`outreach_stats`/`workers`/`worker_config`/`fb_accounts`/`brands` đã có. TTL `outreach_log.expireAt` = **ACTIVE** (xoá log >60 ngày). Index: `leads(brand,phone,detected_at desc)`=CICAgJjFqZMK (tìm SĐT, v119-40d); `outreach_tasks(workerId,status,createdAt)`=CICAgNiroIEK; `outreach_threads(pid,active,nextAt)`; `outreach_log(brandCode,at)`; `leads(brand,detected_at)`; `notes` collectionGroup (brand/vis/by_uid).
 - **Đã qua 3 lượt rà đối kháng** (v119-36, GA#1 v119-38, GA#2 v119-39) — nền chắc để mở cho khách.
@@ -84,7 +87,7 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 ```
 
 **Câu mở đầu mẫu để paste vào phiên mới:**
-> "Em là Claude Code tiếp tục dự án SmartLead của anh Vinh. Đọc `CLAUDE.md` + `HANDOFF.md` để nạp ngữ cảnh. Anh đã đính kèm zip frontend mới nhất (v119-39-ga-round2) + worker.mjs (2026-09-03). Trả lời tiếng Việt, xưng em/anh. Giữ đúng quy trình: FE giao bằng zip, backend giao bằng LỆNH Cloud Shell, không đưa secret vào git/zip/chat. Việc đang chờ: nghiệm thu luồng comment-lead."
+> "Em là Claude Code tiếp tục dự án SmartLead của anh Vinh. Đọc `CLAUDE.md` + `HANDOFF.md` (và `docs/lenh-2026-09-04-*.md` khi cần soạn LỆNH) để nạp ngữ cảnh. Anh đã đính kèm zip frontend mới nhất (v119-48) + worker.mjs (2026-09-04b) (+ config.json). Trả lời tiếng Việt, xưng em/anh. Giữ đúng quy trình: FE giao bằng zip, backend giao bằng LỆNH Cloud Shell, không đưa secret vào git/zip/chat. Việc đang làm dở: nhóm 3 lộ trình — wizard 'Thêm brand mới' + bảng tổng quan agency cho Super Admin (chưa có dòng code nào); sau đó gate func-path theo ma trận (đã có dump stepNick từ LỆNH #16e)."
 
 ## 7. Quy trình & "gu" (chi tiết trong CLAUDE.md — nhắc nhanh)
 - Trả lời **tiếng Việt**, xưng **em** / gọi **anh**; thuật ngữ kỹ thuật giữ English.

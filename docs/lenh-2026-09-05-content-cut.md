@@ -132,3 +132,22 @@ echo "== xong == exit=$?"
 EOF
 bash /tmp/run29.sh
 ```
+
+## LỆNH #30 — bình luận công khai LUÔN có CTA + bám đúng câu khách hỏi (05/09, anh chốt sau lead Hien Chau Thi Thu)
+
+**Bối cảnh**: lead từ bình luận "Giá" nhận câu trả lời kiểu mềm "Mình hiểu, xem cá lóc khô thì giá là điều cần biết đầu tiên…" (chế độ AI, `commentStyle` mặc định `soft` = không chào bán, không CTA). Anh: *thị trường VN, câu vô thưởng vô phạt không chuyển đổi — phải có CTA điều hướng*.
+
+**#30a (chỉ đọc, đã chạy)**: dump `content.js` 88 dòng (`~/content-dump-0905.txt`, anh upload) → em tái lập file cục bộ, vá + test trước. Khối in lead mẫu lỗi `Cannot find package 'firebase-admin'` vì script đặt ở `/tmp` (lặp lại lỗi LỆNH #24) → **quy tắc: mọi script Admin SDK phải nằm trong `~/firebase-s13/functions`**.
+
+**#30b** (`lenh-2026-09-05-30b-cta.sh` = khối anh dán; patch `lenh-2026-09-05-30-c30.cjs`, marker `LENH #30`, 8 mốc, fail-closed, idempotent):
+1. `CMT_SOFT` viết lại có CTA; thêm `CTA_DEF` (3 CTA mặc định), `CTA_RE` (dấu hiệu đã có CTA: inbox/ib/nhắn/liên hệ/để lại/báo giá/bảng giá/tư vấn/số lượng/sỉ/lẻ/cho mình xin…), `ensureCta(s, c)` = thiếu CTA → nối `content.cta` của brand (≤140 ký tự) hoặc CTA mặc định, cắt thân ở cuối câu để tổng ≤ ~360.
+2. `contentOf`: `commentStyle` mặc định → **`direct`** (chỉ `soft` khi brand chọn rõ).
+3. `templateGen` (trần 220 → 320, sót từ #27) + `replyGen` + comment AI đều qua `ensureCta`.
+4. Prompt: nhận diện lead là BÌNH LUẬN (`comment_id/comment_url/kind`), tách text khách (`text` hoặc `comment_text/commentText/comment`) và bài gốc (`parent_text/parentText/post_text/postText/parent_post`); "comment" phải trả lời ĐÚNG bình luận khách vừa viết, câu 1 hữu ích cụ thể (hỏi giá → giá tuỳ loại/quy cách, không con số), câu cuối = CTA (dựa "CTA mong muốn", khớp xưng hô), ≤3 câu <220 ký tự, cấm câu "chúc bạn sớm tìm được"; `soft` = không nhắc brand/sản phẩm nhưng vẫn CTA nhẹ. `usr` thêm **"GỢI Ý ĐÃ SOẠN CHO SALES"** = `lead.reply` (để câu nick đăng cùng ý câu sales thấy trên web) + BÀI GỐC khi là comment-lead.
+5. Test thật `_l30_test.mjs` (trong functions/): 1 lead bình luận + 1 lead bài mới nhất hscl-01 → in field text-ish của lead (xác nhận field chứa câu khách) + comment/inbox + "CÓ CTA ✓" → deploy `outreachTick,genContent`.
+
+Harness cục bộ `harness-content-cta-2026-09-05.mjs` trên bản tái lập (stub fetch): **14/14** — mặc định direct; soft giữ; AI thiếu CTA → nối CTA mặc định/CTA brand; đã có CTA → giữ; prompt comment-lead có BÌNH LUẬN + BÀI GỐC + GỢI Ý SALES; post-lead không có BÀI GỐC; soft đòi CTA nhẹ; templateGen soft luôn CTA; replyGen nối/giữ; ensureCta giới hạn dài; AI lỗi → fallback có CTA.
+
+**#30c (tuỳ chọn)** (`lenh-2026-09-05-30c-regen.sh`): `_l30_regen.mjs [--dry]` — thread funnel `active` chưa có `comment` trong `doneSteps` (lead LỆNH #28 còn xếp hàng) → soạn lại `fpayload.comment_msg/inbox_msg` (+ task `queued/failed/paused`) bằng bản content.js mới; `--dry` chỉ in.
+
+Sau #30: FE Content Studio nên đổi nhãn ô "Kiểu bình luận công khai" (soft = "Nhẹ: đồng cảm + CTA mềm", direct = "Trực tiếp: trả lời + CTA rõ (mặc định)") ở zip kế.

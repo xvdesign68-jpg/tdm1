@@ -46,3 +46,8 @@ Ngoài ra người bán khác vào chào hàng dưới bài người mua ("LIFOO
 - marker `v-selfcmt`: index.js 291 (helper) · 454 (ctx.set) · 528 (comment loop) · 540 (selfSkipped) · 550 (Pha 2 skip) · 585 (log) · 643 (gate role) — đủ 7 mốc; scorer.js 45 (normRole) · 157 (chuẩn hoá role); outreach.js 256 (helper) · 299 (gate) — đủ.
 - deploy `manualScan` + `outreachTick` + `scheduledScan` Successful → rev `scheduledscan-00069-xop`, `outreachtick-00025-dir`; `exit=0`. Cảnh báo `GOOGLE_CLOUD_QUOTA_PROJECT is not usable` = vô hại (đã thấy các lần deploy trước).
 - Kế: KHỐI 2 (`_l31_fix.mjs` DRY → `--apply`), KHỐI 3 tuỳ chọn, KHỐI 4 sau ≥15′.
+
+## ★ KHỐI 2 DRY (05/09 ~22:20 UTC) — khớp #31a
+- comment-lead tổng 413 · chủ bài tên khớp chưa gắn role **158** · bỏ qua đã chốt/không thành 0 · đã dropped sẵn 0 → sẽ xử lý 158 (hscl-01 68 · tuyendung1 42 · tts-1 46 · test-agency 2).
+- thread ĐANG MỞ sẽ tắt **4**: QDlwWQivXXyRZjZhkCqL · RB5FpYY5jgFqeTQqhnhJ · bDw9U2EgEPgp1fYs9Qw3 · kXXzQYyQSonoXIanY1TQ · task funnel queued 0.
+- Mẫu 6 = đúng các ca #31a (Đỗ Minh Hương, Vũ Hồng Đức "Ib tôi", Le Na "Gửi kết bạn nhận Jd"…). → OK để `--apply`.

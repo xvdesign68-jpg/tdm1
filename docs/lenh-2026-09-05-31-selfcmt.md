@@ -39,3 +39,10 @@ Ngoài ra người bán khác vào chào hàng dưới bài người mua ("LIFOO
 ## Còn làm sau (FE, zip kế)
 - Chip "🏪 người bán" / "👤 chủ bài" + hiện `role_reason`; "Bài đã quét" nhãn decision `self_comment`/`seller`; modal comment-lead hiện rõ TÁC GIẢ BÀI GỐC + bài gốc; Content Studio đổi nhãn kiểu bình luận (soft = "Nhẹ + CTA mềm", direct = "Trực tiếp + CTA rõ (mặc định)").
 - Danh sách đối thủ theo brand (tên/page) → chặn cứng thêm (nếu anh muốn).
+
+## ★ KHỐI 1 ĐÃ CHẠY OK (05/09 22:12 UTC)
+- backup `index.js.bak-20260905-221250` · `lib/scorer.js.bak-20260905-221250` · `outreach.js.bak-20260905-221250`
+- `PATCH OK` 3 file · `DONE: 3 file da va` · `SYNTAX OK` · `IMPORT OK · scheduledScan/manualScan/outreachTick/normRole = function`
+- marker `v-selfcmt`: index.js 291 (helper) · 454 (ctx.set) · 528 (comment loop) · 540 (selfSkipped) · 550 (Pha 2 skip) · 585 (log) · 643 (gate role) — đủ 7 mốc; scorer.js 45 (normRole) · 157 (chuẩn hoá role); outreach.js 256 (helper) · 299 (gate) — đủ.
+- deploy `manualScan` + `outreachTick` + `scheduledScan` Successful → rev `scheduledscan-00069-xop`, `outreachtick-00025-dir`; `exit=0`. Cảnh báo `GOOGLE_CLOUD_QUOTA_PROJECT is not usable` = vô hại (đã thấy các lần deploy trước).
+- Kế: KHỐI 2 (`_l31_fix.mjs` DRY → `--apply`), KHỐI 3 tuỳ chọn, KHỐI 4 sau ≥15′.

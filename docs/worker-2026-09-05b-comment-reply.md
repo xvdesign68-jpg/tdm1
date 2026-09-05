@@ -24,3 +24,17 @@
 
 ## Nghiệm thu trên VPS
 Sau khi chép đè + chạy lại: cửa sổ worker in `v2026-09-05b`; khi bốc trúng comment-lead, "Hoạt động gần đây" hiện *Thả cảm xúc vào bình luận → Trả lời bình luận của Lead* (✓ Đã gửi), cửa sổ worker có dòng `ô trả lời: {"label":"trả lời dưới tên …","inside":false,…}`. Nếu vẫn thất bại: gửi em ảnh `errors/<leadId>__comment_0.png` + dòng `ô trả lời` (nếu có) để em chỉnh nhãn.
+
+## Bản `2026-09-05c` (cùng ngày, sau ảnh lỗi 18:38 VN)
+
+Anh chạy bản b → vẫn "không thấy ô trả lời xuất hiện sau khi bấm Phản hồi". Ảnh `errors/` cho thấy ô trả lời **đã mở** (có sẵn tag "Đỗ Minh Hương", Facebook tự focus), tức bộ lọc theo NHÃN của bản b trượt: nhãn ô trả lời trên giao diện mới **giống hệt ô bình luận của bài** ("Viết bình luận công khai…"), nút Thích dưới bình luận là **icon** (không có chữ), và Facebook có thể **vẽ lại khung comment** khi mở ô (mất `data-sl-target`).
+
+Sửa (`replyComment` viết lại lần 2, marker `v2026-09-05c`):
+- Nhận ô theo **cấu trúc**: (1) ô đang được **focus** ngay sau cú bấm "Trả lời" — miễn không phải ô CŨ (đã hiển thị trước cú bấm) mang nhãn bình luận bài; (2) ô mới đứng sau/trong khung comment có nhãn trả lời; (3) ô mới duy nhất không phải nhãn bài; (4) ô nhãn trả lời nằm trong khung. Chỉ đánh dấu "cũ" các ô **đang hiển thị** (ô dựng sẵn nhưng ẩn → khi hiện ra vẫn tính là mới).
+- `findCommentEl` ghi `comment_id` lên `<html data-sl-cid>`; khung comment mất dấu → đánh dấu lại theo permalink.
+- Tag tên có sẵn: đưa caret về **cuối** (End) trước khi gõ, thiếu khoảng trắng thì thêm → không gõ đè lên tag.
+- Sau Enter: chỉ tính "chưa gửi" khi **nội dung của mình** còn trong ô (ô chỉ còn tag tên = đã gửi, KHÔNG Enter thêm — tránh đăng bình luận chỉ có tên); chưa gửi + chưa thấy trên bài (`verifyCommentPosted`: chữ trong article NGOÀI ô soạn) → bấm nút Gửi của chính ô (hoặc Enter lần 2) → vẫn còn → throw.
+- Không nhận được ô → in **chẩn đoán** mọi textbox (nhãn/cũ/sau khung/focus) ra cửa sổ worker + đính vào lỗi.
+- `tymComment`/`verifyCommentReact` nhận thêm nút icon (`aria-label` Thích / Bỏ thích / `aria-pressed`).
+
+Kiểm: `wk05/t_reply2.mjs` (mock đúng giao diện trong ảnh) **9/9** — ô ngoài article + nhãn giống ô bài + tag + vẽ lại khung; ô dựng sẵn ẩn; ô ở lại sau gửi (không đăng thêm); chỉ có nút Gửi; nhiều dòng; bấm không mở ô → throw; ô bài đang focus → từ chối; runFunnel trọn. `t_reply.mjs` 19/19 (cập nhật 1 kỳ vọng: ô MỚI được focus dù nhãn giống ô bài = ô trả lời), `t_flow` 16/16, `t_uid` 9/9, `node --check` OK. Backup `worker.2026-09-05b.bak.mjs` (scratchpad).

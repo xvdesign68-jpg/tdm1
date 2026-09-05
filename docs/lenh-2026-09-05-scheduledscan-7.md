@@ -6,6 +6,8 @@
 >
 > **Cơ chế sau patch (quét theo lịch, `sowMode`)**: lượt T gặt bài (như #21) → Pha 1b: **(a) gặt** mọi `C_*` đã chín (BrightData `ready`) → comment nối vào bài cha (ctx dựng lại từ meta lưu trong doc: url bài, url nguồn, tác giả/đoạn text bài) → đi chung pipeline chống trùng/lọc/AI như cũ; chưa chín → để lượt sau; `failed`/quá 2h → xoá; **(b) gieo**: bài cần quét comment (đúng nhịp `cmt_scrape` như cũ) → `bdTriggerComments` theo lô 50 bài → ghi doc pending → trả về NGAY (không poll). Lượt có comment giờ ≈ vài giây thay vì 300–510 s. Sổ tiền (`bdComments` theo nguồn, `bdCommentRecords`), `commentsFetched`, `cmt_scrape`/`qualified_only` giữ nguyên ngữ nghĩa.
 
+> **★ KHỐI 1 ĐÃ CHẠY THÀNH CÔNG (05/09 04:43 UTC = 11:43 VN, `exit=0`)**: backup `index.js.bak-20260905-044358` + `lib/scraper.js.bak-20260905-044358` · `index.js: import tinh + harvestComments` · PATCH OK · SYNTAX OK · marker v-sowc index.js:442/494/495/505, lib/scraper.js:271/313 · IMPORT OK (scheduledScan/manualScan/harvestComments = function) · deploy `manualScan` + `scheduledScan` Successful → **rev `scheduledscan-00068-pob`, timeout 1800, ACTIVE** · Rules block `system_status` (bản sao workers, read isSuperAdmin / write false) compiled + released. Tiếp: KHỐI 2 sau ≥10′.
+
 ## KHỐI 1 — chạy ngay (qua file .sh)
 
 Dán NGUYÊN KHỐI vào Cloud Shell. Khối chỉ tạo 3 file bằng heredoc rồi `bash /tmp/ss23_run.sh`; trong script mọi bước xích `&&` — lỗi ở đâu dừng ở đó, KHÔNG deploy code hỏng.

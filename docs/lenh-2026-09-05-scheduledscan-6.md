@@ -160,3 +160,54 @@ node _ss22_after.mjs; rm -f _ss22_after.mjs
 - **Tắt nguồn**: ghi `active:false` + `disabledAt` + `disabledReason` (merge) vào `sources/{id}` — web (Cấu hình → Nguồn quét) hiện "tạm dừng" như bật/tắt tay; muốn bật lại thì gạt công tắc trên web (chỉ có ích khi đã cấp cookie nick + cấu hình `BROWSER_SVC_URL`).
 - `.env.bak-<TS>` chứa secret — nằm trong Cloud Shell của anh như `.env`, không gửi đi đâu.
 - **Bài học shell**: bash tương tác history-expand `!` trên dòng lệnh (cả trong `"…"`, cả dòng nối `\`), KHÔNG expand trong heredoc `<<'EOF'`. Chuỗi lệnh dài → file `.sh` + `bash`. Dry-run cục bộ bằng `bash file` KHÔNG bắt được lỗi này (non-interactive) → thêm bước `grep '!'` ngoài heredoc trước khi gửi.
+
+## ★ KẾT QUẢ KHỐI 1 bản 2 (05/09 03:5x VN) — THÀNH CÔNG, `exit=0`
+- (a) giữ backup gốc (`lib/config.js.bak-20260905-034109` + `.env.bak-20260905-034109`); (b) idempotent đúng ("đã có/giữ nguyên"); (c) `CFG.SCANNED_TTL_DAYS = 3 | VPS_URL đã đặt = true | dài 24 ký tự`.
+- (d) nơi dùng `VPS_URL`: `lib/config.js:59` (đã rỗng) và **`lib/autoSend.js:81` `var VPS_URL = process.env.VPS_URL || "http://<IP>:8080"`** + `:99 fetch(VPS_URL + "/comment")` → còn 1 chỗ hard-code IP → **LỆNH #22c** bên dưới.
+- (e) `sources: 32 | đang bật: 28 | nguồn nick: 5 | nick đang bật: 5` → tắt đúng 5 (neu1 · bk-1 · nguyên căn 1 · hhqcvain1 · Tm S Con Sen — đều brand `test-agency`, nick `acc_Nick_A_*`) → `đang bật 23 | nick đang bật 0`.
+- (f) deploy `manualScan` + `scheduledScan` Successful (cảnh báo `GOOGLE_CLOUD_QUOTA_PROJECT is not usable…` là warning quen của Firebase CLI trong Cloud Shell, vô hại). (g) `scheduledscan-00067-but` + `manualscan-00072-qim`: `SCANNED_TTL_DAYS=3 | VPS_URL=(đã đặt, 24 ký tự)`.
+
+## LỆNH #22c — dời nốt IP mặc định trong `lib/autoSend.js` (chạy sau KHỐI 2, KHÔNG deploy)
+
+```bash
+cd ~/firebase-s13/functions || exit 1
+cat > /tmp/ss22c.cjs <<'EOF'
+/* LỆNH #22c (05/09/2026) — dời nốt địa chỉ VPS mặc định trong lib/autoSend.js (dòng ~81, lộ ra ở bước (d) LỆNH #22) sang .env.
+   Fail-closed: .env phải có VPS_URL khác rỗng mới gỡ mặc định. Idempotent (marker v-ttl-vps). KHÔNG in giá trị. */
+const fs = require('fs');
+const F = 'lib/autoSend.js';
+if (!fs.existsSync(F)) { console.log('KHONG CO ' + F + ' — bo qua'); process.exit(0); }
+const envL = (fs.existsSync('.env') ? fs.readFileSync('.env', 'utf8') : '').split('\n').find(l => /^\s*VPS_URL\s*=/.test(l));
+const envVal = envL ? envL.replace(/^\s*VPS_URL\s*=/, '').trim().replace(/^(['"])(.*)\1$/, '$2') : '';
+if (!envVal) { console.log('.env CHUA CO VPS_URL (hoặc trống) → KHONG GHI GI (fail-closed)'); process.exit(3); }
+const L = fs.readFileSync(F, 'utf8').split('\n');
+if (L.some(l => l.includes('v-ttl-vps'))) { console.log('autoSend.js: đã có marker v-ttl-vps (patch trước đó) → giữ nguyên'); process.exit(0); }
+const i = L.findIndex(l => /^\s*(var|let|const)\s+VPS_URL\s*=\s*process\.env\.VPS_URL\s*\|\|/.test(l));
+if (i < 0) { console.log('KHONG THAY MOC "VPS_URL = process.env.VPS_URL ||" trong ' + F + ' — KHONG GHI GI'); process.exit(2); }
+const m = L[i].match(/^(\s*(?:var|let|const)\s+VPS_URL\s*=\s*process\.env\.VPS_URL\s*\|\|\s*)(['"])(.*?)\2(\s*;?)(.*)$/);
+if (!m) { console.log('DONG KHONG DUNG DANG (đã che IP): ' + L[i].replace(/\d{1,3}(\.\d{1,3}){3}/g, '<IP>')); process.exit(2); }
+const TS = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15).replace(/(\d{8})(\d{6})/, '$1-$2');
+fs.copyFileSync(F, F + '.bak-' + TS);
+L[i] = m[1] + '""' + m[4] + '  // v-ttl-vps 05/09/2026: địa chỉ VPS CHỈ ở .env (không để trong code)';
+fs.writeFileSync(F, L.join('\n'));
+console.log('backup: ' + F + '.bak-' + TS);
+console.log('PATCH OK ' + F + ' dòng ' + (i + 1) + ': mặc định → "" (địa chỉ đã có trong .env, ' + envVal.length + ' ký tự)');
+EOF
+cat > /tmp/ss22c_run.sh <<'EOF'
+# LỆNH #22c — chạy bằng `bash /tmp/ss22c_run.sh` (không dán từng dòng — tránh history expansion).
+cd ~/firebase-s13/functions || exit 1
+echo "=== (a) patch lib/autoSend.js (mặc định VPS_URL → rỗng) ===" \
+ && node /tmp/ss22c.cjs && node --check lib/autoSend.js && echo "SYNTAX OK lib/autoSend.js" \
+ && echo "=== (b) dòng VPS_URL trong autoSend.js sau patch (đã che IP) ===" \
+ && grep -n "VPS_URL" lib/autoSend.js | sed -E 's#[0-9]{1,3}(\.[0-9]{1,3}){3}#<IP>#g' \
+ && echo "=== (c) file nào import lib/autoSend.js (để biết function nào mang nó) ===" \
+ && ( grep -rln "autoSend" --include=*.js --include=*.mjs . 2>/dev/null | grep -v node_modules | grep -v "\.bak-" || echo "(không file nào)" ) \
+ && echo "=== (d) rà mọi IPv4 literal còn trong code (đã che, tối đa 20 dòng) ===" \
+ && ( grep -rnE "[0-9]{1,3}(\.[0-9]{1,3}){3}" --include=*.js --include=*.mjs --include=*.cjs . 2>/dev/null | grep -v node_modules | grep -v "\.bak-" | sed -E 's#[0-9]{1,3}(\.[0-9]{1,3}){3}#<IP>#g' | head -20 || true ) \
+ && echo "=== XONG #22c (KHÔNG deploy — function dùng autoSend.js sẽ nhận .env VPS_URL ở lần deploy kế) ===" \
+ && rm -f /tmp/ss22c.cjs /tmp/ss22c_run.sh
+EOF
+bash /tmp/ss22c_run.sh; echo "exit=$?"
+```
+
+**Kỳ vọng**: `PATCH OK lib/autoSend.js dòng 81: mặc định → ""` + `SYNTAX OK`; (b) 2 dòng VPS_URL không còn IP; (c) danh sách file import autoSend.js (em cần để biết function nào mang nó); (d) các IPv4 literal còn lại trong code (đã che) — kỳ vọng còn rất ít hoặc 0. Không deploy: function đang chạy giữ code cũ (vẫn có mặc định) → không đổi hành vi; lần deploy kế của function dùng autoSend.js sẽ đọc `.env` (đã có `VPS_URL`). Fail-closed: `.env` thiếu `VPS_URL` → không ghi (`exit=3`).

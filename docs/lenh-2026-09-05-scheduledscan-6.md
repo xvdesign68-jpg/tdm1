@@ -211,3 +211,68 @@ bash /tmp/ss22c_run.sh; echo "exit=$?"
 ```
 
 **Kỳ vọng**: `PATCH OK lib/autoSend.js dòng 81: mặc định → ""` + `SYNTAX OK`; (b) 2 dòng VPS_URL không còn IP; (c) danh sách file import autoSend.js (em cần để biết function nào mang nó); (d) các IPv4 literal còn lại trong code (đã che) — kỳ vọng còn rất ít hoặc 0. Không deploy: function đang chạy giữ code cũ (vẫn có mặc định) → không đổi hành vi; lần deploy kế của function dùng autoSend.js sẽ đọc `.env` (đã có `VPS_URL`). Fail-closed: `.env` thiếu `VPS_URL` → không ghi (`exit=3`).
+
+## ★ KẾT QUẢ KHỐI 2 + #22c (05/09 ~11:00 VN; LƯU Ý: timestamp backup Cloud Shell là giờ UTC = VN − 7h)
+- **KHỐI 2**: 2 lượt trước khi tắt nguồn (10:46/10:49 VN) còn `nguồn 28 | scrapeErr 5 | authRuns 5`; **2 lượt sau deploy: 10:52 `nguồn 23 | scrapeErr 0 | authRuns 0` (5 s, lượt gieo/skip) · 10:56 `nguồn 23 | scrapeErr 0 | authRuns 0 | bài 24 | bd 24` (74 s, lượt gặt)**. `sources đang bật: 23 | nick đang bật: 0`. `system_status/brightdata {ok:true, runs:0}`. ⇒ **hết hẳn 5 scrapeErrors cố định, hệ quét chạy đúng sau LỆNH #22.**
+- **#22c**: `PATCH OK lib/autoSend.js dòng 81: mặc định → ""` + `SYNTAX OK`; backup `lib/autoSend.js.bak-20260905-035825`; (c) **KHÔNG file nào import `lib/autoSend.js`** (chỉ chính nó khớp) → module mồ côi trong s13 (cụm auto-send thật nằm ở `~/codebase2`) → không function nào bị ảnh hưởng. (d) rà IPv4 literal: **còn đúng 1 chỗ `lib/approveEngagement.js:7` `const SVC=()=>process.env.BROWSER_SVC_URL||'http://<IP>:8080'`** → LỆNH #22d.
+
+## LỆNH #22d — dời IP mặc định CUỐI CÙNG (`lib/approveEngagement.js:7`, KHÔNG deploy)
+
+> `approveEngagement` là function ĐANG chạy từ s13 → không deploy lại trong LỆNH này (function giữ code cũ có mặc định, hành vi không đổi). Script chép mặc định vào `.env` (`BROWSER_SVC_URL=…`) nếu `.env` chưa có/trống, RỒI mới đổi mặc định trong code thành `''` → lần deploy kế đọc `.env`. Sau #22d, code s13 không còn IPv4 literal nào.
+
+```bash
+cd ~/firebase-s13/functions || exit 1
+cat > /tmp/ss22d.cjs <<'EOF'
+/* LỆNH #22d (05/09/2026) — dời IP mặc định CUỐI CÙNG: lib/approveEngagement.js dòng ~7 `process.env.BROWSER_SVC_URL||'http://<IP>:8080'`.
+   Cách làm như VPS_URL: chép mặc định vào .env (BROWSER_SVC_URL=…) nếu .env chưa có/trống → rồi đổi mặc định trong code thành ''. Idempotent (marker v-ttl-vps). KHÔNG in giá trị. */
+const fs = require('fs');
+const F = 'lib/approveEngagement.js', ENV_F = '.env';
+if (!fs.existsSync(F)) { console.log('KHONG CO ' + F + ' — bo qua'); process.exit(0); }
+const L = fs.readFileSync(F, 'utf8').split('\n');
+if (L.some(l => l.includes('v-ttl-vps'))) { console.log(F + ': đã có marker v-ttl-vps → giữ nguyên'); process.exit(0); }
+const i = L.findIndex(l => /process\.env\.BROWSER_SVC_URL\s*\|\|\s*['"]/.test(l));
+if (i < 0) { console.log('KHONG THAY MOC process.env.BROWSER_SVC_URL||\'…\' trong ' + F + ' — KHONG GHI GI'); process.exit(2); }
+const m = L[i].match(/^(.*process\.env\.BROWSER_SVC_URL\s*\|\|\s*)(['"])(.*?)\2(.*)$/);
+if (!m) { console.log('DONG KHONG DUNG DANG (đã che IP): ' + L[i].replace(/\d{1,3}(\.\d{1,3}){3}/g, '<IP>')); process.exit(2); }
+const def = m[3];
+let envLines = (fs.existsSync(ENV_F) ? fs.readFileSync(ENV_F, 'utf8') : '').split('\n');
+const ei = envLines.findIndex(l => /^\s*BROWSER_SVC_URL\s*=/.test(l));
+const envVal = ei >= 0 ? envLines[ei].replace(/^\s*BROWSER_SVC_URL\s*=/, '').trim().replace(/^(['"])(.*)\1$/, '$2') : '';
+const out = [];
+if (envVal) out.push('.env: BROWSER_SVC_URL đã có giá trị (giữ nguyên .env, ' + envVal.length + ' ký tự)');
+else if (def) {
+  const line = 'BROWSER_SVC_URL=' + def;
+  if (ei >= 0) { envLines[ei] = line; out.push('.env: BROWSER_SVC_URL đang TRỐNG → đã điền mặc định từ code'); }
+  else { if (envLines.length && envLines[envLines.length - 1] !== '') envLines.push(''); envLines.splice(envLines.length - 1, 0, line); out.push('.env: đã THÊM BROWSER_SVC_URL (chép mặc định từ code, ' + def.length + ' ký tự)'); }
+} else { console.log('Mặc định trong code rỗng và .env cũng không có → không có gì để dời'); process.exit(0); }
+const TS = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15).replace(/(\d{8})(\d{6})/, '$1-$2');
+fs.copyFileSync(F, F + '.bak-' + TS);
+L[i] = m[1] + "''" + m[4] + '  // v-ttl-vps 05/09/2026: địa chỉ dịch vụ trình duyệt CHỈ ở .env (không để trong code)';
+let envOut = envLines.join('\n'); if (!envOut.endsWith('\n')) envOut += '\n';
+fs.writeFileSync(ENV_F, envOut, { mode: 0o600 });
+fs.writeFileSync(F, L.join('\n'));
+out.forEach(l => console.log('  ' + l));
+console.log('backup: ' + F + '.bak-' + TS);
+console.log('PATCH OK ' + F + ' dòng ' + (i + 1) + ": mặc định → '' (địa chỉ đã ở .env)");
+EOF
+cat > /tmp/ss22d_run.sh <<'EOF'
+# LỆNH #22d — chạy bằng `bash /tmp/ss22d_run.sh` (không dán từng dòng — tránh history expansion).
+cd ~/firebase-s13/functions || exit 1
+echo "=== (a) patch lib/approveEngagement.js + .env ===" \
+ && node /tmp/ss22d.cjs && node --check lib/approveEngagement.js && echo "SYNTAX OK lib/approveEngagement.js" \
+ && echo "=== (b) dòng BROWSER_SVC_URL sau patch (đã che IP) ===" \
+ && grep -n "BROWSER_SVC_URL" lib/approveEngagement.js | sed -E 's#[0-9]{1,3}(\.[0-9]{1,3}){3}#<IP>#g' \
+ && echo ".env dòng BROWSER_SVC_URL: $(grep -c '^BROWSER_SVC_URL=' .env) (kỳ vọng 1)" \
+ && echo "=== (c) file nào import lib/approveEngagement.js ===" \
+ && ( grep -rln "approveEngagement" --include=*.js --include=*.mjs . 2>/dev/null | grep -v node_modules | grep -v "\.bak-" || echo "(không file nào)" ) \
+ && echo "=== (d) rà lại IPv4 literal trong code (kỳ vọng: 0 dòng) ===" \
+ && ( grep -rnE "[0-9]{1,3}(\.[0-9]{1,3}){3}" --include=*.js --include=*.mjs --include=*.cjs . 2>/dev/null | grep -v node_modules | grep -v "\.bak-" | sed -E 's#[0-9]{1,3}(\.[0-9]{1,3}){3}#<IP>#g' | head -20; echo "(hết)" ) \
+ && echo "=== XONG #22d (KHÔNG deploy — approveEngagement đang chạy giữ code cũ; lần deploy kế đọc .env) ===" \
+ && rm -f /tmp/ss22d.cjs /tmp/ss22d_run.sh
+EOF
+bash /tmp/ss22d_run.sh; echo "exit=$?"
+```
+
+**Kỳ vọng**: `.env: đã THÊM BROWSER_SVC_URL (chép mặc định từ code, 24 ký tự)` (hoặc "đã có giá trị (giữ nguyên)" nếu `.env` sẵn có) + `PATCH OK … dòng 7` + `SYNTAX OK`; (b) dòng 7 không còn IP, `.env dòng BROWSER_SVC_URL: 1`; (c) file import approveEngagement.js (kỳ vọng `index.js`); (d) `(hết)` ngay, không dòng IP nào; `exit=0`.
+
+**Tuỳ chọn về sau**: nếu bật lại đường quét nick (`fetchPostsAuth`), thêm `BROWSER_SVC_URL`/`BROWSER_SVC_SECRET` vào `lib/config.js` (`env.BROWSER_SVC_URL || ''`) — hiện config.js không map nên `fetchPostsAuth` luôn báo "Chưa cấu hình"; 5 nguồn nick đã tắt nên không ảnh hưởng.

@@ -77,3 +77,58 @@ EOF2
 set -a; . ./.env; set +a
 node _cl_reopen.mjs --apply; rm -f _cl_reopen.mjs
 ```
+
+## LỆNH #29 — llmJson: GPT-5 đốt token suy nghĩ trong trần 700 → "LLM không trả JSON" → rơi fallback (ĐÃ CHẠY 05/09 11:15 UTC)
+Phát hiện từ output LỆNH #28: brand hscl-01 chạy chế độ AI (có Hồ sơ AI), 2/11 lead báo `LLM không trả JSON [gpt-5.6-sol]` → dùng `lead.reply` → đó là gốc của comment cụt chiều 05/09. Nguyên nhân: `max_completion_tokens=700` quá nhỏ cho model reasoning (token suy nghĩ tính vào trần) → content rỗng/cụt. Vá `/tmp/c29.cjs` (marker `LENH #29`, fail-closed 3 mốc): trần → `LLM_MAX_TOKENS` (mặc định 2000); gpt-5x/ox thêm `reasoning_effort` (`LLM_REASONING`, mặc định `low`; API từ chối → tự bỏ, retry `noReason`); `finish_reason=length` không có JSON → thử lại 1 lần trần gấp đôi (`bigger`); lỗi ghi rõ `finish=<reason>, N ký tự`. Test giả lập 3 kịch bản PASS. **Kết quả thật**: backup `content.js.bak-20260905-111503`, PATCH OK, SYNTAX OK, test lead PQQbXjZQjF09MjhPP5LL (AI từng lỗi) → `mode ai | gpt-5.6-sol | 11 s | spam 3`, comment 118 ký tự kiểu soft đúng ngành (tép khô), inbox 338 ký tự cá nhân hoá + opt-out; deploy `outreachTick` + `genContent` Successful. Nhanh hơn trước (16 s → 11 s) nhờ reasoning low. Tồn nhỏ: dòng opt-out ép nguyên văn "anh/chị" dù thân tin xưng "Anh" (polish sau).
+```bash
+cat > /tmp/c29.cjs <<'EOF'
+/* LỆNH #29 — content.js llmJson: model GPT-5 (reasoning) đốt token suy nghĩ trong max_completion_tokens=700 → content rỗng/cụt → "LLM không trả JSON" → rơi fallback lead.reply.
+   Vá: trần token 700 → LLM_MAX_TOKENS (mặc định 2000); gpt-5x và ox thêm reasoning_effort (LLM_REASONING, mặc định 'low'; API từ chối → tự bỏ);
+   finish_reason=length → thử lại 1 lần với trần gấp đôi; lỗi "không trả JSON" ghi rõ finish_reason + độ dài để chẩn đoán. Idempotent (marker LENH #29), fail-closed. */
+const fs = require('fs');
+const f = process.argv[2] || 'content.js';
+let s = fs.readFileSync(f, 'utf8');
+if (s.includes('LENH #29')) { console.log('ĐÃ PATCH (idempotent)'); process.exit(0); }
+const fail = [];
+function rep(label, a, b) { const n = s.split(a).length - 1; if (n !== 1) { fail.push(label + ': mốc xuất hiện ' + n + ' lần (cần 1)'); return; } s = s.replace(a, () => b); }
+rep('max tokens', "  if (o.legacyMax) body.max_tokens = 700; else body.max_completion_tokens = 700;",
+`  const MAXT = (Number(process.env.LLM_MAX_TOKENS) || 2000) * (o.bigger ? 2 : 1); // LENH #29: 700 quá nhỏ cho model reasoning (gpt-5*) → content rỗng
+  if (o.legacyMax) body.max_tokens = MAXT; else body.max_completion_tokens = MAXT;
+  if (/^(gpt-5|o[0-9])/i.test(model) && !o.noReason) body.reasoning_effort = process.env.LLM_REASONING || 'low'; // LENH #29: bớt token suy nghĩ, trả nhanh hơn`);
+rep('retry response_format', "    if (/response_format|json_object/i.test(msg) && !o.noJson) return llmJson(sys, usr, Object.assign({}, o, { noJson: true }));",
+`    if (/response_format|json_object/i.test(msg) && !o.noJson) return llmJson(sys, usr, Object.assign({}, o, { noJson: true }));
+    if (/reasoning_effort|reasoning/i.test(msg) && !o.noReason) return llmJson(sys, usr, Object.assign({}, o, { noReason: true })); // LENH #29`);
+rep('no json', "  const m = String(txt).match(/\\{[\\s\\S]*\\}/); if (!m) throw new Error('LLM không trả JSON [model ' + model + ']');",
+`  const fr = (j && j.choices && j.choices[0] && j.choices[0].finish_reason) || '';
+  const m = String(txt).match(/\\{[\\s\\S]*\\}/);
+  if (!m && fr === 'length' && !o.bigger) return llmJson(sys, usr, Object.assign({}, o, { bigger: true })); // LENH #29: cụt vì trần token → thử trần gấp đôi 1 lần
+  if (!m) throw new Error('LLM không trả JSON (finish=' + (fr || '?') + ', ' + String(txt).length + ' ký tự) [model ' + model + ']');`);
+if (fail.length) { console.error('KHÔNG PATCH — ' + fail.join(' | ')); process.exit(2); }
+fs.writeFileSync(f, s);
+console.log('PATCH OK');
+EOF
+cat > /tmp/run29.sh <<'EOF'
+set -e
+cd ~/firebase-s13/functions
+TS=$(date +%Y%m%d-%H%M%S)
+if grep -q "LENH #29" content.js; then echo "content.js đã có LENH #29 (giữ backup cũ)"; else cp content.js "content.js.bak-$TS"; echo "backup content.js.bak-$TS"; fi
+node /tmp/c29.cjs content.js
+node --check content.js && echo "SYNTAX OK"
+set -a; . ./.env; set +a
+echo "== test thật genForLead chế độ AI (brand hscl-01, lead PQQbXjZQjF09MjhPP5LL — lead AI vừa lỗi ở LỆNH #28) =="
+node --input-type=module -e "
+import admin from 'firebase-admin'; if (admin.apps.length === 0) admin.initializeApp();
+const db = admin.firestore();
+const { genForLead } = await import('./content.js');
+const b = (await db.doc('brands/hscl-01').get()).data() || {}; const l = (await db.doc('leads/PQQbXjZQjF09MjhPP5LL').get()).data() || {};
+const t0 = Date.now(); const g = await genForLead(Object.assign({ code: 'hscl-01' }, b), Object.assign({ id: 'PQQbXjZQjF09MjhPP5LL' }, l));
+console.log('mode', g.mode, '| model', g.model || g._model || '?', '| ' + Math.round((Date.now() - t0) / 1000) + ' s', '| spam', g.spam, '| note', g.note || '—');
+console.log('COMMENT (' + g.comment.length + '):', g.comment);
+console.log('INBOX (' + g.inbox.length + '):', g.inbox);
+" || echo "(test AI lỗi — vẫn deploy vì fallback giữ nguyên; gửi em dòng lỗi phía trên)"
+echo "== deploy =="
+cd ~/firebase-s13 && firebase deploy --only functions:outreachTick,functions:genContent --force
+echo "== xong == exit=$?"
+EOF
+bash /tmp/run29.sh
+```

@@ -55,3 +55,7 @@ Ngoài ra người bán khác vào chào hàng dưới bài người mua ("LIFOO
 ## ★ KHỐI 2b --apply XONG (05/09 ~22:25 UTC)
 - `ĐÃ GHI: 158 lead (role poster_self + dropped) | 4 thread tắt | 0 task huỷ`. 158 lead chủ bài giờ có `role:'poster_self', self_comment:true, dropped:true, dropped_by:'lenh31b'`; 4 thread → `active:false, step:'skipped_role'`.
 - Kế: KHỐI 4 (`_l31_after.mjs 3`) sau ≥15′; KHỐI 3 rescore sau khi KHỐI 4 xác nhận prompt mới chạy đúng.
+
+## ★ KHỐI 4 lần 1 (05/09 ~22:40 UTC = 06/09 05:40 VN, đêm)
+- `scanned_posts 3h: 27 {scored_low 4, prefiltered_out 14, excluded 3, lead 1, seller 5}` → decision `seller` MỚI đã xuất hiện = prompt vai chạy thật (4 mẫu: "hàng đi mỗi ngày. ghép xốp các loại", "30 35 con Chào sỉ 1xx", "Nhí 1xx" = người bán rõ; **"Cần tìm 2 bạn đi học và thi trong 4 ngày…" = người ĐI TUYỂN** → cần soi brand: nếu brand tuyendung phục vụ NHÀ TUYỂN DỤNG thì đây là buyer bị chặn oan). `self_comment` 0 (đêm, ít bình luận). leads mới 3h: 1, role rỗng (chưa rõ trước/sau deploy). outreach_log 0 (ngoài giờ 8–22h VN, đúng). threads skipped_role 4 · leads poster_self 158 · seller 0.
+- **Điểm cần soi**: SYS_RULES ghi seller = "… hoặc TUYỂN NGƯỜI cho chính họ" — với brand tuyển dụng (khách = nhà tuyển dụng) quy tắc này chặn nhầm. → KHỐI 4b `_l31_check.mjs` (chỉ đọc): in decision seller/self_comment/lead 6h kèm brand/nguồn/điểm + Hồ sơ AI (ngành/khách) từng brand + 10 lead mới nhất có vai. Nếu brand tuyendung1 phục vụ nhà tuyển dụng → #31c sửa câu vai thành TƯƠNG ĐỐI theo brand (người đăng tuyển = buyer khi brand cung cấp dịch vụ tuyển dụng).

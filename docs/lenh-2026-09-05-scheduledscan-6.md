@@ -2,13 +2,14 @@
 
 > **Quyết định của anh (05/09)**: (1) **TẮT** 5 nguồn quét bằng nick (neu1 · bk-1 · nguyên căn 1 · hhqcvain1 · Tm S Con Sen) — đường quét nick chết (thiếu cookie + `BROWSER_SVC_URL` chưa cấu hình) → mỗi lượt +5 `scrapeErrors` vô ích; (2) **`SCANNED_TTL_DAYS` = 3 ngày** + sửa `lib/config.js` đọc đúng từ `.env` (trước đây `.env` có nhưng config.js quên đọc → TTL "Bài đã quét" luôn 1 ngày); (3) **dời địa chỉ VPS** khỏi mặc định trong `lib/config.js` (`VPS_URL`) sang `.env` — LỆNH tự chép giá trị hiện tại vào `.env` nếu chưa có rồi mới đổi mặc định thành `''` → hành vi không đổi. **Không in địa chỉ VPS ra màn hình** (mọi grep đều che IP).
 >
-> Cách chạy: dán NGUYÊN KHỐI vào Cloud Shell (`~/firebase-s13/functions`). Mọi bước xích `&&` (bài học #20) — lỗi ở đâu dừng ở đó, dòng lỗi ngay trên. Idempotent: chạy lại không ghi đè lần 2. Rollback: `cp lib/config.js.bak-<TS> lib/config.js; cp .env.bak-<TS> .env` rồi deploy lại.
+> **★ KẾT QUẢ LẦN CHẠY 1 (05/09 03:41 VN) + BÀI HỌC**: (a)+(b) chạy đúng — backup `lib/config.js.bak-20260905-034109` + `.env.bak-20260905-034109` (= BẢN GỐC để rollback), `PATCH OK` (config.js thêm `SCANNED_TTL_DAYS`, `.env` thêm `VPS_URL`, `VPS_URL` mặc định → `''`, `.env` `SCANNED_TTL_DAYS 7 → 3`). **Dừng ở (c)**: bash tương tác của Cloud Shell làm **history expansion ký tự `!`** trên dòng lệnh (kể cả trong dấu nháy kép và trên dòng nối `\`): `!!CFG.VPS_URL` bị thay bằng LỆNH TRƯỚC (nguyên heredoc `_ss22_src.mjs`) → node `SyntaxError`; `(TRỐNG!)` ở (g) → `-bash: !: event not found`. Heredoc `<<'EOF'` KHÔNG bị (script `ss22.cjs` có `!m`… vẫn chạy đúng). ⇒ **Từ nay mọi chuỗi lệnh dài ghi vào file `.sh` bằng heredoc quoted rồi `bash file.sh`; không dùng `!` ngoài heredoc.** Chưa deploy, chưa tắt nguồn → chạy lại KHỐI 1 (bản dưới, idempotent: (a) thấy marker `v-ttl-vps` thì giữ backup cũ; (b) báo "đã có, giữ nguyên").
+>
+> Cách chạy: dán NGUYÊN KHỐI vào Cloud Shell. Khối chỉ tạo 3 file bằng heredoc rồi `bash /tmp/ss22_run.sh`; trong script mọi bước xích `&&` (bài học #20) — lỗi ở đâu dừng ở đó. Rollback: `cp lib/config.js.bak-20260905-034109 lib/config.js; cp .env.bak-20260905-034109 .env` rồi deploy lại.
 
-## KHỐI 1 — chạy ngay
+## KHỐI 1 — chạy ngay (bản 2, chạy qua file .sh)
 
 ```bash
 cd ~/firebase-s13/functions || exit 1
-echo "=== (a) backup config.js + .env ==="; TS=$(date +%Y%m%d-%H%M%S); cp lib/config.js "lib/config.js.bak-$TS" && cp .env ".env.bak-$TS" && chmod 600 ".env.bak-$TS" && ls -1 "lib/config.js.bak-$TS" ".env.bak-$TS"
 
 cat > /tmp/ss22.cjs <<'EOF'
 /* LỆNH #22 (05/09/2026) — patch lib/config.js + .env theo MỐC NỘI DUNG, idempotent (marker v-ttl-vps), KHÔNG in giá trị VPS_URL.
@@ -97,12 +98,21 @@ let act = 0, nickOn = 0; after.forEach(d => { const s = d.data(); if (isOn(s)) {
 console.log('ĐÃ TẮT', on.length, 'nguồn. SAU KHI TẮT: đang bật', act, '| nick đang bật', nickOn, '(kỳ vọng', (all.filter(isOn).length - on.length) + ' | 0)');
 EOF
 
-echo "=== (b) patch lib/config.js + .env ===" \
+cat > /tmp/ss22_run.sh <<'EOF'
+# LỆNH #22 — chạy bằng `bash /tmp/ss22_run.sh` (KHÔNG dán từng dòng): shell tương tác của Cloud Shell làm history expansion ký tự `!` → vỡ lệnh (bài học lần chạy 1).
+cd ~/firebase-s13/functions || exit 1
+echo "=== (a) backup config.js + .env ==="
+if grep -q 'v-ttl-vps' lib/config.js; then
+  echo "config.js đã có marker v-ttl-vps (patch từ lần chạy trước) → GIỮ backup cũ, không backup đè:"; ls -1 lib/config.js.bak-* .env.bak-* 2>/dev/null | tail -4
+else
+  TS=$(date +%Y%m%d-%H%M%S); cp lib/config.js "lib/config.js.bak-$TS" && cp .env ".env.bak-$TS" && chmod 600 ".env.bak-$TS" && ls -1 "lib/config.js.bak-$TS" ".env.bak-$TS" || exit 1
+fi
+echo "=== (b) patch lib/config.js + .env (idempotent) ===" \
  && node /tmp/ss22.cjs && node --check lib/config.js && echo "SYNTAX OK lib/config.js" \
  && echo "--- config.js (đã che IP) ---" && grep -n "SCANNED_TTL_DAYS\|VPS_URL" lib/config.js | sed -E 's#[0-9]{1,3}(\.[0-9]{1,3}){3}#<IP>#g' \
  && echo "--- .env (chỉ tên/số) ---" && echo ".env dòng VPS_URL: $(grep -c '^VPS_URL=' .env) (kỳ vọng 1)" && grep '^SCANNED_TTL_DAYS=' .env \
  && echo "=== (c) import test với .env ===" \
- && ( set -a; . ./.env; set +a; node --input-type=module -e "const {CFG}=await import('./lib/config.js'); console.log('CFG.SCANNED_TTL_DAYS =',CFG.SCANNED_TTL_DAYS,'(kỳ vọng 3) | VPS_URL đã đặt =',!!CFG.VPS_URL,'| dài',String(CFG.VPS_URL).length,'ký tự | FULLSWEEP_HOURS =',CFG.FULLSWEEP_HOURS)" ) \
+ && ( set -a; . ./.env; set +a; node --input-type=module -e "const {CFG}=await import('./lib/config.js'); console.log('CFG.SCANNED_TTL_DAYS =',CFG.SCANNED_TTL_DAYS,'(kỳ vọng 3) | VPS_URL đã đặt =',Boolean(CFG.VPS_URL),'| dài',String(CFG.VPS_URL).length,'ký tự | FULLSWEEP_HOURS =',CFG.FULLSWEEP_HOURS)" ) \
  && echo "=== (d) nơi dùng VPS_URL trong code (đã che IP) ===" \
  && ( grep -rn "VPS_URL" --include=*.js --include=*.mjs --include=*.cjs . 2>/dev/null | grep -v node_modules | grep -v "\.bak-" | sed -E 's#[0-9]{1,3}(\.[0-9]{1,3}){3}#<IP>#g' || echo "(không thấy chỗ nào khác dùng VPS_URL)" ) \
  && echo "=== (e) tắt 5 nguồn nick ===" \
@@ -110,14 +120,17 @@ echo "=== (b) patch lib/config.js + .env ===" \
  && echo "=== (f) deploy scheduledScan + manualScan (nhận .env mới + TTL) ===" \
  && firebase deploy --only functions:scheduledScan,functions:manualScan \
  && echo "=== (g) kiểm env trên Cloud Run (chỉ tên + độ dài, không in giá trị VPS) ===" \
- && for svc in scheduledscan manualscan; do gcloud run services describe $svc --region asia-southeast1 --format=json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const e=(j.spec.template.spec.containers[0].env||[]);const f=e.filter(x=>/^(SCANNED_TTL_DAYS|VPS_URL|SCAN_SOURCE_INTERVAL_MIN|BD_SOW_MODE)$/.test(x.name)).map(x=>x.name+'='+(x.name==='VPS_URL'?(x.value?'(đã đặt, '+x.value.length+' ký tự)':'(TRỐNG!)'):x.value));console.log('$svc:',j.status.latestReadyRevisionName,'|',f.join(' | ')||'(không thấy biến nào)')})"; done \
- && rm -f /tmp/ss22.cjs \
+ && for svc in scheduledscan manualscan; do gcloud run services describe $svc --region asia-southeast1 --format=json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const e=(j.spec.template.spec.containers[0].env||[]);const f=e.filter(x=>/^(SCANNED_TTL_DAYS|VPS_URL|SCAN_SOURCE_INTERVAL_MIN|BD_SOW_MODE)$/.test(x.name)).map(x=>x.name+'='+(x.name==='VPS_URL'?(x.value?'(đã đặt, '+x.value.length+' ký tự)':'(TRỐNG)'):x.value));console.log('$svc:',j.status.latestReadyRevisionName,'|',f.join(' | ')||'(không thấy biến nào)')})"; done \
+ && rm -f /tmp/ss22.cjs /tmp/ss22_run.sh \
  && echo "=== XONG LỆNH #22 — chờ ≥6 phút rồi chạy KHỐI 2 ==="
+EOF
+
+bash /tmp/ss22_run.sh; echo "exit=$?"
 ```
 
-**Kỳ vọng output**: (b) `PATCH OK` + 4 dòng tóm tắt (config.js thêm `SCANNED_TTL_DAYS`, `.env` thêm `VPS_URL`, config.js `VPS_URL` → `''`, `.env` `SCANNED_TTL_DAYS x → 3`); (c) `CFG.SCANNED_TTL_DAYS = 3 | VPS_URL đã đặt = true`; (d) danh sách file/dòng dùng `VPS_URL` (chỉ để em biết chỗ dùng — em chưa map được vì nằm ngoài dump); (e) `nick đang bật: 5` + 5 dòng `SẼ TẮT` + `ĐÃ TẮT 5 nguồn … đang bật 23 | nick đang bật 0`; (f) 2 function `Successful update operation`; (g) mỗi service in `SCANNED_TTL_DAYS=3 | VPS_URL=(đã đặt, N ký tự) | SCAN_SOURCE_INTERVAL_MIN=… | BD_SOW_MODE=…` (hai biến sau chỉ hiện nếu anh từng đặt trong `.env`).
+**Kỳ vọng output**: (a) "đã có marker v-ttl-vps → GIỮ backup cũ" + tên 2 backup `…034109`; (b) `PATCH OK` với 4 dòng "đã có/giữ nguyên"; (c) `CFG.SCANNED_TTL_DAYS = 3 | VPS_URL đã đặt = true`; (d) danh sách file/dòng dùng `VPS_URL` (chỗ dùng nằm ngoài dump — em cần để map); (e) `nick đang bật: 5` + 5 dòng `SẼ TẮT` + `ĐÃ TẮT 5 nguồn … đang bật 23 | nick đang bật 0`; (f) 2 function `Successful update operation`; (g) mỗi service in `SCANNED_TTL_DAYS=3 | VPS_URL=(đã đặt, N ký tự)`; cuối cùng `exit=0`.
 
-Nếu (e) in `SỐ NGUỒN NICK ĐANG BẬT = N ≠ 5 → KHÔNG GHI` thì lệnh DỪNG trước deploy — gửi em output, em xem danh sách rồi quyết (không ép `--force` khi chưa rõ).
+Nếu (e) in `SỐ NGUỒN NICK ĐANG BẬT = N ≠ 5 → KHÔNG GHI` thì script DỪNG trước deploy (`exit=3`) — gửi em output, em xem danh sách rồi quyết (không ép `--force` khi chưa rõ).
 
 ## KHỐI 2 — kiểm sau ≥6 phút (chỉ đọc)
 
@@ -146,3 +159,4 @@ node _ss22_after.mjs; rm -f _ss22_after.mjs
 - **VPS_URL**: các function KHÁC (không deploy trong LỆNH này) vẫn chạy code cũ có mặc định trong config.js → không đổi hành vi; tới lần deploy kế của chúng sẽ nhận `.env` `VPS_URL` (đã có sẵn từ LỆNH này). Firebase CLI nạp `.env` cho MỌI function lúc deploy.
 - **Tắt nguồn**: ghi `active:false` + `disabledAt` + `disabledReason` (merge) vào `sources/{id}` — web (Cấu hình → Nguồn quét) hiện "tạm dừng" như bật/tắt tay; muốn bật lại thì gạt công tắc trên web (chỉ có ích khi đã cấp cookie nick + cấu hình `BROWSER_SVC_URL`).
 - `.env.bak-<TS>` chứa secret — nằm trong Cloud Shell của anh như `.env`, không gửi đi đâu.
+- **Bài học shell**: bash tương tác history-expand `!` trên dòng lệnh (cả trong `"…"`, cả dòng nối `\`), KHÔNG expand trong heredoc `<<'EOF'`. Chuỗi lệnh dài → file `.sh` + `bash`. Dry-run cục bộ bằng `bash file` KHÔNG bắt được lỗi này (non-interactive) → thêm bước `grep '!'` ngoài heredoc trước khi gửi.

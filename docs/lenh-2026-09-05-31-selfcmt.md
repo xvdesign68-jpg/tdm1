@@ -51,3 +51,7 @@ Ngoài ra người bán khác vào chào hàng dưới bài người mua ("LIFOO
 - comment-lead tổng 413 · chủ bài tên khớp chưa gắn role **158** · bỏ qua đã chốt/không thành 0 · đã dropped sẵn 0 → sẽ xử lý 158 (hscl-01 68 · tuyendung1 42 · tts-1 46 · test-agency 2).
 - thread ĐANG MỞ sẽ tắt **4**: QDlwWQivXXyRZjZhkCqL · RB5FpYY5jgFqeTQqhnhJ · bDw9U2EgEPgp1fYs9Qw3 · kXXzQYyQSonoXIanY1TQ · task funnel queued 0.
 - Mẫu 6 = đúng các ca #31a (Đỗ Minh Hương, Vũ Hồng Đức "Ib tôi", Le Na "Gửi kết bạn nhận Jd"…). → OK để `--apply`.
+
+## ★ KHỐI 2b --apply XONG (05/09 ~22:25 UTC)
+- `ĐÃ GHI: 158 lead (role poster_self + dropped) | 4 thread tắt | 0 task huỷ`. 158 lead chủ bài giờ có `role:'poster_self', self_comment:true, dropped:true, dropped_by:'lenh31b'`; 4 thread → `active:false, step:'skipped_role'`.
+- Kế: KHỐI 4 (`_l31_after.mjs 3`) sau ≥15′; KHỐI 3 rescore sau khi KHỐI 4 xác nhận prompt mới chạy đúng.

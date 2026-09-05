@@ -198,6 +198,8 @@ bash /tmp/ss23_run.sh; echo "exit=$?"
 
 **Kỳ vọng**: `PATCH OK: index.js(…) · lib/scraper.js(…)` (dòng trên có `index.js: import tinh + harvestComments` hoặc `… dynamic import`) · `SYNTAX OK` · `IMPORT OK · scheduledScan = function · manualScan = function · harvestComments = function` · deploy 2 function Successful · describe rev mới (`scheduledscan-00068-…`), timeout 1800, ACTIVE · Rules `đã chèn block system_status` + `Deploy complete` · `exit=0`. Thấy `THIEU MOC:` → không ghi gì, dán output cho em.
 
+> **★ KHỐI 2 NGHIỆM THU PASS (05/09 11:27–11:56 VN)**: 10 lượt `dur` 3–107 s (107 s = lượt 11:31 code cũ; sau deploy: 9/23/4/34 s) · log `GIEO snapshot comment (1 bai)` 11:47 → `GAT … 0 comment / 1 bai` + `[sowc] gặt 1 → 0 comment · còn chờ 0` 11:50 → `GIEO (4 bai)` 11:50 → `GAT … 0 comment / 4 bai` 11:53 → `GIEO (13 bai)` 11:56 (gặt trước, gieo sau trong cùng lượt) · pending bài 4 / comment C_ 1 / chờ >30′ 0 · `system_status/brightdata ok:true`. Lượt 11:44 (code cũ) `comment 5 / bdCmt 14 / 63 s` là mốc so sánh. 0 comment ở các lượt gặt = bài mới chưa có bình luận (BrightData trả 1 record placeholder/bài, stub-filter loại; bdCmt = số bài). Theo dõi thêm lượt gặt có `comment > 0` buổi chiều.
+
 ## KHỐI 2 — kiểm sau ≥10 phút (chỉ đọc)
 
 ```bash

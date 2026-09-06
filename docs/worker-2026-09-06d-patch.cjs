@@ -1,0 +1,40 @@
+/* Worker 2026-09-06d: HUỶ CỨNG zombie runNick (watchdog) — patch content-anchored, idempotent (marker v2026-09-06d) */
+const fs = require('fs'); const f = process.argv[2]; let s = fs.readFileSync(f, 'utf8');
+if (s.includes("WORKER_VERSION = '2026-09-06d'")) { console.log('đã patch (idempotent)'); process.exit(0); }
+let n = 0; const rep = (a, b, all) => { if (!s.includes(a)) { console.error('KHONG THAY MOC: ' + a.slice(0, 90)); process.exit(1); } s = all ? s.split(a).join(b) : s.replace(a, () => b); n++; };
+rep("const WORKER_VERSION = '2026-09-06c';", "const WORKER_VERSION = '2026-09-06d';");
+rep("   Cấu hình: serviceAccount.json + config.json cạnh file này.",
+"   v2026-09-06d: watchdog HUỶ CỨNG — nick quá nickTimeoutMs không còn chạy nền như zombie: ngắt kết nối trình duyệt (CDP) → mọi thao tác\n     Playwright dở dang ném lỗi → phiên tự thoát trong vài giây; việc dở → onInfra (hẹn lại 10', KHÔNG đốt tries; doneSteps chống làm lại bước\n     đã xong); adspowerStop đúng 1 lần; AdsPower start/CDP connect có timeout. Hết ca \"nick treo >20' vẫn double-act\" (tồn từ v119-38/39).\n   Cấu hình: serviceAccount.json + config.json cạnh file này.");
+// isInfraErr: lỗi sau khi ngắt trình duyệt / watchdog = hạ tầng (không đốt tries)
+rep("|Timeout \\d+ms exceeded|ws:\\/\\/|websocket|fetch failed|socket hang up|page\\.goto: /i.test(m);",
+    "|Timeout \\d+ms exceeded|ws:\\/\\/|websocket|fetch failed|socket hang up|page\\.goto: |watchdog|has been closed|Connection closed|Browser closed/i.test(m); // v2026-09-06d: + watchdog/đã đóng");
+// AdsPower start + CDP connect có timeout (không để watchdog không có gì để ngắt)
+rep("  const r = await fetch(`${CFG.adspowerBase}/api/v1/browser/start?user_id=${encodeURIComponent(userId)}&open_tabs=1`);",
+    "  const r = await fetch(`${CFG.adspowerBase}/api/v1/browser/start?user_id=${encodeURIComponent(userId)}&open_tabs=1`, { signal: AbortSignal.timeout(90000) }); // v2026-09-06d: AdsPower treo → lỗi hạ tầng sau 90 s");
+rep("  const browser = await chromium.connectOverCDP(cdp);", "  const browser = await chromium.connectOverCDP(cdp, { timeout: 60000 }); // v2026-09-06d: không chờ CDP vô hạn");
+// runNick nhận ctl
+rep("async function runNick(profile, tasks) {\n  log(`▶ nick ${profile}: ${tasks.length} việc`);",
+    "async function runNick(profile, tasks, ctl) {\n  ctl = ctl || { aborted: false, browser: null, page: null }; // v2026-09-06d: watchdog (tick) giữ ctl → hardCancel ngắt trình duyệt + cờ aborted\n  log(`▶ nick ${profile}: ${tasks.length} việc`);");
+rep("    const cdp = await adspowerStart(profile);\n    ({ browser, page } = await getPage(cdp));\n",
+    "    const cdp = await adspowerStart(profile);\n    if (ctl.aborted) throw Object.assign(new Error('watchdog: nick quá giờ trước khi mở xong trình duyệt'), { infra: true, watchdog: true });\n    ({ browser, page } = await getPage(cdp));\n    ctl.browser = browser; ctl.page = page; page.__slCtl = ctl; // v2026-09-06d: để watchdog ngắt đúng trình duyệt + runFunnel biết đã huỷ\n    if (ctl.aborted) throw Object.assign(new Error('watchdog: nick quá giờ khi vừa mở trình duyệt'), { infra: true, watchdog: true });\n");
+rep("    await warm(page);\n    for (const t of tasks) {\n      try {\n        await execOnPage(page, t);",
+    "    await warm(page);\n    let ti = 0; // v2026-09-06d: chỉ số việc đang làm — huỷ cứng thì việc còn lại (ti..) trả về hàng đợi ngay, không chờ reaper\n    for (; ti < tasks.length; ti++) {\n      const t = tasks[ti];\n      if (ctl.aborted) break;\n      try {\n        await execOnPage(page, t);");
+rep("      } catch (e) {\n        if (e && e.needLogin) { await onNeedLogin(t); await markTask(t, 'failed'); log('  ⚠️ cần đăng nhập lại'); break; }",
+    "      } catch (e) {\n        if (ctl.aborted || (e && e.watchdog)) { await onInfra(t, 'watchdog: nick quá giờ — huỷ phiên, việc trả về hàng đợi'); await markTask(t, 'failed'); ti++; break; } // v2026-09-06d\n        if (e && e.needLogin) { await onNeedLogin(t); await markTask(t, 'failed'); log('  ⚠️ cần đăng nhập lại'); break; }");
+rep("      await sleep(rand(1500, 4000)); // giãn nhẹ giữa các việc trong cùng phiên\n    }\n",
+    "      await sleep(rand(1500, 4000)); // giãn nhẹ giữa các việc trong cùng phiên\n    }\n    if (ctl.aborted) { for (; ti < tasks.length; ti++) { await onInfra(tasks[ti], 'watchdog: nick quá giờ — huỷ phiên, việc trả về hàng đợi'); await markTask(tasks[ti], 'failed'); } log(`  ⏱ nick ${profile}: phiên đã bị huỷ cứng — việc dở hẹn lại 10'`); } // v2026-09-06d\n");
+rep("    if (CFG.inbox && CFG.inbox.enabled && !superseded() && !pausedAll) { try { await checkReplies(page, meta0); }",
+    "    if (CFG.inbox && CFG.inbox.enabled && !superseded() && !pausedAll && !ctl.aborted) { try { await checkReplies(page, meta0); }");
+rep("    for (const t of tasks) { if (isInfraErr(e)) await onInfra(t, e && e.message); else await onFail(t, e && e.message); await markTask(t, 'failed'); }",
+    "    for (const t of tasks) { if ((e && e.infra) || isInfraErr(e)) await onInfra(t, e && e.message); else await onFail(t, e && e.message); await markTask(t, 'failed'); } // v2026-09-06d: e.infra (watchdog)");
+// runFunnel: lỗi khi đã huỷ = hạ tầng; kiểm cờ trước mỗi bước
+rep("      if (isInfraErr(e)) throw Object.assign(e, { infra: true }); // v2026-09-04: hạ tầng → không tính tries",
+    "      if ((page.__slCtl && page.__slCtl.aborted) || isInfraErr(e)) throw Object.assign(e, { infra: true, watchdog: !!(page.__slCtl && page.__slCtl.aborted) }); // v2026-09-04: hạ tầng → không tính tries · v2026-09-06d: đã huỷ cứng → mọi lỗi = hạ tầng");
+rep("    if (done.has(step)) { log(`    ⏭ bỏ qua ${step} (đã xong lần trước)`); continue; }\n",
+    "    if (done.has(step)) { log(`    ⏭ bỏ qua ${step} (đã xong lần trước)`); continue; }\n    abortCheck(page); // v2026-09-06d: watchdog đã huỷ → không bắt đầu bước mới\n");
+// withTimeout + hardCancel + abortCheck
+rep("// chạy p nhưng KHÔNG chờ quá ms; hết giờ gọi onTimeout (nếu có) rồi resolve → vòng lặp không kẹt\nfunction withTimeout(p, ms, onTimeout) {",
+    "/* v2026-09-06d: HUỶ CỨNG phiên nick quá giờ. Trước đây watchdog chỉ resolve sớm, runNick vẫn chạy nền (zombie) tới khi Playwright tự\n   timeout → nick treo THẬT >20' có thể làm lại việc reaper đã trả về (double-act). Giờ: đặt cờ aborted + ngắt kết nối CDP → mọi thao tác\n   dở dang ném lỗi \"has been closed\" → runNick unwind qua catch/finally trong vài giây: việc dở → onInfra (10', không đốt tries),\n   adspowerStop 1 lần (lần chạy vẫn là hiện hành). browser.close() trên kết nối connectOverCDP = NGẮT kết nối, không tắt AdsPower. */\nasync function hardCancel(ctl, profile) {\n  if (!ctl || ctl.aborted) return; ctl.aborted = true;\n  log(`⏱ nick ${profile} quá giờ (${Math.round(CFG.nickTimeoutMs / 1000)}s) — HUỶ CỨNG: ngắt trình duyệt, việc dở trả về hàng đợi (10')`);\n  try { if (ctl.browser) await withTimeout(ctl.browser.close(), 10000); } catch (_) { }\n}\nfunction abortCheck(page) { const c = page && page.__slCtl; if (c && c.aborted) throw Object.assign(new Error('watchdog: nick quá giờ — huỷ giữa chừng'), { infra: true, watchdog: true }); }\n// chạy p nhưng KHÔNG chờ quá ms; hết giờ gọi onTimeout (nếu có) rồi resolve → vòng lặp không kẹt\nfunction withTimeout(p, ms, onTimeout) {");
+rep("      await Promise.all(chunk.map(([profile, tasks]) => withTimeout(\n        runNick(profile, tasks).catch(e => log(`nick ${profile} lỗi:`, e && e.message)),\n        CFG.nickTimeoutMs,\n        () => log(`⏱ nick ${profile} quá giờ (${Math.round(CFG.nickTimeoutMs / 1000)}s) — bỏ qua vòng này (reaper sẽ trả task về hàng đợi)`)\n      )));",
+    "      await Promise.all(chunk.map(([profile, tasks]) => { const ctl = { aborted: false, browser: null, page: null }; return withTimeout(\n        runNick(profile, tasks, ctl).catch(e => log(`nick ${profile} lỗi:`, e && e.message)),\n        CFG.nickTimeoutMs,\n        () => hardCancel(ctl, profile) // v2026-09-06d: huỷ cứng thay vì bỏ qua (zombie)\n      ); }));");
+fs.writeFileSync(f, s); console.log('PATCH OK n=' + n);

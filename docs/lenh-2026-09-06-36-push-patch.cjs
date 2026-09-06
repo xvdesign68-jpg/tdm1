@@ -1,0 +1,6 @@
+/* LỆNH #36 (a) = LỆNH #16 (a) 04/09: push.js — thông báo "khách phản hồi" ĐỨNG LẠI tới khi bấm (require:'1') + nút "Mở lead"; hẹn chăm + nút "Mở việc".
+   FE v119-48 (sw.js/90-boot) đã đọc require/actionTitle. Regex khoan dung (LỆNH #12 có thể đã đổi phần trước trong dòng), idempotent, fail-closed. */
+const fs = require('fs'); const F = process.argv[2] || 'push.js'; let s = fs.readFileSync(F, 'utf8'); let n = 0;
+if (!/require: '1'/.test(s)) { const r = /tag: 'reply-' \+ id \}/; if (!r.test(s)) { console.error("KHONG THAY MOC reply (tag: 'reply-' + id }). Dòng hiện có:\n" + (s.split('\n').filter(l => l.includes("'reply-'")).join('\n') || '(không có)')); process.exit(1); } s = s.replace(r, () => "tag: 'reply-' + id, require: '1', actionTitle: 'Mở lead' }"); n++; } else console.log('push.js: reply đã có require/actionTitle (idempotent)');
+if (!/actionTitle: 'Mở việc'/.test(s)) { const r = /tag: 'fu-' \+ d\.id \}/; if (!r.test(s)) { console.error("KHONG THAY MOC hẹn chăm (tag: 'fu-' + d.id }). Dòng hiện có:\n" + (s.split('\n').filter(l => l.includes("'fu-'")).join('\n') || '(không có)')); process.exit(1); } s = s.replace(r, () => "tag: 'fu-' + d.id, actionTitle: 'Mở việc' }"); n++; } else console.log('push.js: hẹn chăm đã có actionTitle (idempotent)');
+if (n) fs.writeFileSync(F, s); console.log('PATCH push.js n=' + n + ' (2 = mới vá đủ, 0 = đã vá trước)');

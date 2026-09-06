@@ -45,3 +45,9 @@ Luồng funnel bài, comment-lead DOM (05b/05c), checkReplies, Safety Score, gat
 ```
 3. Bấm đúp `run.bat` → dòng đầu `v2026-09-06b`, `API nội bộ=BẬT`.
 4. Nghiệm thu: khi engine bốc lead-bình luận, cửa sổ worker in `react-comment API: OK` + `reply API: OK`; web "Hoạt động gần đây" hiện *Thả cảm xúc ❤️ vào bình luận của Lead ✓ → Trả lời bình luận của Lead ✓* nhanh hơn (không mở khung comment). Nếu in `FAIL` kèm `errors` → gửi em dòng đó (doc_id lại đổi → capture lại).
+
+## ★ Worker `2026-09-06c` (06/09/2026, đi cùng LỆNH #34 — meta nội dung lên lead)
+- **Mục đích**: web đo tỉ lệ khách phản hồi theo KIỂU nội dung (cách soạn · bài gốc là bài chào bán của người khác hay không · kiểu bình luận · CTA · kiểu mở đầu inbox AI xoay) → Content Studio card "📈 Hiệu quả nội dung" (zip v119-55).
+- **Thay đổi (marker `v2026-09-06c`)**: `stampExtra(t, action)` — nếu `task.payload.content_meta` là object (engine đóng dấu từ `genForLead(...).meta`, LỆNH #34) → ghi `leads/{id}.outreach.content = meta`; bước `comment` → `outreach.comment_at`, bước `inbox` → `outreach.inbox_at` (ms). Gọi ở 2 chỗ `stampLead` (per-step `addLog` + funnel `logStep`, kể cả nhánh "đã là bạn"). `set(merge:true)` → KHÔNG đè `replied_at`/field khác. Không có meta → không ghi gì thêm (hành vi cũ).
+- **Kiểm**: `docs/harness-worker-meta-2026-09-06.mjs` 7/7 (comment-lead API → content + comment_at; kết bạn+inbox → inbox_at + content mới thay content cũ, replied_at giữ; không meta / meta rác → bỏ qua; nhánh đã-là-bạn vẫn ghi) + 6 harness cũ PASS; `node --check` OK. Stub Firestore của harness (`wk05/stubs.mjs`) sửa `applyMerge` merge SÂU map lồng như Firestore thật (trước merge nông → harness báo sai).
+- **Anh cần**: chép đè `worker.mjs` MỌI VPS + chạy lại run.bat (config.json không đổi so với bản 2026-09-06b). Nghiệm thu: sau 1 phễu có inbox, lead trong Firestore có `outreach.content.v=34` + `outreach.inbox_at`; web Content Studio hiện "Đã inbox 1".

@@ -1,0 +1,23 @@
+import fs from 'fs'; import path from 'path'; import { pathToFileURL } from 'url';
+process.env.LLM_API_KEY = 'x'; process.env.LLM_MODEL = 'gpt-test';
+let src = fs.readFileSync('content.js', 'utf8');
+src = src.replace(/^import \{ onRequest \} from 'firebase-functions\/v2\/https';$/m, 'const onRequest=(o,f)=>f;').replace(/^import \{ getFirestore \} from 'firebase-admin\/firestore';$/m, 'const getFirestore=()=>({});').replace(/^import \{ getAuth \} from 'firebase-admin\/auth';$/m, 'const getAuth=()=>({});');
+src += '\nexport { contentOf, templateGen, replyGen };\n'; fs.writeFileSync('_c.mjs', src);
+const C = await import(pathToFileURL(path.resolve('_c.mjs')).href);
+let pass = 0, total = 0; const check = (n, ok, x) => { total++; if (ok) pass++; console.log(ok ? 'PASS' : 'FAIL', n, x !== undefined ? '→ ' + x : ''); };
+const c = C.contentOf({ content: {} });
+check('contentOf: optout mặc định RỖNG', c.optout === '');
+let r = C.replyGen({ reply: 'Chào chị Lan, em thấy chị cần mực khô loại 1. Chị cho em xin số lượng để báo giá nhé.' }, c);
+check('replyGen: inbox không có opt-out, nguyên câu', r.inbox === 'Chào chị Lan, em thấy chị cần mực khô loại 1. Chị cho em xin số lượng để báo giá nhé.', r.inbox);
+r = C.templateGen({ name: 'Tuấn', need: 'mua ghẹ đá sỉ', service: 'ghẹ đá' }, c);
+check('templateGen: không opt-out, không thừa khoảng trắng cuối', !/bỏ qua tin này/.test(r.inbox) && !/\s$/.test(r.inbox), r.inbox.slice(-60));
+let lastSys = '', reply = { comment: 'Dạ giá tuỳ loại ạ. Chị nhắn riêng em báo giá nhé.', inbox: 'Chào chị Hiền, em thấy chị hỏi giá cá lóc khô. Chị lấy sỉ hay lẻ ạ? Chị inbox em gửi bảng giá nhé.', spam: 3, note: 'ok' };
+globalThis.fetch = async (u, o) => { lastSys = JSON.parse(o.body).messages[0].content; return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(reply) }, finish_reason: 'stop' }] }) }; };
+const brandAi = { code: 'hscl-01', ai: { nganh: 'Hải sản', dichvu: 'Mực khô', khach: 'người kinh doanh' } };
+r = await C.genForLead(brandAi, { id: 'L1', name: 'Hien', temp: 'warm', text: 'Giá', comment_id: '5', kind: 'comment', reply: 'x' });
+check('AI: prompt KHÔNG còn yêu cầu dòng opt-out', !/opt-out \(giữ/.test(lastSys), lastSys.match(/kết bằng CTA[^\n]{0,80}/)?.[0]);
+check('AI: inbox giữ nguyên, không nối opt-out', r.inbox === reply.inbox, r.inbox);
+// brand tự ghi câu riêng → vẫn thêm (tuỳ chọn của brand)
+r = C.replyGen({ reply: 'Chào anh Nam, em gửi anh bảng giá nhé.' }, C.contentOf({ content: { optout: 'Không cần thì anh/chị bỏ qua giúp em ạ.' } }));
+check('brand tự ghi opt-out riêng → vẫn nối + khớp xưng hô', /nhé\. Không cần thì anh bỏ qua giúp em ạ\.$/.test(r.inbox), r.inbox.slice(-60));
+console.log(`\n${pass}/${total} PASS`); if (pass !== total) process.exit(1);

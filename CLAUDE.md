@@ -585,11 +585,12 @@ NODE_PATH=<nơi có node_modules> node tools/smoke.js   # PASS hết mới gửi
 
 ## Việc còn tồn (chờ anh chốt)
 - ~~Dọn 9 code chết + nâng dần part sang ES module thật; pin version esbuild/eslint bằng package.json — làm khi bắt đầu v120.~~ → ĐÃ LÀM: code chết dọn ở v119-42, pin ở v119-42, ES module = v120-esm (05/09).
-- (Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không — liên quan sink `${l.score}` (client đã ép Number nên rủi ro thấp).
-- logo-mark.png tham chiếu từ JS (màn login 80-rbac-auth) không có ?v= — nếu thay logo thì đổi TÊN file.
+- ~~(Tuỳ chọn, backend) LỆNH kiểm Rules `leads` update có whitelist field không~~ → ĐÃ CÓ từ LỆNH #8 (04/09): update `hasOnly([31 field vận hành])` cho non-super.
+- ~~logo-mark.png tham chiếu từ JS không có ?v=~~ → ĐÃ LÀM v119-53 (`logoSrc()` đọc href `<link rel=icon>` đã hash).
 - ~~Tách `boot()` live.js~~ → ĐÃ LÀM v119-51 (openDb/buildApi/wrapAudit/onAuthChanged, cùng closure).
 - ~~Pipeline chưa diff theo lead.id như feed~~ → ĐÃ LÀM v119-51 (diff theo cột: pvParts/pvPatch).
 - `buildData` whitelist → pass-through: ĐÃ CÓ `D.cfg` pass-through toàn bộ config (v119-48); lead/scan/scanned vốn spread nguyên doc → không còn việc.
 - ~~`assigned_at`/giờ ghi chú vẫn dùng đồng hồ máy client~~ → ĐÃ LÀM v119-51 bằng giờ server đo qua header Date (không đổi kiểu dữ liệu, không migrate).
-- Ngoài code: research Zalo cá nhân (yêu cầu 26/08); xoay key OpenAI; xoá lead rác "Lan Anh Nguyễn".
+- Ngoài code: ~~research Zalo cá nhân~~ (BỎ theo Q5 03/09); xoay key OpenAI (anh tự làm, không qua chat); xoá lead rác "Lan Anh Nguyễn" (`node _l36_junk.mjs --delete`, anh tạm bỏ qua 07/09).
+- **TRẠNG THÁI 07/09/2026 sáng (anh chốt "tạm thời là xong")**: không còn task đang dở phía em. Anh TẠM BỎ QUA: đăng nhập lại 4 nick, xoá lead rác, deploy zip v119-57/v120-esm-g. Việc tuỳ chọn còn treo, chỉ làm khi anh gọi: #30c regen thread cũ · `_l34_move.mjs` chuyển thread nick chết · đề xuất nội dung mục 1/3/4 (kiến thức brand có số, follow-up lần 2 sau 24–48 h, CTA xin Zalo) · deploy v120-esm-g sau khi v119-57 ổn.
 - Chi tiết: báo cáo audit đã gửi anh (57 phát hiện, lọc theo mức độ/nhóm).

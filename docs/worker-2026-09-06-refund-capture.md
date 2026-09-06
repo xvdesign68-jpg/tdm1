@@ -23,3 +23,25 @@ Worker ghi mọi lệnh GraphQL liên quan (tên có React/Comment/Feedback/UFI/
 
 ## 3. Không đổi
 Luồng funnel bài, comment-lead DOM (05b/05c), checkReplies, Safety Score, gate ngôn ngữ FB, heartbeat — giữ nguyên.
+
+## ★ Bản `2026-09-06b` — comment-lead đi API nội bộ (sau capture 06/09 08:47–08:50 VN, nick k1gm6por)
+### Capture cho thấy
+- **Tym bình luận** = cùng mutation react bài `CometUFIFeedbackReactMutation` doc_id `27646120298312844`, chỉ khác **`feedback_id` = base64("feedback:<postId>_<commentId>")** (vd `feedback:1735915220991477_1744380153478317`), `feedback_source: "OBJECT"`. Response `feedback_react.feedback.viewer_feedback_reaction_info.id` = id cảm xúc → react thật.
+- **Trả lời bình luận** = `useCometUFICreateCommentMutation` **doc_id `28781864408106143`** (MỚI — bản 29/08 là `28980334608233889`, FB đã xoay), variables như comment bài + **`reply_comment_parent_fbid` = base64("comment:<postId>_<commentId>")**, `reply_target_clicked: true`, `feedLocation: "POST_PERMALINK_DIALOG"`, `feedbackSource: 2`, `translationType: "ORIGINAL"`; FB tự thêm `message.ranges` tag tên chủ comment (worker gửi `ranges: []` — reply vẫn lồng đúng dưới comment cha, chủ comment vẫn được báo). Response có `comment_create`.
+- Bình luận cấp 1 lên bài (đối chiếu) cũng dùng doc_id `28781864408106143` → **config.json `commentDocId` nên cập nhật** sang id này (đường comment bài có thể đang rơi DOM vì id cũ).
+- Không cần doc_id mới cho react (dùng chung); inbox vẫn WebSocket (không có graphql) → DOM messenger như cũ.
+
+### Worker `2026-09-06b` làm gì
+- Helper `cmtFeedbackId(postId,cid)` / `cmtParentFbid(postId,cid)`; `gqlReactComment()` (dùng lại `gqlReact` với feedback id bình luận, source OBJECT); `gqlReply()` (doc_id = `graphql.replyDocId || commentDocId`, đủ bộ biến như capture) trả `{ok, ambiguous, sample}`.
+- `runFunnel` comment-lead: bước **react** → API trước (chỉ cần đứng trên trang bài `gotoCmtPage()`, không định vị khung comment) → OK = xong; API tắt/lỗi → DOM tym như cũ (best-effort). Bước **comment** → `gqlReply` → OK = xong; **mơ hồ** (200 nhưng không thấy `comment_create`) → mở khung comment + `verifyComment` thấy chữ của mình → coi là đã gửi, KHÔNG gõ lại (chống double); lỗi rõ → DOM `replyComment` như cũ (fail-closed).
+- `graphql` rỗng → không gọi API, hành vi y bản cũ (harness DOM thật t_reply/t_reply2 vẫn PASS).
+- Kiểm: `docs/harness-worker-cmtapi-2026-09-06.mjs` **12/12** (A API OK 2 bước đúng doc_id/feedback_id/parent_fbid/feedLocation/groupID, 1 lần điều hướng; B mơ hồ + đã hiện → không gõ; C lỗi → DOM fail-closed; D graphql tắt → 0 lệnh API; E thiếu replyDocId → dùng commentDocId; F lead-bài không đổi) + t_flow 16/16 · t_reply 19/19 · t_reply2 9/9 · t_uid 9/9 · t_refund 6/6. Backup `worker.2026-09-06.bak.mjs` (scratchpad).
+
+### Anh làm trên VPS
+1. Chép đè `worker.mjs` (2026-09-06b).
+2. Mở `config.json`, sửa khối `graphql` thành (giữ nguyên các mục khác):
+```json
+"graphql": { "reactDocId": "27646120298312844", "commentDocId": "28781864408106143", "replyDocId": "28781864408106143", "friendDocId": "28400389149651601" }
+```
+3. Bấm đúp `run.bat` → dòng đầu `v2026-09-06b`, `API nội bộ=BẬT`.
+4. Nghiệm thu: khi engine bốc lead-bình luận, cửa sổ worker in `react-comment API: OK` + `reply API: OK`; web "Hoạt động gần đây" hiện *Thả cảm xúc ❤️ vào bình luận của Lead ✓ → Trả lời bình luận của Lead ✓* nhanh hơn (không mở khung comment). Nếu in `FAIL` kèm `errors` → gửi em dòng đó (doc_id lại đổi → capture lại).

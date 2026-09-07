@@ -1,0 +1,74 @@
+Inter                        vietnamese=2 faces=14
+Be Vietnam Pro               vietnamese=2 faces=6
+Plus Jakarta Sans            vietnamese=2 faces=8
+Manrope                      vietnamese=2 faces=12
+Public Sans                  vietnamese=2 faces=6
+IBM Plex Sans                vietnamese=2 faces=12
+Source Sans 3                vietnamese=2 faces=14
+Nunito Sans                  vietnamese=2 faces=10
+Figtree                      vietnamese=0 faces=4
+Lexend                       vietnamese=2 faces=6
+Geist                        vietnamese=2 faces=10
+Instrument Sans              vietnamese=0 faces=4
+DM Sans                      vietnamese=0 faces=4
+Roboto                       vietnamese=2 faces=18
+Noto Sans                    vietnamese=2 faces=16
+Sora                         vietnamese=0 faces=4
+Albert Sans                  vietnamese=0 faces=4
+Onest                        vietnamese=2 faces=14
+Wix Madefor Text             vietnamese=2 faces=10
+Schibsted Grotesk            vietnamese=0 faces=4
+Hanken Grotesk               vietnamese=2 faces=8
+Archivo                      vietnamese=2 faces=6
+Work Sans                    vietnamese=2 faces=6
+Montserrat                   vietnamese=2 faces=10
+Mulish                       vietnamese=2 faces=10
+Bricolage Grotesque          vietnamese=2 faces=6
+Funnel Sans                  vietnamese=0 faces=4
+Host Grotesk                 vietnamese=0 faces=4
+Golos Text                   vietnamese=0 faces=8
+Rubik                        vietnamese=0 faces=12
+Lato                         vietnamese=0 faces=2
+Open Sans                    vietnamese=2 faces=20
+Jost                         vietnamese=0 faces=6
+Outfit                       vietnamese=0 faces=4
+Urbanist                     vietnamese=0 faces=4
+Barlow                       vietnamese=2 faces=6
+Epilogue                     vietnamese=2 faces=6
+Red Hat Text                 vietnamese=0 faces=4
+Reddit Sans                  vietnamese=2 faces=6
+Atkinson Hyperlegible Next   vietnamese=0 faces=4
+Familjen Grotesk             vietnamese=2 faces=6
+Space Grotesk                vietnamese=2 faces=6
+Chivo                        vietnamese=2 faces=6
+Karla                        vietnamese=0 faces=4
+Encode Sans                  vietnamese=2 faces=6
+Cabin                        vietnamese=2 faces=6
+Overpass                     vietnamese=2 faces=10
+Signika                      vietnamese=2 faces=6
+Tai Heritage Pro             vietnamese=1 faces=4
+Roboto Flex                  vietnamese=2 faces=12
+Noto Sans Display            vietnamese=2 faces=14
+Inter Tight                  vietnamese=2 faces=14
+Anybody                      vietnamese=2 faces=6
+Geologica                    vietnamese=2 faces=12
+Gantari                      vietnamese=0 faces=4
+Radio Canada                 vietnamese=2 faces=8
+Commissioner                 vietnamese=2 faces=12
+Readex Pro                   vietnamese=2 faces=8
+Sarabun                      vietnamese=2 faces=8
+Prompt                       vietnamese=2 faces=8
+Kanit                        vietnamese=2 faces=8
+Mitr                         vietnamese=2 faces=8
+Niramit                      vietnamese=2 faces=8
+K2D                          vietnamese=2 faces=8
+Bai Jamjuree                 vietnamese=2 faces=8
+Chakra Petch                 vietnamese=2 faces=8
+Nunito                       vietnamese=2 faces=10
+Quicksand                    vietnamese=2 faces=6
+Poppins                      vietnamese=0 faces=6
+Raleway                      vietnamese=2 faces=10
+Saira                        vietnamese=2 faces=6
+Exo 2                        vietnamese=2 faces=10
+Lexend Deca                  vietnamese=2 faces=6
+Instrument Serif             vietnamese=0 faces=2

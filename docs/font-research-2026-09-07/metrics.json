@@ -1,0 +1,222 @@
+[
+ {
+  "font": "Source Sans 3",
+  "ok": true,
+  "widthVsInter": -13.9,
+  "xHeight": 0.49,
+  "capHeight": 0.66,
+  "tnum": true,
+  "digitW": 6.96,
+  "kb": 387
+ },
+ {
+  "font": "Inter Tight",
+  "ok": true,
+  "widthVsInter": -10,
+  "xHeight": 0.54,
+  "capHeight": 0.73,
+  "tnum": true,
+  "digitW": 8.41,
+  "kb": 567
+ },
+ {
+  "font": "Reddit Sans",
+  "ok": true,
+  "widthVsInter": -7.1,
+  "xHeight": 0.53,
+  "capHeight": 0.73,
+  "tnum": true,
+  "digitW": 8.52,
+  "kb": 342
+ },
+ {
+  "font": "Roboto Flex",
+  "ok": true,
+  "widthVsInter": -6.9,
+  "xHeight": 0.52,
+  "capHeight": 0.72,
+  "tnum": true,
+  "digitW": 7.9,
+  "kb": 264
+ },
+ {
+  "font": "Commissioner",
+  "ok": true,
+  "widthVsInter": -6.9,
+  "xHeight": 0.5,
+  "capHeight": 0.72,
+  "tnum": false,
+  "digitW": 8.5,
+  "kb": 305
+ },
+ {
+  "font": "Hanken Grotesk",
+  "ok": true,
+  "widthVsInter": -6.4,
+  "xHeight": 0.5,
+  "capHeight": 0.7,
+  "tnum": true,
+  "digitW": 7.84,
+  "kb": 248
+ },
+ {
+  "font": "Manrope",
+  "ok": true,
+  "widthVsInter": -6.3,
+  "xHeight": 0.55,
+  "capHeight": 0.73,
+  "tnum": true,
+  "digitW": 8.68,
+  "kb": 189
+ },
+ {
+  "font": "IBM Plex Sans",
+  "ok": true,
+  "widthVsInter": -6,
+  "xHeight": 0.52,
+  "capHeight": 0.71,
+  "tnum": true,
+  "digitW": 8.4,
+  "kb": 296
+ },
+ {
+  "font": "Nunito Sans",
+  "ok": true,
+  "widthVsInter": -5.6,
+  "xHeight": 0.5,
+  "capHeight": 0.71,
+  "tnum": true,
+  "digitW": 8.4,
+  "kb": 270
+ },
+ {
+  "font": "Geist",
+  "ok": true,
+  "widthVsInter": -4.7,
+  "xHeight": 0.53,
+  "capHeight": 0.71,
+  "tnum": true,
+  "digitW": 8.4,
+  "kb": 210
+ },
+ {
+  "font": "Public Sans",
+  "ok": true,
+  "widthVsInter": -4.1,
+  "xHeight": 0.52,
+  "capHeight": 0.73,
+  "tnum": true,
+  "digitW": 9.8,
+  "kb": 205
+ },
+ {
+  "font": "Wix Madefor Text",
+  "ok": true,
+  "widthVsInter": -3.4,
+  "xHeight": 0.5,
+  "capHeight": 0.72,
+  "tnum": false,
+  "digitW": 8.54,
+  "kb": 158
+ },
+ {
+  "font": "Bricolage Grotesque",
+  "ok": true,
+  "widthVsInter": -3.3,
+  "xHeight": 0.52,
+  "capHeight": 0.66,
+  "tnum": true,
+  "digitW": 8.43,
+  "kb": 268
+ },
+ {
+  "font": "Plus Jakarta Sans",
+  "ok": true,
+  "widthVsInter": -3.1,
+  "xHeight": 0.54,
+  "capHeight": 0.75,
+  "tnum": true,
+  "digitW": 8.4,
+  "kb": 224
+ },
+ {
+  "font": "Mulish",
+  "ok": true,
+  "widthVsInter": -2.8,
+  "xHeight": 0.51,
+  "capHeight": 0.7,
+  "tnum": true,
+  "digitW": 8.4,
+  "kb": 260
+ },
+ {
+  "font": "Onest",
+  "ok": true,
+  "widthVsInter": -2,
+  "xHeight": 0.52,
+  "capHeight": 0.71,
+  "tnum": true,
+  "digitW": 9.41,
+  "kb": 292
+ },
+ {
+  "font": "Space Grotesk",
+  "ok": true,
+  "widthVsInter": -0.7,
+  "xHeight": 0.49,
+  "capHeight": 0.7,
+  "tnum": true,
+  "digitW": 8.68,
+  "kb": 188
+ },
+ {
+  "font": "Geologica",
+  "ok": true,
+  "widthVsInter": -0.4,
+  "xHeight": 0.5,
+  "capHeight": 0.7,
+  "tnum": true,
+  "digitW": 9.07,
+  "kb": 218
+ },
+ {
+  "font": "Inter",
+  "ok": true,
+  "widthVsInter": 0,
+  "xHeight": 0.54,
+  "capHeight": 0.73,
+  "tnum": true,
+  "digitW": 9.08,
+  "kb": 562
+ },
+ {
+  "font": "Lexend",
+  "ok": true,
+  "widthVsInter": 1.3,
+  "xHeight": 0.53,
+  "capHeight": 0.71,
+  "tnum": false,
+  "digitW": 8.11,
+  "kb": 343
+ },
+ {
+  "font": "Be Vietnam Pro",
+  "ok": true,
+  "widthVsInter": 1.5,
+  "xHeight": 0.53,
+  "capHeight": 0.74,
+  "tnum": false,
+  "digitW": 8.88,
+  "kb": 99
+ },
+ {
+  "font": "Work Sans",
+  "ok": true,
+  "widthVsInter": 2.3,
+  "xHeight": 0.5,
+  "capHeight": 0.67,
+  "tnum": true,
+  "digitW": 8.46,
+  "kb": 383
+ }
+]

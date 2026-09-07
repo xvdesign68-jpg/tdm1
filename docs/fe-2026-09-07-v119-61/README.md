@@ -66,3 +66,13 @@ W=<v119-64 hoặc v120-esm-n>; S=docs/fe-2026-09-07-v119-61
 python3 $S/m8.py $W && cd $W && node tools/build.mjs --zip /tmp/smartleads17deploy-v119-65.zip && NODE_PATH=$PWD/node_modules node tools/smoke.js && node <repo>/docs/harness-chanretry-2026-09-07.mjs assets/js/live.js
 ```
 
+
+## v119-66 / v120-esm-p (07/09 trưa, ĐỀ XUẤT font Geist — chờ anh chốt)
+Anh hỏi font hệ thống ban đầu là gì mà "oke" hơn, rồi "research kĩ và đề xuất font đẹp, phù hợp nhất". Research đo được ở `docs/font-research-2026-09-07/README.md`. Kết quả: Be Vietnam Pro không có chữ số bảng + rộng → gãy dòng; Geist gọn như SF Pro, tnum, dấu Việt chuẩn, 146 KB.
+```
+cp -a w62 w66 && python3 m9.py w66      # cây IIFE v119-65 → v119-66
+cp -a w62e w66e && python3 m9.py w66e   # cây ESM v120-esm-o → v120-esm-p
+cd w66  && node tools/build.mjs --zip smartleads17deploy-v119-66.zip   && node tools/smoke.js
+cd w66e && node tools/build.mjs --zip smartleads17deploy-v120-esm-p.zip && node tools/smoke.js
+```
+`m9.py` fail-closed 7 mốc: link Google Fonts ở `app.html`/`privacy.html`/`terms.html`, `tokens.css --font`/`--font-head`/comment, comment `app.css`. Muốn đổi sang Manrope/Reddit Sans: sửa 2 hằng `LINK_NEW` + tên họ trong m9.py.

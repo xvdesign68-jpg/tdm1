@@ -42,3 +42,6 @@ python3 $S/m3css.py $W        # CSS icon (v119-61 từng chèn tay) + 3 sửa sm
 cd $W && node tools/build.mjs --zip /tmp/smartleads17deploy-v119-62.zip && NODE_PATH=$PWD/node_modules node tools/smoke.js
 ```
 Cây ESM `v120-esm-l`: như mục "Cây ESM" ở trên. Kết quả: smoke 108/108 cả 2 cây.
+
+## v119-63 / v120-esm-m (07/09 chiều, anh: "để lại khung hotline và đổi lại font chữ sao cho thật đẹp")
+`python3 $S/m6.py $W <thư mục v119-60>` sau các bước của v119-62: (1) trả lại **khung hotline sidebar** nguyên bản (HTML + CSS lấy từ v119-60; hotline nổi mobile vẫn bỏ vì che nội dung); (2) **bộ font Z15 CRM thật sự được áp**: `--font-head` Plus Jakarta Sans (tiêu đề, số KPI), `--font` Inter (chữ), `--font-mono` JetBrains Mono (mã/số liệu) – nạp Google Fonts `display=swap`, Inter bật `cv11` + `ss03`. Trước đây app.css đè `--font` bằng font hệ thống nên Google Fonts tải mà không dùng. Xem thử: tải woff2 về `assets/fp/` (chỉ để chụp, không vào zip).

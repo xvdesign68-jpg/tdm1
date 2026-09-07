@@ -56,3 +56,9 @@ Lý do lặp lại nhiều nhất: (a) thiết kế cho màn hình — x-height 
 Việt Nam: Zalo dùng font hệ thống (SF Pro iOS / Roboto Android); Shopee có "Shopee 2021" tối ưu dấu Việt; MoMo có bộ font thương hiệu riêng; Be Vietnam Pro (Yellow Type/beGroup) được cộng đồng thiết kế VN chuộng — đẹp cho in/branding nhưng đo thực tế: không có số bảng, rộng → không hợp dashboard. Grab (có thị trường VN) chọn Inter.
 
 Kết luận cho SmartLead: "hiện đại nhất" 2025–2026 = Geist (dev-tool/AI) hoặc Inter (SaaS lớn); cả hai cùng triết lý "font biến mất, số liệu rõ". Geist gọn hơn Inter 4,7% (đo ở trên) nên hợp 1440/mobile hơn → giữ đề xuất Geist; Inter là phương án "chuẩn ngành" nếu anh muốn giống Notion/Linear/Grab. Muốn cá tính: giữ 1 font UI + font tiêu đề riêng cho landing/marketing, không đưa vào app.
+
+### Xanh SM / Green SM (anh hỏi thêm 07/09)
+- 2023 (ra mắt, Aurora Vietnam): tài liệu brand guidelines lưu trên Studocu ghi font chính **Roboto** ("rõ, hiện đại, đọc được cả digital lẫn in") — lưu ý đây là bài tập sinh viên Swinburne dựng lại guideline, không phải tài liệu gốc GSM; app Android dùng Roboto hệ thống là hợp lý.
+- Cuối 2024 (rebrand bởi InSpace Creative × Aurora Vietnam, Bronze Transform Awards Asia 2025): **font riêng (custom typeface)** — lý do nêu: "thể hiện ngôn ngữ bản địa (dấu tiếng Việt) tự nhiên, vẫn quốc tế, linh hoạt đa nền tảng"; cyan sáng hơn, lưới modular; tên font không công bố.
+- 14/04/2026: đổi tên Xanh SM → **Green SM** để thống nhất thương hiệu toàn cầu (VN, Lào, Indonesia, Philippines…), app 2025 thiết kế lại 4 tab.
+- Không kiểm được font UI thật của app/web (proxy phiên chặn greensm.com/xanhsm.com/Behance). Bài học cho SmartLead: cùng công thức các hãng lớn — font riêng cho THƯƠNG HIỆU (xe, quảng cáo), UI vẫn ưu tiên font đọc rõ; GSM đi được vì có ngân sách làm font riêng đủ dấu Việt.

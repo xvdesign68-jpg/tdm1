@@ -45,3 +45,17 @@ Cây ESM `v120-esm-l`: như mục "Cây ESM" ở trên. Kết quả: smoke 108/1
 
 ## v119-63 / v120-esm-m (07/09 chiều, anh: "để lại khung hotline và đổi lại font chữ sao cho thật đẹp")
 `python3 $S/m6.py $W <thư mục v119-60>` sau các bước của v119-62: (1) trả lại **khung hotline sidebar** nguyên bản (HTML + CSS lấy từ v119-60; hotline nổi mobile vẫn bỏ vì che nội dung); (2) **bộ font Z15 CRM thật sự được áp**: `--font-head` Plus Jakarta Sans (tiêu đề, số KPI), `--font` Inter (chữ), `--font-mono` JetBrains Mono (mã/số liệu) – nạp Google Fonts `display=swap`, Inter bật `cv11` + `ss03`. Trước đây app.css đè `--font` bằng font hệ thống nên Google Fonts tải mà không dùng. Xem thử: tải woff2 về `assets/fp/` (chỉ để chụp, không vào zip).
+
+## v119-64 / v120-esm-n (07/09 chiều, anh gửi ảnh cặp font: Plus Jakarta Sans — tiêu đề, nút, nhãn · Be Vietnam Pro — thân chữ)
+`python3 $S/m7.py <cây>` sau m6 — áp được cho CẢ cây IIFE (v119-63) lẫn cây ESM (v120-esm-m), không cần thư mục base:
+(1) Google Fonts link → `Plus+Jakarta+Sans:500;600;700;800` + `Be+Vietnam+Pro:400;500;600;700` + `JetBrains+Mono:400;500;600`, `display=swap`;
+(2) tokens.css: `--font` = Be Vietnam Pro (fallback Plus Jakarta Sans), `--font-head` = Plus Jakarta Sans (fallback Be Vietnam Pro); bỏ `font-feature-settings: "cv11","ss03"` (riêng Inter); `.btn` + `.chip/.badge` thêm `font-family: var(--font-head)`;
+(3) app.css: 11 rule nhãn/nút đang ghi rõ `var(--font)` → `var(--font-head)` + khối cuối gom nhãn/nút còn inherit (`.nav-item, .side-nav .nav-item, .seg button, .bt-item, .form-row label, .kpi .lbl, th bảng, eyebrow…`) — LƯU Ý `.side-nav .nav-item { font-family: inherit }` specificity (0,2,0) đè rule `.nav-item` (0,1,0) nên phải liệt kê rõ;
+(4) `src/app/80-rbac-auth.js` màn đăng nhập `#authGate` bỏ font hệ thống ghi cứng → `var(--font)` / `var(--font-head)` (nút `.ag-btn` = Jakarta).
+Ô nhập/select/textarea giữ thân chữ; số liệu `.mono`/eyebrow mono giữ JetBrains Mono.
+```bash
+W=<v119-63 hoặc v120-esm-m>; S=docs/fe-2026-09-07-v119-61
+python3 $S/m7.py $W && cd $W && node tools/build.mjs --zip /tmp/smartleads17deploy-v119-64.zip && NODE_PATH=$PWD/node_modules node tools/smoke.js
+```
+Kết quả: smoke **108/108** cả 2 cây; kiểm `document.fonts`: 33 face nạp (Be Vietnam Pro 400–700, Jakarta 500–700, JetBrains 400/600), body = Be Vietnam Pro, h1/nút/menu/chip = Plus Jakarta Sans; 11 ảnh desktop 1440 + mobile 390 dấu tiếng Việt đủ. Xem thử cục bộ: tải woff2 về `assets/fp/` với URL tuyệt đối `/assets/fp/fN.woff2` (chỉ để chụp, không vào zip).
+

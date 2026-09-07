@@ -1,0 +1,25 @@
+// LENH #38 (07/09/2026) — CHỈ ĐỌC: Rules ĐANG CHẠY (ruleset nào, có deploy mới hôm nay không) + in block users/leads/outreach_log/outreach_stats/workers/scans/config + MỌI helper function. Không ghi gì.
+import fs from 'fs'; import { execSync } from 'child_process';
+const P = 'smartlead-z15';
+const tok = execSync('gcloud auth print-access-token', { encoding: 'utf8' }).trim();
+const get = async (path) => { const r = await fetch('https://firebaserules.googleapis.com/v1/' + path, { headers: { Authorization: 'Bearer ' + tok } }); const j = await r.json(); if (!r.ok) throw new Error(path + ' → HTTP ' + r.status + ' ' + JSON.stringify(j).slice(0, 200)); return j; };
+const vn = s => s ? new Date(s).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '-';
+const rel = await get('projects/' + P + '/releases');
+const fsRel = (rel.releases || []).find(r => r.name.endsWith('/cloud.firestore'));
+console.log('== RELEASE cloud.firestore ==');
+console.log(' ruleset đang chạy:', fsRel ? fsRel.rulesetName.split('/').pop() : '(không thấy)', '| tạo', vn(fsRel && fsRel.createTime), '| release gần nhất', vn(fsRel && fsRel.updateTime));
+const rs = await get('projects/' + P + '/rulesets?pageSize=10');
+const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+console.log('== 10 RULESET mới nhất (ngày VN hôm nay = ' + today + ') ==');
+(rs.rulesets || []).forEach(r => { const d = new Date(new Date(r.createTime).getTime() + 7 * 3600e3).toISOString().slice(0, 10); console.log(' -', r.name.split('/').pop(), vn(r.createTime), d === today ? '← HÔM NAY' : '', r.name === (fsRel && fsRel.rulesetName) ? '← ĐANG CHẠY' : ''); });
+if (!fsRel) process.exit(1);
+const full = await get(fsRel.rulesetName);
+const src = ((full.source || {}).files || []).map(f => f.content).join('\n');
+fs.writeFileSync(process.env.HOME + '/rules-deployed.txt', src);
+console.log('== bản đang chạy:', src.length, 'ký tự,', src.split('\n').length, 'dòng → đã lưu ~/rules-deployed.txt ==');
+const blk = (s, name) => { const one = s.match(new RegExp('^[ \\t]*match\\s+/' + name + '/\\{[^}]*\\}\\s*\\{[^\\n]*\\}[ \\t]*$', 'm')); if (one) return one[0]; const m = s.match(new RegExp('([ \\t]*)match\\s+/' + name + '/\\{[^}]*\\}\\s*\\{[\\s\\S]*?\\n\\1\\}')); return m ? m[0] : '(không thấy)'; };
+for (const b of ['users', 'leads', 'outreach_log', 'outreach_stats', 'workers', 'scans', 'config']) console.log('== BLOCK ' + b + ' (ĐANG CHẠY) ==\n' + blk(src, b));
+console.log('== MỌI HELPER function (ĐANG CHẠY) ==');
+const fns = src.match(/function\s+\w+\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\}/g) || [];
+fns.forEach(f => console.log(f));
+console.log('== XONG rules ==');

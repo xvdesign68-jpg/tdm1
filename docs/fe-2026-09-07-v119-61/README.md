@@ -24,3 +24,21 @@ E=<bản sao cây IIFE đã vá>; cp <v120-esm-j>/tools/build.mjs $E/tools/; cp 
 cp docs/esm-convert-2026-09-05.mjs $E/tools/_esm.mjs && (cd $E && node tools/_esm.mjs $E && rm tools/_esm.mjs) && cd $E && node tools/build.mjs --zip /tmp/smartleads17deploy-v120-esm-k.zip
 ```
 Kết quả 07/09: smoke **108/108** cả 2 cây · harness boot stub OK · eslint 0 lỗi (ESM 6 warning biến cục bộ không dùng).
+
+## v119-62 / v120-esm-l (07/09 chiều, sau khi anh xem v119-61 "xấu hơn")
+Đối chiếu ảnh v119-60 ↔ v119-61 cho thấy phần **đợt 2 design-system** làm mất "chất" cũ: bỏ nhãn CAPS (eyebrow/tiêu đề bảng/rail), số liệu bỏ font mono, hộp AI cam → xanh, khung brand sidebar mất viền gradient anh đã chỉnh v129–v131, cỡ chữ .5px làm chữ to hơn gãy dòng, bo góc/breakpoint đổi. **v119-62 = v119-61 trừ các thay đổi thuần thẩm mỹ đó** (giữ cấu trúc menu, chữ nghĩa, icon SVG, menu ⋯, bóng cuộn, hộp thoại app, token :root duy nhất, bỏ Google Fonts, CSS chết).
+```bash
+W=<v119-60>; S=docs/fe-2026-09-07-v119-61
+python3 $S/m1b.py $W          # = m1 nhưng tiêu đề nhóm menu giữ class mono
+python3 $S/m2.py $W
+cp $S/dash.mjs $W/tools/_dash.mjs && (cd $W && node tools/_dash.mjs $W $(ls src/app/*.js) assets/js/live.js && rm tools/_dash.mjs)
+sed -i 's|Z15 Miracle - Dashboard|Z15 Miracle – Dashboard|' $W/app.html
+# KHÔNG chạy caps.py
+python3 $S/m3pre.py $W
+cp $S/m3.mjs $W/tools/_m3.mjs && (cd $W && node tools/_m3.mjs $W $(ls src/app/*.js) && rm tools/_m3.mjs tools/_m3.log)
+python3 $S/m4b.py $W          # = m4 trừ đổi màu hộp AI / khối brand / .mono; + icon phương thức quét to có màu
+python3 $S/m5b.py $W          # = m5 trừ cỡ chữ .5px / bo góc / breakpoint / orb tĩnh / đổi giá trị radius token
+python3 $S/m3css.py $W        # CSS icon (v119-61 từng chèn tay) + 3 sửa smoke
+cd $W && node tools/build.mjs --zip /tmp/smartleads17deploy-v119-62.zip && NODE_PATH=$PWD/node_modules node tools/smoke.js
+```
+Cây ESM `v120-esm-l`: như mục "Cây ESM" ở trên. Kết quả: smoke 108/108 cả 2 cây.

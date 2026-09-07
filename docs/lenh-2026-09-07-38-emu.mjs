@@ -12,7 +12,8 @@ await env.withSecurityRulesDisabled(async ctx => {
   const d = ctx.firestore();
   for (const col of ['users', 'leads', 'outreach_log', 'outreach_stats', 'workers', 'scans']) for (const [id, data] of Object.entries(seed[col] || {})) await setDoc(doc(d, col, id), revive(data));
 });
-const uid = seed.superUid; const em = seed.superEmail;
+const uid = seed.superUid || Object.keys(seed.users || {})[0]; const em = seed.superEmail || 'x@y.z';
+if (!uid) { console.log('KHÔNG có uid super trong ~/l38-seed.json (KHỐI 1b chưa tra được Auth/users) → bỏ qua emulator'); await env.cleanup(); process.exit(2); }
 const me = env.authenticatedContext(uid, { email: em, email_verified: true, firebase: { sign_in_provider: 'google.com' } }).firestore();
 const oldestMs = Math.min(...Object.values(seed.leads).map(l => (l.detected_at && l.detected_at.__ts) || Date.now()));
 const tests = [

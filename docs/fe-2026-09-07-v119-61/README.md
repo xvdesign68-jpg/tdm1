@@ -59,3 +59,10 @@ python3 $S/m7.py $W && cd $W && node tools/build.mjs --zip /tmp/smartleads17depl
 ```
 Kết quả: smoke **108/108** cả 2 cây; kiểm `document.fonts`: 33 face nạp (Be Vietnam Pro 400–700, Jakarta 500–700, JetBrains 400/600), body = Be Vietnam Pro, h1/nút/menu/chip = Plus Jakarta Sans; 11 ảnh desktop 1440 + mobile 390 dấu tiếng Việt đủ. Xem thử cục bộ: tải woff2 về `assets/fp/` với URL tuyệt đối `/assets/fp/fN.woff2` (chỉ để chụp, không vào zip).
 
+## v119-65 / v120-esm-o (07/09 tối, sau LỆNH #38: banner "leads cũ / outreach_log permission-denied" trên tài khoản super)
+`python3 $S/m8.py <cây>` sau m7 (áp cho cả 2 cây; live.js 2 cây giống nhau). live.js: `snapErr` thử đăng ký lại **4 lần có giãn cách 10s/30s/90s/240s** (trước: đúng 1 lần sau 10s rồi treo banner); lượt đếm THEO KÊNH, nhiều kênh lỗi cùng lúc gộp 1 lần đăng ký lại; banner trong lúc thử = "gián đoạn … đang tự kết nối lại (lần n/4)" (`detail.soft`), hết lượt mới "lỗi permission-denied … báo quản trị viên"; `chanOkAt[name]` = mốc OK gần nhất → kênh khoẻ ≥5′ rồi lỗi = đợt mới (lượt về 0), còn cache trả OK rồi máy chủ từ chối ngay thì KHÔNG reset (kênh hỏng thật dừng sau 4 lượt, không lặp vô hạn); đổi người dùng → xoá lượt + huỷ timer; console ghi `uid… · role · lần n`; `onAuthChanged`: super theo email mà `users/{uid}` thiếu/`role` ≠ superadmin → banner "Hồ sơ Super Admin trên máy chủ chưa đúng (…, uid …)" + console.error. 90-boot `showFbDown`: hậu tố theo `d.soft`. Harness `docs/harness-chanretry-2026-09-07.mjs <live.js>` **19/19** (trích đúng khối từ live.js đã vá; Date/setTimeout giả). Smoke 108/108 cả 2 cây.
+```bash
+W=<v119-64 hoặc v120-esm-n>; S=docs/fe-2026-09-07-v119-61
+python3 $S/m8.py $W && cd $W && node tools/build.mjs --zip /tmp/smartleads17deploy-v119-65.zip && NODE_PATH=$PWD/node_modules node tools/smoke.js && node <repo>/docs/harness-chanretry-2026-09-07.mjs assets/js/live.js
+```
+

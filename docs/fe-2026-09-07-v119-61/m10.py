@@ -1,5 +1,5 @@
-# m10.py <cây> — v119-67 / v120-esm-q (anh chốt 08/09): menu Plus Jakarta Sans IN ĐẬM; nội dung chính = TikTok Sans, to/đậm hơn một chút
-# (thân chữ weight 450, cỡ nền giữ 14px; bài đăng lead + bài gốc trong modal 14 → 15px); số trong nội dung dùng chữ số TikTok Sans (có tabular).
+# m10.py <cây> — v119-67 / v120-esm-q (anh chốt 08/09; v119-68 / v120-esm-r = cùng script với TXT_PX=14.5px mặc định, v119-67 = TXT_PX=15px): menu Plus Jakarta Sans IN ĐẬM; nội dung chính = TikTok Sans, to/đậm hơn một chút
+# (thân chữ weight 450, cỡ nền giữ 14px; bài đăng lead + bài gốc trong modal + AI đọc vị 14 → TXT_PX); số trong nội dung dùng chữ số TikTok Sans (có tabular).
 # Áp được lên cây v119-65 / v120-esm-o (cặp Jakarta + Be Vietnam Pro) HOẶC v119-66 / v120-esm-p (Geist) — mốc nào khớp thì thay.
 # Fail-closed: mốc không khớp → dừng, KHÔNG ghi file nào (lib.py ghi 2 pha từ 08/09). DRY=1 để kiểm mốc. 18 mốc.
 import sys, os
@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib import *
 import lib
 lib.ROOT = sys.argv[1]
+TXT = os.environ.get('TXT_PX', '14.5px')   # cỡ 3 khối đọc chính (bài đăng thẻ lead · bài gốc modal · AI đọc vị): v119-67 = 15px, v119-68 = 14.5px (anh chỉnh 08/09)
 def rep_any(p, olds, new, tag=''):
     s = rd(p); hits = [o for o in olds if s.count(o) == 1]
     if len(hits) != 1:
@@ -34,8 +35,8 @@ rep(T, "  line-height: 1.6;\n  font-size: 14px;\n", "  line-height: 1.6;\n  font
 A = 'assets/css/app.css'
 rep(A, "  font-size: 13.5px; font-weight: 500; color: var(--ink-600);", "  font-size: 13.5px; font-weight: 600; color: var(--ink-600);", tag='nav.weight')
 rep(A, "  color: var(--brand-700); font-weight: 650;", "  color: var(--brand-700); font-weight: 700;", tag='nav.active')
-rep(A, ".lead-card .txt { font-size: 14px;", ".lead-card .txt { font-size: 15px;", tag='feed.txt')
-rep(A, ".ld-post .tx { font-size: 14px;", ".ld-post .tx { font-size: 15px;", tag='modal.tx')
+rep(A, ".lead-card .txt { font-size: 14px;", ".lead-card .txt { font-size: "+TXT+";", tag='feed.txt')
+rep(A, ".ld-post .tx { font-size: 14px;", ".ld-post .tx { font-size: "+TXT+";", tag='modal.tx')
 rep_any(A, ["/* ===== v119-64: cặp font anh chốt — Plus Jakarta Sans cho tiêu đề · nút · nhãn; Be Vietnam Pro cho thân chữ ===== */",
             "/* ===== v119-64: nhãn/nút dùng --font-head (v119-66: cả hai token = Geist) ===== */"],
            "/* ===== v119-64: nhãn/nút dùng --font-head — v119-67: Plus Jakarta Sans (tiêu đề · nút · nhãn · menu đậm) + TikTok Sans (thân chữ 450 · bài đăng 15px · số) ===== */", tag='css.cmt')
@@ -46,7 +47,7 @@ rep(T, "button { font-family: inherit; cursor: pointer; border: none; background
 rep(T, "input, select, textarea { font-family: inherit; }", "input, select, textarea { font-family: inherit; font-weight: inherit; }", tag='tok.input')
 # (2) Khối "AI đọc vị nhu cầu" trên thẻ lead được đặt = cỡ .lead-card .txt từ v46 → theo lên 15px
 rep('assets/css/pipeline-v2.css', "cho cân đối - ý anh Vinh */\n  font-size: 14px; line-height: 1.6; color: var(--ink-800);",
-    "cho cân đối - ý anh Vinh; v119-67: .txt lên 15px nên theo */\n  font-size: 15px; line-height: 1.6; color: var(--ink-800);", tag='pv2.intent')
+    "cho cân đối - ý anh Vinh; v119-67/68: theo cỡ .txt */\n  font-size: "+TXT+"; line-height: 1.6; color: var(--ink-800);", tag='pv2.intent')
 # (3) Thanh tab dưới mobile: mục đang chọn đậm hơn như menu sidebar
 rep(A, "  .bt-item.active { color: var(--brand-600, #1B2DCC); }", "  .bt-item.active { color: var(--brand-600, #1B2DCC); font-weight: 700; }", tag='tabs.active')
 # (4) Modal lead-là-bình-luận: bài gốc 12.5 → 13.5px (sales cần đọc bài gốc để hiểu câu khách)

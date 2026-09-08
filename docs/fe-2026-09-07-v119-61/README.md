@@ -174,3 +174,14 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
   dùng cho Đã tư vấn/Đã chốt ở modal). `m18.py <cây>` (áp lên v119-75 / v120-esm-y, 3 mốc): icons.js thêm `trophy` (Lucide, trước `siren`) · 20-feed ô
   "Chốt hôm nay" → `SLI.trophy` · 50-config-views KPI "Đã chốt" (Báo cáo) → `SLI.trophy` (cùng nghĩa, đồng bộ). `handshake` giữ cho bước "Kết bạn" (Tiếp cận)
   + tiêu đề CRM (cỡ lớn hơn, đúng nghĩa quan hệ). Smoke 111/111 cả 2 cây (không thêm check — check v119-75 đã đòi mỗi ô có svg).
+
+## v119-77 / v120-esm-aa (08/09, anh: "ô Bài đã quét ở Bảng điều khiển của người dùng brand không hiển thị")
+- **Nguyên nhân**: `kpi.scanned` (live.js) = tổng `postsFetched` của nhật ký `scans`; live.js chỉ subscribe `scans` khi `role==='superadmin'` (khớp Rules — scans là
+  dữ liệu vận hành nội bộ có chi phí/token, không cho brand đọc) → user brand: `scans=[]` → `kpi.scanned=null` → ô hiện "—" + "chưa có nhật ký quét" (câu sai:
+  hệ thống có quét, chỉ là họ không được đọc nhật ký). Thanh nhịp quét ở Lead mới đã có bản rút gọn cho brand từ v16.22 (`lastScanInfo`), riêng ô KPI Overview
+  thì chưa. `opsStrip` (Lần quét cuối/Chi phí) đã là super-only; Lịch sử quét / widget phương thức / ngân sách Bright Data đều super-only → không lộ ô rỗng khác.
+- `m19.py <cây>` (FE-only): Super Admin giữ "Bài đã quét"; user brand thấy **"Đã hẹn tư vấn"** (`kpi.booked` thật của brand, caption "tỷ lệ hẹn N% trên lead
+  hợp lệ") → hàng KPI thành phễu Hợp lệ → Nóng → Hẹn → Chốt. smoke +1 check v119-77 (gọi `SLAuth.show('app',{role:'admin'})` rồi vẽ Overview → ô 1 = "Đã hẹn
+  tư vấn <số>"; trả lại super → "Bài đã quét") → **112/112** cả 2 cây (BÀI HỌC: `SLAuth.show(mode,user,role)` — vai trò là tham số thứ 3, không nằm trong user; check đầu truyền `{role}` nên cả 2 lần vẽ đều thành viewer). Ảnh `shots-kpi-v119-77/kpi-admin-1440.png`.
+- **Tuỳ chọn sau (backend, chưa làm)**: muốn brand thấy đúng "bài đã quét của brand mình" thì thêm counter `daily_stats/{brand}__{ngày}.scanned` từ
+  `scans.bySource` (nguồn → brand) trong `scheduledScan` (LỆNH) → FE đọc `D.dailyStats` (brand user đã đọc được daily_stats theo Rules).

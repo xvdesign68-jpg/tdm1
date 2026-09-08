@@ -65,23 +65,24 @@ window.__SCN = (function(){ const M = window.__SCN_MODE;
   const scan = (n) => ({ id: 'S'+n, data: () => ({ trigger:'scheduled', at: new Date(Date.now()-n*180000), durationMs: 5000, sourcesCount: 23, postsFetched: 20+n, leadsCreated: 2, hotLeads: 1, scanMethod:'brightdata', stats:{ totalPosts: 1000+n } }) });
   const src = [ { id:'g1', data: () => ({ name:'Group Hải sản', url:'https://www.facebook.com/groups/1', brand:'hscl-01', active:true, industry:'Hải sản' }) }, { id:'g2', data: () => ({ name:'Chợ khô', url:'https://www.facebook.com/groups/2', brand:'hscl-01', active:true, industry:'Hải sản' }) } ];
   const cfg = { autoScanEnabled: true, scanMethod: 'brightdata', keywords: ['mua','giá'], exclude: [], weights: {} };
-  const leadsSnap = M==='slow' ? { cache: { ms: 120, docs: () => mk(OLD) }, server: { ms: 3000, docs: () => mk(NEW) } }
+  const cold = (M==='coldslow' || M==='nocache');
+  const leadsSnap = M==='coldslow' ? { server: { ms: 900, docs: () => mk(NEW) } } : M==='slow' ? { cache: { ms: 120, docs: () => mk(OLD) }, server: { ms: 3000, docs: () => mk(NEW) } }
                   : M==='nocache' ? { server: { ms: 900, docs: () => mk(NEW) } }
                   : M==='leadsErr' ? { error: { ms: 300, code: 'permission-denied' } }
                   : { cache: { ms: 120, docs: () => mk(OLD) }, server: { ms: 700, docs: () => mk(NEW) } };
   const userDoc = M==='pending' ? { role: 'pending', active: false, email: 'x@y.z', displayName: 'Khách' } : { role: 'superadmin', active: true, email: user.email, displayName: user.displayName };
   const authUser = M==='login' ? null : (M==='pending' ? Object.assign({}, user, { email: 'x@y.z', uid: 'u2' }) : user);
   return {
-    auth: { currentUser: authUser }, authMs: 200, getDocMs: 150, getDocsMs: 400,
+    auth: { currentUser: authUser }, authMs: 200, getDocMs: cold ? 350 : 150, getDocsMs: M==='coldslow' ? 2500 : 400,
     docs: { 'users/u1': userDoc, 'users/u2': userDoc, 'brands/hscl-01': { name: 'Hải sản Cường Linh' } },
     lists: { users: [ { id:'u1', role:'superadmin', active:true, email:user.email, displayName:user.displayName } ], fb_accounts: [], brands: [ { id:'hscl-01', name:'Hải sản Cường Linh' } ], brand_sales: [] },
     snap: {
-      'users/u1': { cache: { ms: 60, doc: { role: 'superadmin', active: true, email: user.email, displayName: user.displayName } }, server: { ms: 400, doc: { role: 'superadmin', active: true, email: user.email, displayName: user.displayName, sessions: {} } } },
+      'users/u1': cold ? { server: { ms: 400, doc: userDoc } } : { cache: { ms: 60, doc: userDoc }, server: { ms: 400, doc: Object.assign({ sessions: {} }, userDoc) } },
       'leads':    leadsSnap,
       'users/u2': { cache: { ms: 60, doc: userDoc }, server: { ms: 400, doc: userDoc } },
-      'sources':  { cache: { ms: 100, docs: src }, server: { ms: 500, docs: src } },
-      'config/app': { cache: { ms: 80, doc: cfg }, server: { ms: 450, doc: cfg } },
-      'scans':    { cache: { ms: 150, docs: [ scan(2) ] }, server: { ms: 650, docs: [ scan(1), scan(2) ] } },
+      'sources':  cold ? { server: { ms: 500, docs: src } } : { cache: { ms: 100, docs: src }, server: { ms: 500, docs: src } },
+      'config/app': cold ? { server: { ms: 450, doc: cfg } } : { cache: { ms: 80, doc: cfg }, server: { ms: 450, doc: cfg } },
+      'scans':    cold ? { server: { ms: M==='coldslow' ? 4000 : 650, docs: [ scan(1), scan(2) ] } } : { cache: { ms: 150, docs: [ scan(2) ] }, server: { ms: 650, docs: [ scan(1), scan(2) ] } },
     },
     snapDefault: { server: { ms: 600, docs: [], doc: null } },
   };
@@ -104,7 +105,7 @@ await page.addInitScript(() => { window.__TL = []; document.addEventListener('DO
 const t0 = Date.now();
 await page.goto(`http://127.0.0.1:${port}/app.html`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(MODE==='normal'?4200:8800);
-const r = await page.evaluate(() => ({ tl: window.__TL, ev: window.__EV || [], liveFlags: { ready: window.SL_LIVE_READY, fb: !!window.SL_FB } }));
+const r = await page.evaluate(() => ({ tl: window.__TL, ev: window.__EV || [], boot: window.SL_BOOT || null }));
 await browser.close(); server.close();
 // In các mốc đổi trạng thái (gộp các bước count-up thành 1 dòng)
 let last = null; const rows = [];
@@ -112,4 +113,5 @@ for (const s of r.tl) { const key = [s.loading, s.gate, s.gateTxt, s.cards, s.vi
 console.log(`== ${LABEL} [${MODE}]: mốc từ DOMContentLoaded (ms) — màn chờ · cổng auth · KPI đầu · số thẻ lead · view`);
 for (const s of rows) console.log(String(s.t).padStart(5) + 'ms  chờ=' + (s.loading ? 'CÓ ' : 'không') + '  gate=' + (s.gate ? ('CÓ "' + s.gateTxt + '"') : 'không') + '  KPI=' + (s.kpi || '-') + (s.note ? ' (' + s.note + ')' : '') + '  thẻ=' + s.cards + '  view=' + s.viewKids + '  [' + s.title + ']');
 console.log('-- sự kiện SDK giả (ms từ khi module chạy):', r.ev.map(e => e.join(':')).join('  '));
+console.log('-- SL_BOOT:', r.boot ? Object.entries(r.boot).map(([k,v])=>k+' '+v).join(' · ') : '(không có)');
 console.log('-- lỗi trang:', errors.length ? errors.join(' | ') : 'không');

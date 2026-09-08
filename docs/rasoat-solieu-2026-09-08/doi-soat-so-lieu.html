@@ -1,0 +1,122 @@
+<title>Sổ đối soát số liệu SmartLead</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+:root{--bg:#F6F7FB;--sf:#FFFFFF;--ink:#14162B;--ink2:#3E4260;--mute:#6C7190;--line:#E1E4EF;--acc:#1B2DCC;--acc-bg:#EAEDFF;--ok:#0F7B3D;--ok-bg:#E6F6EC;--warn:#B45309;--warn-bg:#FFF4E5;--bad:#B91C1C;--bad-bg:#FEF2F2;--info:#4B5563;--info-bg:#EEF0F5;--mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;--head:'Plus Jakarta Sans',system-ui,sans-serif;--body:'Be Vietnam Pro',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1120;--sf:#171A2E;--ink:#EEF0FA;--ink2:#C9CCE0;--mute:#8E93B0;--line:#2A2E48;--acc:#8EA0FF;--acc-bg:#1E2650;--ok:#5FD08F;--ok-bg:#12301F;--warn:#F2B15A;--warn-bg:#3A2A10;--bad:#F08A8A;--bad-bg:#3B1A1A;--info:#B8BCD0;--info-bg:#232742}}
+:root[data-theme="dark"]{--bg:#0F1120;--sf:#171A2E;--ink:#EEF0FA;--ink2:#C9CCE0;--mute:#8E93B0;--line:#2A2E48;--acc:#8EA0FF;--acc-bg:#1E2650;--ok:#5FD08F;--ok-bg:#12301F;--warn:#F2B15A;--warn-bg:#3A2A10;--bad:#F08A8A;--bad-bg:#3B1A1A;--info:#B8BCD0;--info-bg:#232742}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:36px 22px 72px}
+h1,h2,h3{font-family:var(--head);letter-spacing:-.02em;text-wrap:balance;margin:0}
+h1{font-size:30px;font-weight:800;line-height:1.15}
+h2{font-size:19px;font-weight:700;margin:40px 0 12px}
+.eyebrow{font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.lead{color:var(--ink2);max-width:66ch;margin:10px 0 0}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:26px 0 8px}
+.tile{background:var(--sf);border:1px solid var(--line);border-radius:14px;padding:14px 16px 12px}
+.tile b{display:block;font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.tile span{display:block;margin-top:6px;font-size:12.5px;color:var(--mute);font-weight:500}
+.tile.ok b{color:var(--ok)}.tile.warn b{color:var(--warn)}.tile.acc b{color:var(--acc)}
+.note{background:var(--acc-bg);border:1px solid transparent;border-radius:12px;padding:12px 14px;color:var(--ink2);font-size:14px;margin:14px 0 0}
+.note b{color:var(--ink)}
+.tblwrap{overflow-x:auto;background:var(--sf);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+th{font-family:var(--head);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--sf)}
+td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink2)}
+tr:last-child td{border-bottom:none}
+td.where{font-family:var(--head);font-weight:600;color:var(--ink);white-space:nowrap;width:150px}
+td.what b{color:var(--ink);font-weight:600}
+code{font-family:var(--mono);font-size:12px;background:var(--info-bg);color:var(--ink2);padding:1px 5px;border-radius:5px}
+.pill{display:inline-block;font-family:var(--head);font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:.02em}
+.p-ok{background:var(--ok-bg);color:var(--ok)}.p-be{background:var(--warn-bg);color:var(--warn)}.p-ask{background:var(--acc-bg);color:var(--acc)}.p-no{background:var(--info-bg);color:var(--info)}.p-bad{background:var(--bad-bg);color:var(--bad)}
+.sev{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--mute)}
+.sev.c{color:var(--bad)}.sev.v{color:var(--warn)}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;font-size:13px;color:var(--mute);align-items:center}
+.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--mute);font-size:12.5px}
+.foot p{margin:4px 0}
+@media (max-width:720px){.tiles{grid-template-columns:repeat(2,1fr)}h1{font-size:24px}}
+</style>
+<div class="wrap">
+  <div class="eyebrow">SmartLead · Z15 Miracle · rà soát 08/09/2026</div>
+  <h1>Sổ đối soát số liệu SmartLead</h1>
+  <p class="lead">Rà toàn bộ số hiển thị ở 18 mục của web: mỗi con số lấy từ đâu, tính thế nào, có khớp với nhau không, và tài khoản brand có thật sự thấy được không. Ba agent đọc mã độc lập, em kiểm chứng lại từng mục mức Cao/Vừa trực tiếp trên code rồi vá thành bản v119-79.</p>
+  <div class="tiles">
+    <div class="tile"><b>85</b><span>phát hiện thô từ 3 agent</span></div>
+    <div class="tile ok"><b>46</b><span>mục đã vá trong v119-79 (59 mốc code, smoke 114/114)</span></div>
+    <div class="tile warn"><b>5</b><span>cần backend (LỆNH), 1 đã soạn sẵn</span></div>
+    <div class="tile acc"><b>12</b><span>chờ anh chốt cách hiển thị</span></div>
+  </div>
+  <div class="note"><b>Điểm mấu chốt:</b> web không còn số bịa từ v119-40, nhưng cùng một khái niệm đang được tính bằng nhiều công thức khác nhau ở các mục khác nhau. Lỗi lớn nhất là "Lead hợp lệ" đếm cả lead rác và lead đã Loại, kéo mọi tỷ lệ lệch theo; tiếp đến là các "tổng" tính trên cửa sổ lead đã tải mà ghi như toàn kho, và vài số ghi cứng cho tài khoản brand.</div>
+
+  <h2>1. Đã vá trong v119-79</h2>
+  <div class="legend"><span class="sev c">CAO</span> số sai hoặc gây hiểu nhầm · <span class="sev v">VỪA</span> hai nơi hai định nghĩa · <span class="sev">THẤP</span> nhãn chưa rõ</div>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Mục</th><th>Trước khi vá</th><th>Sau khi vá</th><th>Mức</th></tr></thead>
+    <tbody>
+      <tr><td class="where">Bảng điều khiển, Báo cáo, Nguồn quét</td><td class="what"><b>"Lead hợp lệ" = mọi lead đã tải</b>, gồm cả lead rác và lead đã Loại. Caption ghi "sau khi AI lọc rác". Tỷ lệ phản hồi, hẹn, chốt đều chia cho mẫu số này.</td><td>Một định nghĩa dùng chung cho KPI, tỷ lệ, phễu, xu hướng 14 ngày, biểu đồ ngành và thống kê nguồn: không rác, không Loại; lead Không thành vẫn tính vì đó là lead thật. Mẫu số 0 hiện "—" thay vì "0%".</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Bảng điều khiển</td><td class="what"><b>"Lead nóng"</b> đếm cả lead nóng đã Loại, trong khi bảng "Lead nóng cần xử lý" ngay dưới lọc chúng ra. Tâm biểu đồ tròn dùng một tổng khác với thẻ KPI cạnh đó.</td><td>Cùng tập lead hợp lệ, hai số khớp nhau.</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Lead mới (cột phải + badge)</td><td class="what">Rail Nóng/Ấm/Lạnh, "N lead", "Chờ giao", "Hôm nay cần chăm" và badge "Lead mới" trên menu đếm cả lead feed đang ẩn (rác, Loại, Không thành). Bấm "Nóng · 42" ra danh sách ngắn hơn.</td><td>Đếm đúng số thẻ sẽ hiện; phần ẩn ghi "+N ẩn"; Chờ giao bỏ lead đã chốt/không thành.</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Card Hôm nay</td><td class="what">Ô "Chốt hôm nay" và "chưa nhập giá trị" lọc trên tập lead khác 7 ô còn lại; ô "Quá hẹn" và "Hẹn hôm nay" bấm ra cùng một danh sách pipeline.</td><td>Cùng tập lead; pipeline có bộ lọc "Quá hẹn" riêng và ô Quá hẹn dẫn đúng.</td><td><span class="sev v">VỪA</span></td></tr>
+      <tr><td class="where">Lead mới (thanh nhịp quét, tài khoản brand)</td><td class="what"><b>"Nhịp quét ~3 phút/lượt" là số ghi cứng</b>; "Đang trực 24/7" hiện cả lúc Bright Data ngưng vì brand không đọc được trạng thái đó.</td><td>Hiện nhịp gieo thật theo cấu hình; brand thấy "Quét tự động đang bật", "24/7" chỉ còn cho Super Admin. Dải trạng thái super ghi rõ "lịch 3′/lượt · gieo mỗi nguồn N′".</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Bài đã quét, Lịch sử quét</td><td class="what">Ô "Chưa đạt / loại" thiếu bài lỗi chấm so với chip lọc cùng tên. Hạn tự xoá ghi "1 ngày" ở chỗ này, "7 ngày" ở chỗ khác, thực tế là 3 ngày. Nhãn "Tổng bài đã quét", "Toàn bộ bài đã chấm" tính trên 1.000 lượt gần nhất.</td><td>Một số cho cả ô và chip; hạn "~3 ngày" thống nhất; nhãn ghi rõ "1.000 lượt quét gần nhất".</td><td><span class="sev v">VỪA</span></td></tr>
+      <tr><td class="where">Pipeline</td><td class="what">"N việc hôm nay" đếm số loại dòng nên tối đa luôn là 2. Tuổi thẻ và "Quá hẹn X phút" đứng yên tới khi dữ liệu đổi.</td><td>Đếm thật số lead kẹt + rác; tuổi thẻ được vẽ lại mỗi ~10 phút ở repaint mềm.</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Hộp việc, Phản hồi khách</td><td class="what">Lead máy phát hiện phản hồi nhưng giai đoạn chưa đổi bị coi là "đã tiếp quản". Hộp việc đếm mọi lead "Đã phản hồi" kể cả đã xử lý, badge lại đếm khác.</td><td>"Chưa xử lý" = chưa có người thật chạm vào; Hộp việc và badge dùng chung một danh sách.</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Giá trị & ROI</td><td class="what"><b>Dự báo chốt 30 ngày cộng cả deal đã chốt</b> (xác suất 100%). Tỷ lệ chốt tự học có lead đã Loại/Không thành trong mẫu số. "Chi phí mỗi lead" chia phí tháng cho lead cả cửa sổ khi thiếu dữ liệu 30 ngày. Chế độ Đơn giản đếm lead nhiều tháng. "Giá trị pipeline" cộng cả doanh thu đã thu.</td><td>Dự báo chỉ từ lead đang mở; mẫu số sạch; CPL chia cho lead nóng+ấm 30 ngày, thiếu thì "—"; Đơn giản đếm lead 30 ngày; pipeline tách khỏi đã chốt.</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Chi phí Bright Data (super)</td><td class="what">"Lãi gộp" lấy phí gói trọn tháng trừ chi phí mới tới hôm nay, nên đầu tháng ~95% rồi tụt dần.</td><td>Phí gói tạm tính theo số ngày đã qua trong tháng; đầu cột ghi rõ.</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Tiếp cận, Bảng brand</td><td class="what">Số "hôm nay" đóng băng theo ngày lúc mở tab: qua nửa đêm vẫn hiện số hôm qua. "Lead trong phễu" thực chất là số lượt thả cảm xúc. "Đã rep" ẩn khi automation tắt.</td><td>Ngày tính lại mỗi 5 phút; đổi nhãn thành "Lượt cảm xúc hôm nay"; "Đã rep" luôn hiện số.</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Báo cáo</td><td class="what">Dòng "Tổng (20 nguồn)" của attribution chỉ cộng 12 nguồn top. Bảng hiệu chỉnh điểm AI hiện % với 2 lead mà không cảnh báo. "TG phản hồi TB" bỏ mốc dạng Timestamp im lặng và cắt ở 7 ngày.</td><td>Tổng cộng đủ mọi nguồn; gắn "ít mẫu" khi dưới 30; TG phản hồi nhận mọi dạng mốc, trần 30 ngày khớp Bảng brand, caption "lead đã được chăm".</td><td><span class="sev c">CAO</span></td></tr>
+      <tr><td class="where">Bảng brand</td><td class="what">Brand không có lead nào vẫn được 10/20 điểm SLA trong điểm sức khoẻ. Tooltip SLA nói "ngưỡng của brand" nhưng counter làm tròn lên mốc 15/30/60/120′.</td><td>Không dữ liệu = 0 điểm; tooltip nói rõ xấp xỉ theo mốc.</td><td><span class="sev v">VỪA</span></td></tr>
+      <tr><td class="where">Người dùng</td><td class="what">"Đang hoạt động" bỏ sót tài khoản cũ chưa có cờ; "Chờ duyệt" và tiêu đề card bên dưới ra hai số.</td><td>Cùng quy ước với Bảng brand; hai số khớp.</td><td><span class="sev v">VỪA</span></td></tr>
+      <tr><td class="where">Modal lead</td><td class="what">"Lần đầu thấy số này" khẳng định trên dữ liệu đã tải; toast tìm SĐT đếm cả lead đang xem.</td><td>"Chưa thấy trong dữ liệu đã tải"; toast nói rõ kể cả lead đang xem.</td><td><span class="sev">THẤP</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>2. Cần backend (em soạn LỆNH, anh chạy)</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Việc</th><th>Vì sao cần backend</th><th>Trạng thái</th></tr></thead>
+    <tbody>
+      <tr><td class="where">Bài đã quét theo brand</td><td class="what">Brand không đọc được nhật ký quét (Rules). Cần bộ đếm <code>daily_stats.scanned</code> theo brand/ngày từ mỗi lượt quét. FE v119-78 đã đọc sẵn; chưa có counter thì ô hiện "Đã hẹn tư vấn".</td><td><span class="pill p-be">LỆNH #39 đã soạn</span></td></tr>
+      <tr><td class="where">"Bài đã quét" của Super Admin</td><td class="what">Đang là tổng của 1.000 lượt quét gần nhất (khoảng 2–7 ngày), không phải tổng thật. Sau khi LỆNH #39 chạy, super có thể dùng cùng counter theo brand để ra số 14 ngày chính xác.</td><td><span class="pill p-be">Bước kế sau #39</span></td></tr>
+      <tr><td class="where">SLA đạt ở Bảng brand</td><td class="what">Counter ghi theo mốc 15/30/60/120′, không theo ngưỡng riêng của brand (45′ được tính như 60′). Tử số và mẫu số khác cohort nên phải kẹp 100%. Sửa ở CF <code>statsOnLead</code>: ghi thêm bucket theo ngưỡng brand và theo ngày phát hiện.</td><td><span class="pill p-ask">Chờ anh chốt</span></td></tr>
+      <tr><td class="where">Nguồn ↔ lead nối bằng tên</td><td class="what">Lead lưu tên nguồn lúc quét; đổi tên nguồn là số lead của nguồn về 0. Cần scanner ghi mã nguồn vào lead rồi FE nối theo mã.</td><td><span class="pill p-be">LỆNH sau</span></td></tr>
+      <tr><td class="where">Dòng thời gian 360°</td><td class="what">Lead chỉ lưu mốc giai đoạn hiện tại nên hành trình mới → inbox → phản hồi → hẹn chỉ hiện 1 dòng. Cần lưu lịch sử giai đoạn khi đổi (FE ghi thêm mảng, Rules cho phép).</td><td><span class="pill p-ask">Chờ anh chốt</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>3. Chờ anh chốt cách hiển thị</h2>
+  <p class="lead" style="margin-bottom:12px">Những chỗ này số không sai về phép tính, nhưng cách gọi tên hoặc phạm vi có thể gây hiểu nhầm. Em đề xuất hướng sửa, anh chốt em làm.</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Chỗ</th><th>Vấn đề</th><th>Đề xuất</th></tr></thead>
+    <tbody>
+      <tr><td class="where">Mọi "tổng" trên Bảng điều khiển, Báo cáo, ROI</td><td class="what">Tính trên cửa sổ lead đã tải (500 lead mới nhất, tự nạp thêm tới 4.000), không phải toàn kho. Chỉ admin thấy cảnh báo ở cột phải Lead mới; sales không thấy gì.</td><td>Thêm caption "trên N lead đã nạp" ở KPI cho mọi vai, hoặc chuyển KPI sang bộ đếm <code>daily_stats</code> (chính xác ở mọi quy mô).</td></tr>
+      <tr><td class="where">4 KPI Bảng điều khiển</td><td class="what">Số to là toàn cửa sổ, nhưng mũi tên ▲▼ và "so với 14 ngày trước" là chênh lệch 14 ngày. Mũi tên đứng cạnh con số mà nó không mô tả.</td><td>Đổi số to sang giá trị 14 ngày, hoặc bỏ mũi tên khỏi thẻ không phải 14 ngày.</td></tr>
+      <tr><td class="where">Delta "Tỷ lệ chốt"</td><td class="what">So theo cohort ngày phát hiện: lead vừa phát hiện chưa kịp chốt nên delta luôn nghiêng âm.</td><td>So theo ngày chốt (deal chốt trong kỳ).</td></tr>
+      <tr><td class="where">Mốc "hôm nay"</td><td class="what">Card Hôm nay dùng nửa đêm máy khách; thanh nhịp quét và các counter dùng nửa đêm giờ Việt Nam. Máy đặt ở Việt Nam thì như nhau.</td><td>Thống nhất về giờ Việt Nam nếu có người dùng ở múi giờ khác.</td></tr>
+      <tr><td class="where">Pipeline "kẹt"</td><td class="what">Bỏ qua cột Mới: lead nằm ở Mới 90 ngày không bao giờ được coi là kẹt. Phễu tính trên toàn pipeline kể cả khi đang lọc.</td><td>Thêm nhánh "Mới quá X ngày"; ghi "toàn pipeline" cạnh phễu khi đang lọc.</td></tr>
+      <tr><td class="where">Độ tin cậy hồ sơ (modal)</td><td class="what">Kết luận mạnh từ đúng một dữ kiện ("tài khoản hoạt động thật" vì xuất hiện ở 2 nguồn); chip trạng thái bỏ qua cảnh báo.</td><td>Hạ giọng thành mô tả dữ kiện; cho cảnh báo tham gia quyết định chip.</td></tr>
+      <tr><td class="where">Báo cáo mở cho mọi vai</td><td class="what">Đầu trang in tên brand + giờ in như báo cáo chính thức, trong khi số là cửa sổ lead đã tải.</td><td>Thêm dòng phạm vi bắt buộc vào tiêu đề in.</td></tr>
+      <tr><td class="where">Keyword hiệu quả, hiệu chỉnh điểm AI</td><td class="what">Mẫu lấy từ lead mới nhất đã tải; keyword khớp 1 lead ra "100%".</td><td>Ẩn dòng dưới 10 lead; ghi rõ phạm vi.</td></tr>
+      <tr><td class="where">ROI Super Admin</td><td class="what">Dự báo toàn hệ thống chạy bằng tham số mặc định thay vì tham số riêng từng brand; phương trình tiết kiệm không khớp khi có brand âm; "brand đang hoạt động" suy từ lead đã tải.</td><td>Cộng dự báo từng brand; hiện cả tổng âm; lấy trạng thái brand từ danh sách brand.</td></tr>
+      <tr><td class="where">Tiếp cận</td><td class="what">Brand 0 nick vẫn hiện thanh van "0/40"; panel VPS cộng nick đang chạy của VPS đã offline.</td><td>Hiện "chưa gán nick"; chỉ cộng VPS online.</td></tr>
+      <tr><td class="where">Benchmark CPL trong ROI</td><td class="what">Số ngành ghi cứng năm 2025, không có nguồn bấm được.</td><td>Đưa vào cấu hình kèm năm và nguồn.</td></tr>
+      <tr><td class="where">Tìm nhanh Cmd+K</td><td class="what">Chỉ tìm trong lead đã tải, cắt 9 kết quả, không có nút tìm trên máy chủ như modal.</td><td>Thêm dòng "tìm trên máy chủ →" khi không thấy.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>4. Đã kiểm, không cần sửa</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Chỗ</th><th>Kết luận</th></tr></thead>
+    <tbody>
+      <tr><td class="where">Delta 14 ngày, Bài đã quét ×14</td><td class="what">Lớp số bịa cũ đã được dọn từ v119-40: kỳ trước bằng 0 thì không hiện delta, không còn nhân hệ số.</td></tr>
+      <tr><td class="where">Hiệu quả nội dung (Tiếp cận)</td><td class="what">Làm đúng chuẩn: gắn "ít mẫu" dưới 30, phân biệt "máy chủ đếm cộng dồn" với "lead đã nạp". Lấy làm mẫu cho các bảng khác.</td></tr>
+      <tr><td class="where">Attribution theo nguồn</td><td class="what">Cột chi phí AI ghi rõ "ước tính" ở tiêu đề và tên cột; doanh thu là giá trị đơn sales nhập.</td></tr>
+      <tr><td class="where">Điểm sức khoẻ brand</td><td class="what">Không có thành phần bịa; chỉ cần nói rõ "khối lượng 30" là điểm tương đối so với brand mạnh nhất.</td></tr>
+      <tr><td class="where">Pipeline, ROI với lead đã Loại</td><td class="what">Cả hai đều bỏ lead đã Loại/Không thành khỏi giá trị kỳ vọng và cột, nhất quán với feed.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="foot">
+    <p>Phương pháp: 3 agent chỉ đọc mã theo 3 nhóm mục (Bảng điều khiển + live.js + Lead mới · Pipeline + ROI + modal + Hộp việc + quét · Báo cáo + Bảng brand + Tiếp cận + Người dùng), mỗi phát hiện ghi file:dòng và công thức. Em kiểm lại trực tiếp trên code các mục Cao/Vừa trước khi vá; hàm tính KPI được kiểm bằng harness riêng (8/8) và smoke 114 check trên cả 2 cây IIFE và ES module.</p>
+    <p>Bản đầy đủ 85 phát hiện lưu trong git: docs/rasoat-solieu-2026-09-08/. Script vá: docs/fe-2026-09-07-v119-61/m21.py. Zip giao: smartleads17deploy-v119-79.zip (bản riêng v120-esm-ac).</p>
+  </div>
+</div>

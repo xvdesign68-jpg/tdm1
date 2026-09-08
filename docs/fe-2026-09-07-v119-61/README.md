@@ -167,3 +167,10 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
   xuống hàng riêng, pill trái + nút phải. `.td-head` giữ nguyên (dùng chung với card "Nên gọi tiếp theo" + "Bắt đầu với SmartLead").
 - smoke +1 check **v119-75** (7 ô đều có chip icon + số mono; pill đúng chữ/lớp; ô alert có nền màu; ô 0 mờ khác màu ô có số; dòng ngày không còn chứa
   số việc) → **111/111** cả 2 cây. Ảnh: `shots-today-v119-75/sau-today-{2000,1440,1024,390}.png` + `sau-today-390-full.png`.
+
+## v119-76 / v120-esm-z (08/09, anh: "icon Chốt hôm nay xấu quá, em sửa lại đi")
+- `SLI.handshake` (bắt tay) ở 16px trong chip 30px thành cục rối. So 7 phương án ở đúng cỡ chip (`shots-today-v119-75/icons-cmp2.png`: handshake · trophy ·
+  badgeCheck · checkCircle · flag · coins · star · partyCheck) → chọn **trophy** (cúp: rõ ở 16px, đúng nghĩa "chốt được deal", không trùng checkCircle đang
+  dùng cho Đã tư vấn/Đã chốt ở modal). `m18.py <cây>` (áp lên v119-75 / v120-esm-y, 3 mốc): icons.js thêm `trophy` (Lucide, trước `siren`) · 20-feed ô
+  "Chốt hôm nay" → `SLI.trophy` · 50-config-views KPI "Đã chốt" (Báo cáo) → `SLI.trophy` (cùng nghĩa, đồng bộ). `handshake` giữ cho bước "Kết bạn" (Tiếp cận)
+  + tiêu đề CRM (cỡ lớn hơn, đúng nghĩa quan hệ). Smoke 111/111 cả 2 cây (không thêm check — check v119-75 đã đòi mỗi ô có svg).

@@ -76,3 +76,13 @@ cd w66  && node tools/build.mjs --zip smartleads17deploy-v119-66.zip   && node t
 cd w66e && node tools/build.mjs --zip smartleads17deploy-v120-esm-p.zip && node tools/smoke.js
 ```
 `m9.py` fail-closed 7 mốc: link Google Fonts ở `app.html`/`privacy.html`/`terms.html`, `tokens.css --font`/`--font-head`/comment, comment `app.css`. Muốn đổi sang Manrope/Reddit Sans: sửa 2 hằng `LINK_NEW` + tên họ trong m9.py.
+
+## v119-67 / v120-esm-q (08/09 rạng sáng, ANH CHỐT sau khi so 9 phương án trên trang xem thử)
+Anh chốt: menu giữ Plus Jakarta Sans nhưng **in đậm**; nội dung chính đổi sang **TikTok Sans** (Google Fonts, variable opsz 12..36 · wght 300..900, có subset tiếng Việt, mở nguồn 7/2025), to/đậm hơn một chút; số trong nội dung dùng chữ số TikTok Sans (có tabular). Thay đổi thật: `.nav-item` 500→600, `.nav-item.active` 650→700; `tokens.css` `--font` = TikTok Sans (fallback Jakarta), `--font-head` = Jakarta (fallback TikTok Sans), body `font-weight:450` (cỡ nền GIỮ 14px vì app.css cũng đặt 14px); `.lead-card .txt` và `.ld-post .tx` 14→15px; link Google Fonts 3 trang = Jakarta 500–800 + TikTok Sans + JetBrains Mono.
+```
+python3 m10.py <cây>   # áp được lên v119-65 / v120-esm-o (Jakarta + Be Vietnam Pro) HOẶC v119-66 / v120-esm-p (Geist) — 12 mốc, fail-closed, DRY=1 kiểm
+cd w67  && node tools/build.mjs --zip smartleads17deploy-v119-67.zip   && NODE_PATH=$PWD/node_modules node tools/smoke.js   # 108/108
+cd w67e && node tools/build.mjs --zip smartleads17deploy-v120-esm-q.zip && NODE_PATH=$PWD/node_modules node tools/smoke.js  # 108/108
+```
+Đo trước khi chốt (trang xem thử Lead mới, cùng dữ liệu, 9 chip: Geist · Jakarta+Geist · Hiện tại · Hiện tại+số Jakarta · Font hệ thống · Inter · Manrope · TikTok Sans · Kiểu Facebook): TikTok Sans gọn hơn Be Vietnam Pro 2,6%, chữ số bảng ✓ (Be Vietnam Pro ✗), dấu tiếng Việt ở 14px gần bằng Be Vietnam Pro (hơn hẳn Geist/Inter), 122 KB/3 file so với cặp cũ 155 KB/15 file. Sau vá: chiều cao 18 mục ở 1440 giảm hoặc giữ nguyên (feed +27px do bài đăng 15px), không mục nào thêm phần tử tràn ngang; Users 1440 hết 19 phần tử lòi.
+

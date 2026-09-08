@@ -106,3 +106,18 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
 ## v119-71 / v120-esm-u (08/09, anh gửi file logo ngang "Z15 MIRACLE" qua zip)
 `python3 m13.py <cây> <logo.png>` (áp sau m12): chép file vào `assets/img/logo-full.png` (1874×601 RGBA, 40 KB; ?v= tự hash → SW cache), màn chờ `#loading-screen` dùng logo ngang cao 64px (không bo góc/đổ bóng, rộng tối đa 78vw/360px), thay dấu V vuông 56px. Ảnh anh dán vào chat chỉ là ảnh xem (không thành file) → cần zip hoặc Drive; Cloudinary bị proxy phiên chặn. Không dùng Cloudinary cho logo màn chờ: cùng domain Netlify không tốn thêm DNS/TLS, có ?v= + SW cache nên lần sau hiện tức thì kể cả offline. Sidebar/favicon/icon PWA vẫn dấu V (anh chỉ hỏi màn chờ). Smoke 108/108 cả 2 cây.
 
+
+## v119-72 / v120-esm-v (08/09, anh: "fix lại cái icon cạnh 'Không nghe máy' cho đẹp hơn")
+- `m14.py <cây>` (áp lên v119-71 / v120-esm-u, fail-closed 2 pha): (1) `assets/js/icons.js` `SLI.phoneOff` vẽ lại = ống nghe đầy đủ + dấu × góc trên phải
+  (kiểu "cuộc gọi nhỡ", × nét 2.2) — bản cũ là ống nghe gãy 2 khúc + gạch chéo, ở 13px trong nút trông như cây bút; so 5 phương án ở kích thước
+  thật (`shots-modal-v119-72/icons-cmp.png`) → chọn D. (2) `assets/css/app.css` Dòng thời gian 360°: chấm mốc bị cắt nửa vì `::before` đặt
+  `left:-17px` nằm NGOÀI padding-box của `.ld-tl-list` (`overflow-y:auto` cắt mọi thứ ngoài padding-box) → bỏ `border-left`, `padding-left:22px`,
+  chấm + đường dọc vẽ bằng `::before/::after` của TỪNG dòng (đường dọc `left:-14px; top:13px; bottom:-8px`, dòng cuối không có), chấm có viền trắng 2px.
+- Kiểm: smoke **108/108** cả 2 cây; ảnh `shots-modal-v119-72/callbox-1440-{truoc,sau}.png`.
+- **Đề xuất UI modal (CHƯA giao, chờ anh chốt)** — `m15p-preview.py <cây>` áp lên cây đã qua m14 để dựng bản xem thử; `shot-modal-cmp.js`
+  (SITE/OUT/TAG, lead làm giàu dấu vết: giao/chăm/hẹn/ghi chú/máy) + `stitch-png.js` ghép → `shots-modal-v119-72/so-sanh-modal-{1440,390}.png`:
+  P1 khối Ghi kết quả liên hệ: dòng mô tả xuống hàng riêng (mobile hết gãy tiêu đề), sắp lại trung tính → tích cực (xanh lá) → tiêu cực (đỏ nhạt),
+  icon 14px · P2 Nhắc hẹn: nút nhanh thành pill, gợi ý nhịp chăm gọn căn phải · P3 nút Xoá lead → icon thùng rác xám (đỏ khi rê), tách khỏi
+  "Không thành" (mobile 2 nút đỏ kề nhau) · P4 chip giai đoạn 1 hàng cuộn ngang, chip hiện tại tự vào giữa, mờ 2 mép (đánh đổi: "Đã chốt" phải cuộn
+  mới thấy — footer vẫn có nút Đã chốt) · P5 tiêu đề 3 khối Ghi kết quả / Ghi chú / Dòng thời gian dùng eyebrow như Pipeline & Nhắc hẹn (1 kiểu
+  tiêu đề trong modal). Anh chốt mục nào thì chuyển phần đó từ m15p-preview.py sang script giao chính thức.

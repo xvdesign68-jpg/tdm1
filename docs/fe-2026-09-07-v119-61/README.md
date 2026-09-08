@@ -138,3 +138,19 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
 - `tools/smoke.js` +1 check **v119-73** (thứ tự 6 nút + 2 xanh/2 đỏ + `.cf-sub` · chip giai đoạn cùng 1 hàng + chip hiện tại trong tầm nhìn · thùng rác đỏ
   không chữ · tiêu đề uppercase · chấm timeline nằm trong padding-box khối cuộn (kiểm âm: CSS cũ → false) · 3 pill hẹn nhanh) → **109/109** cả 2 cây.
 - Ảnh: `shots-modal-v119-73/` (modal trọn 1440/390, khối kết quả liên hệ, footer mobile).
+
+## v119-74 / v120-esm-x (08/09, anh hỏi "có cấn gì ở Dòng thời gian không" → 3 điểm → rồi anh đề xuất "cho dòng Phát hiện… xuống hẳn dòng")
+- 3 điểm "cấn" em chỉ ra (ảnh `shots-modal-v119-74/1440-one-0-hientai.png`): (1) chữ xuống dòng thụt dưới icon (icon inline cùng dòng chữ);
+  (2) tên nguồn = tên group Facebook viết HOA nguyên văn, dài, "hét" giữa dòng nhật ký nhỏ; (3) mốc "11:21 · 08/09/2026" mono 108–119px kiểu log máy,
+  kèm năm, bóp hẹp cột chữ. Mock 2 kiểu bằng CSS/DOM inject trên bản build (`shot-timeline-mock.js`, SITE/OUT): A = 2 cột sửa thụt dòng · B = xếp dọc
+  → chọn **B** (mobile ≤639 vốn đã xếp dọc, desktop theo cho đồng bộ; chữ dài không bị bóp; đánh đổi 9 mốc cao 380 px thay 310 px → nâng `max-height` 330).
+- `m16.py <cây>` (áp lên v119-73 / v120-esm-w, 12 mốc, fail-closed 2 pha): 65-charts-lead-modal `tlWhen(ms)` ("Hôm nay 11:21" · "Hôm qua 09:05" ·
+  "Ngày mai 07:30" · "03/09 14:20", năm chỉ khi khác năm nay; mốc demo dạng chuỗi "2 phút trước" giữ nguyên) + `niceName(s)` (chuỗi ≥8 chữ cái và
+  ≥70% hoa → viết hoa đầu từ mọi từ ≥2 chữ; viết tắt = ≤3 chữ KHÔNG nguyên âm (HCM/TP/BDS) giữ nguyên — KHÔNG dựa độ dài vì tiếng Việt đầy từ 2–3 chữ
+  như TẬP/VÀ; NFC trước khi đếm; unit-test 6 ca) + tên nguồn cắt 48 ký tự ở ranh giới từ + "…" và `title` đủ tên trên `.ld-tl-x`; render bọc chữ trong
+  `<span class="ld-tl-tx">`. CSS: `.ld-tl-i{display:block}` · `.ld-tl-t{display:block; tabular-nums}` (bỏ min-width 108) · `.ld-tl-x{display:flex;gap:6px}`
+  + `.ld-tl-ic{flex:none}` (icon cột riêng) · chấm `top:4px`, đường dọc `top:12px; bottom:-11px` · list `gap:9px; max-height:330px` · bỏ rule mobile
+  `.ld-tl-i{flex-direction:column}` (thừa). smoke +1 check **v119-74** (đổi tên nguồn card đầu thành chuỗi HOA trước khi mở modal → kiểm "Tuyển Dụng Thực
+  Tập Sinh Digital Marketing…" + tooltip đủ; giờ "Hôm nay hh:mm" ≥1 và 0 mốc kiểu cũ; mọi mốc: giờ nằm trên nội dung, cùng lề trái; chữ bắt đầu sau icon
+  ≥3px; trả lại tên nguồn sau khi kiểm) → **110/110** cả 2 cây. BÀI HỌC: smoke bắt được lỗi heuristic đầu ("TẬP" 3 chữ bị coi là viết tắt) trước khi gửi zip.
+- Ảnh: `shots-modal-v119-74/{1440,390}-{one,rich}-that.png` (bản thật) + `*-0-hientai.png` (trước).

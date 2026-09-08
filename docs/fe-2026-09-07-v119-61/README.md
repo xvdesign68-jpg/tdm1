@@ -154,3 +154,16 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
   Tập Sinh Digital Marketing…" + tooltip đủ; giờ "Hôm nay hh:mm" ≥1 và 0 mốc kiểu cũ; mọi mốc: giờ nằm trên nội dung, cùng lề trái; chữ bắt đầu sau icon
   ≥3px; trả lại tên nguồn sau khi kiểm) → **110/110** cả 2 cây. BÀI HỌC: smoke bắt được lỗi heuristic đầu ("TẬP" 3 chữ bị coi là viết tắt) trước khi gửi zip.
 - Ảnh: `shots-modal-v119-74/{1440,390}-{one,rich}-that.png` (bản thật) + `*-0-hientai.png` (trước).
+
+## v119-75 / v120-esm-y (08/09, anh: "cải tiến giao diện card Hôm nay đẹp hơn")
+- Hiện trạng (`shots-today-v119-75/truoc-today-*.png`): 7 ô trắng viền trái 3px, số 22px tô 7 màu khác nhau (đỏ ×2, xanh lá ×2 → "cầu vồng"), nhãn 11.5px,
+  ô = 0 chỉ đổi số sang xám; màn rộng 2000px ô 221px trống rỗng vì nội dung dồn góc trái; dòng "5 việc cần làm ngay" đỏ chen vào dòng ngày.
+- `m17.py <cây>` (áp lên v119-74 / v120-esm-x, 9 mốc, fail-closed 2 pha): 20-feed `todayCard` — mỗi ô: **chip icon** 30px nền màu nhạt (`--tb`) + icon màu (`--tc`)
+  (sparkle · flame · users · warning · clock · message · handshake) → số **26px mono đậm màu mực** → nhãn 11.5px; màu chỉ nằm ở chip; ô = 0 → chip xám
+  `--ink-50`, số `--ink-300`; 2 ô cảnh báo `alert` (Nóng chưa ai chăm · Quá hẹn) khi > 0 → nền nhạt màu + số màu (nhìn là thấy việc gấp). Tiêu đề: dòng ngày
+  riêng; số việc thành **pill** `.td-pill.hot` (siren, đỏ nhạt) / `.td-pill.ok` ("Không có việc tồn", xanh) đứng cạnh nút Hộp việc trong `.td-head-r`.
+  CSS app.css: `.td-grid` minmax 128→136 (7 ô vẫn 1 hàng ở ≥1366; 1280 xuống 2 hàng như trước), `.td-tile` bỏ viền trái, bo 14, `font:inherit`, hover viền
+  màu ô; pipeline-v2.css ≤639: ô lẻ cuối `:last-child:nth-child(odd){grid-column:span 2}` (hết ô mồ côi — kiểm 390: ô cuối 326px vs 159px), `.td-head-r`
+  xuống hàng riêng, pill trái + nút phải. `.td-head` giữ nguyên (dùng chung với card "Nên gọi tiếp theo" + "Bắt đầu với SmartLead").
+- smoke +1 check **v119-75** (7 ô đều có chip icon + số mono; pill đúng chữ/lớp; ô alert có nền màu; ô 0 mờ khác màu ô có số; dòng ngày không còn chứa
+  số việc) → **111/111** cả 2 cây. Ảnh: `shots-today-v119-75/sau-today-{2000,1440,1024,390}.png` + `sau-today-390-full.png`.

@@ -7,7 +7,7 @@ Anh yêu cầu (08/09): *"anh muốn em check kĩ toàn diện xem số liệu t
 - **85 phát hiện** từ 3 agent chỉ-đọc (mỗi agent 1 cụm mục, đọc code cây v119-77) → em kiểm chứng từng mục trên code rồi phân loại:
   - **46 đã vá trong FE `v119-79` / `v120-esm-ac`** (`docs/fe-2026-09-07-v119-61/m21.py`, 59/63 mốc, fail-closed) — smoke **114/114** cả 2 cây + harness `harness-builddata.mjs` 8/8.
   - **5 cần backend** → gộp vào **LỆNH #39** (`docs/lenh-2026-09-08-39.md`, chờ anh chạy) hoặc ghi rõ trong báo cáo.
-  - **12 chờ anh chốt** (đổi định nghĩa số liệu, ví dụ: KPI Overview có tính lead đã Loại hay không, ROI mẫu 30 ngày…).
+  - **12 mục anh giao em tự chốt (08/09 tối) → đã làm ở v119-80 / v120-esm-ad** (`docs/fe-2026-09-07-v119-61/m22.py`, smoke 116/116; quyết định từng mục ở cột "Em chốt · đã làm" của báo cáo HTML). 3 mục backend còn lại gộp vào **LỆNH #40** (`docs/lenh-2026-09-08-40.md`).
   - **22 đã kiểm, không cần sửa** (agent báo nhưng code đúng / by-design).
 - Cách tính đã thống nhất từ v119-79: **mọi KPI/tỷ lệ tính trên lead HỢP LỆ = không `junk`, không `dropped`** (`act` trong `buildData`); tỷ lệ chia 0 → `null` → UI "—" thay vì 0%; rail/badge Lead mới đếm đúng số thẻ đang hiện (bỏ lead đã Loại/Không thành/rác); ngày theo giờ VN (outreach_stats tự đổi ngày lúc 0h VN); ROI cohort bỏ dropped/lost, mẫu = lead 30 ngày; Hộp việc/Phản hồi khách không đếm lead đã xử lý.
 

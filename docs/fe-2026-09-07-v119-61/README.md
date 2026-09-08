@@ -121,3 +121,20 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
   "Không thành" (mobile 2 nút đỏ kề nhau) · P4 chip giai đoạn 1 hàng cuộn ngang, chip hiện tại tự vào giữa, mờ 2 mép (đánh đổi: "Đã chốt" phải cuộn
   mới thấy — footer vẫn có nút Đã chốt) · P5 tiêu đề 3 khối Ghi kết quả / Ghi chú / Dòng thời gian dùng eyebrow như Pipeline & Nhắc hẹn (1 kiểu
   tiêu đề trong modal). Anh chốt mục nào thì chuyển phần đó từ m15p-preview.py sang script giao chính thức.
+
+## v119-73 / v120-esm-w (08/09, anh chốt "làm nốt từ P1 đến P5, riêng P3 thùng rác màu đỏ")
+- `m15.py <cây>` (áp lên v119-72 / v120-esm-v, fail-closed 2 pha, 7 mốc — bản giao chính thức của `m15p-preview.py`, khác P3 = thùng rác ĐỎ):
+  **P1** `#callBox`: tiêu đề + `.cf-sub` riêng dòng; nút xếp `noans, callback` (trung tính) → `talked, booked` (`.call-pos` xanh lá) → `wrong, noneed`
+  (`.call-neg` đỏ nhạt); icon 14px · **P2** `#fuBox`: `.fu-quick` + 3 pill `.fu-q` (handler `[data-fuq]` giữ nguyên) + `.fu-hint` căn phải ·
+  **P3** `#delLeadBtn` → `.ld-del` chỉ icon `SLI.trash` đỏ `#d92d20` (rê chuột đậm + nền hồng), `aria-label="Xoá lead"`, hộp thoại xác nhận như cũ ·
+  **P4** `.mstages` `flex-wrap:nowrap; overflow-x:auto` (ẩn thanh cuộn, mờ 2 mép bằng mask, `margin:0 -16px; padding:0 16px` khớp padding `.ld-stage`),
+  sau khi vẽ modal `scrollLeft` đưa `.mstage.cur` vào giữa (chạy cả khi vẽ lại tại chỗ) · **P5** `#callBox .cf-k, #mNotes .cf-k, .ld-tl summary`
+  = eyebrow 10px caps `--ink-400` như `.ld-stage .row1 .k` (khối CSS chèn SAU `.ld-tl-x` để thắng rule `.ld-tl summary` 13px/700 đứng trước);
+  nút "↻ tải ghi chú cũ" + chữ mờ trong tiêu đề Ghi chú giữ chữ thường.
+  **P6 (lộ ra khi smoke chạy)**: toast "Hoàn tác" `#pvUndoToast` (fixed đáy màn, z 300) đè lên thanh nút cuối modal — trước đây footer 2 hàng (nút
+  "Xoá lead" chữ dài rớt hàng) nên "Đã chốt" nằm cao hơn toast; sau P3 footer còn 1 hàng → nút nằm đúng vùng toast, bấm bị chặn ~6 s sau khi đổi giai đoạn.
+  Vá: `body:has(#modalBg.show) #pvUndoToast { bottom:auto !important; top:14px }` (mobile vốn đã top 14px). Bài học: đổi bố cục footer sticky phải kiểm
+  lớp nổi cố định đáy màn (toast/FAB) có đè lên không — smoke bắt được vì click `#winBtn` ngay sau khi đổi chip.
+- `tools/smoke.js` +1 check **v119-73** (thứ tự 6 nút + 2 xanh/2 đỏ + `.cf-sub` · chip giai đoạn cùng 1 hàng + chip hiện tại trong tầm nhìn · thùng rác đỏ
+  không chữ · tiêu đề uppercase · chấm timeline nằm trong padding-box khối cuộn (kiểm âm: CSS cũ → false) · 3 pill hẹn nhanh) → **109/109** cả 2 cây.
+- Ảnh: `shots-modal-v119-73/` (modal trọn 1440/390, khối kết quả liên hệ, footer mobile).

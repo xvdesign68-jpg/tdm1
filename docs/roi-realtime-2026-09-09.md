@@ -35,3 +35,18 @@ Không lỗi JS. Độ trễ ~270 ms = debounce `rebuild` 250 ms (cố ý, gộp
 1. Super subscribe `brands` bằng onSnapshot (collection nhỏ, ≤ vài chục doc) thay getDocs → tham số riêng/cờ active
    realtime như các kênh khác; `refreshAdmin` chỉ còn users/fb_accounts/brand_sales.
 2. Hoặc nhẹ hơn: mở trang ROI/Bảng brand → `refreshAdmin(true)` (bỏ throttle 1 lần) để số brand luôn mới khi vào trang.
+
+## ĐÃ LÀM hướng 1 (09/09 chiều) — v119-86 / v120-esm-aj (`docs/fe-2026-09-07-v119-61/m28.py`)
+Super Admin đăng ký `brands` bằng onSnapshot; `refreshAdmin` không đọc brands nữa; lần vẽ đầu chờ mềm kênh brands. Harness (cây đã build):
+
+| Kịch bản | v119-85 | v119-86 |
+|---|---|---|
+| T5a đổi tham số riêng brand | không đổi trong 2,5 s; chỉ sau ≥15 s + tín hiệu khác | ĐỔI sau 265 ms |
+| T5c tắt brand (`active:false`) | như trên | ĐỔI sau 265 ms, "1 brand đang hoạt động" |
+| T5d thêm brand mới có tham số riêng | như trên | ĐỔI sau 269 ms, có dòng brand mới |
+| T5e snapshot y hệt bắn lại | — | 0 mutation (chữ ký quản trị) |
+| refreshAdmin getDocs(brands) | 1 lần/lượt | 0 |
+| Vẽ lần đầu (boot-timeline normal) | 1.274 ms | 1.262 ms |
+
+KỲ VỌNG v119-86: PASS 12/12 (IIFE + ESM). Kiểm âm: harness trên bản min v119-85 FAIL 4/12 đúng các mục T5.
+Không đổi: đang gõ ô tham số → hoãn tới blur (cố ý); số tính trên lead đã tải (≤4.000).

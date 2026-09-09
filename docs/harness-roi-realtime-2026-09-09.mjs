@@ -1,7 +1,8 @@
 // Harness REALTIME trang "Giá trị & ROI": chạy app thật (MODE firebase, tài khoản super) với SDK Firebase GIẢ có thể BẮN SNAPSHOT MỚI
 // khi trang ROI đang mở → đo từng chỉ số có tự đổi không và đổi sau bao lâu (không F5, không bấm gì).
 // Kịch bản: T1 thêm 2 lead nóng · T2 chốt 1 deal có giá trị · T3 đổi config/app.roi (phí gói mặc định) · T4 tắt nguồn quét của 1 brand
-//           · T5 đổi tham số riêng brand (brands/… KHÔNG có listener — chỉ tải lại qua refreshAdmin, throttle 15 s) · T6 đang gõ ô tham số thì lead đổi (deferReload).
+//           · T5 đổi tham số riêng brand / tắt brand / thêm brand (brands/…: từ v119-86 super có kênh realtime → đổi ngay; trước: chỉ refreshAdmin throttle 15 s)
+//           · T6 đang gõ ô tham số thì lead đổi (deferReload). Cây có v119-86 (live.js chứa 'danh sách brand') → in thêm bảng KỲ VỌNG PASS/FAIL.
 // Dùng: node harness-roi-realtime-2026-09-09.mjs <thư mục site>
 import fs from 'fs'; import http from 'http'; import path from 'path'; import { createRequire } from 'node:module';
 // playwright-core tìm qua require (tôn trọng NODE_PATH) — ESM import không đọc NODE_PATH nên chạy từ docs/ sẽ lỗi ERR_MODULE_NOT_FOUND
@@ -86,6 +87,7 @@ window.__SCN = (function(){
       'sources':  { cache: { ms: 60, docs: src }, server: { ms: 250, docs: src } },
       'config/app': { cache: { ms: 50, doc: window.__CFG }, server: { ms: 220, doc: window.__CFG } },
       'scans':    { cache: { ms: 90, docs: [ scan(2) ] }, server: { ms: 320, docs: [ scan(1), scan(2) ] } },
+      'brands':   { cache: { ms: 70, docs: () => window.__SCN.lists.brands.map(b => ({ id: b.id, data: () => b })) }, server: { ms: 260, docs: () => window.__SCN.lists.brands.map(b => ({ id: b.id, data: () => b })) } }, // v119-86: kênh realtime brands (cây cũ không đăng ký → không dùng)
     },
     snapDefault: { server: { ms: 400, docs: [], doc: null } },
   };
@@ -121,13 +123,26 @@ let r3 = await waitChange(r2.cur); say(`== T3 đổi phí gói mặc định 8,6
 // T4: tắt nguồn của agc-3 (brand không lead) → số brand hoạt động giảm
 await page.evaluate(() => { window.__SRC.find(s => s.id === 'g3').active = false; window.__push('sources', { docs: window.__SRC.map(s => ({ id: s.id, data: () => s })) }); });
 let r4 = await waitChange(r3.cur); say(`== T4 tắt nguồn quét brand agc-3 → ${r4.changed ? 'ĐỔI sau ' + r4.ms + ' ms' : 'KHÔNG ĐỔI'}\n  kick="${r4.cur.kick}" strip=${JSON.stringify(r4.cur.strip)}`);
-// T5: đổi tham số riêng brand tts-1 (brands/tts-1.roi.fee = 20tr) — KHÔNG có listener; refreshAdmin throttle 15 s + chỉ khi go() chạy
-await page.evaluate(() => { window.__SCN.lists.brands.find(b => b.id === 'tts-1').roi = { fee: 20000000, cplAds: 250000 }; window.__push('leads', { docs: window.__mk(window.__LEADS) }); });
-let r5a = await waitChange(r4.cur, 2500); say(`== T5a đổi tham số riêng tts-1 (brands/…) + có snapshot lead → ${r5a.changed ? 'ĐỔI sau ' + r5a.ms + ' ms' : 'KHÔNG ĐỔI trong 2,5 s'}\n  rows.tts=${r5a.cur.rows['tts-1']} fee=${r5a.cur.fee}`);
-say('   … chờ 15,5 s (throttle refreshAdmin) rồi bắn 1 snapshot lead nữa');
-await page.waitForTimeout(15500);
-await page.evaluate(() => { window.__push('leads', { docs: window.__mk(window.__LEADS) }); });
-let r5b = await waitChange(r5a.cur, 3000); say(`== T5b sau 15,5 s + snapshot lead → ${r5b.changed ? 'ĐỔI sau ' + r5b.ms + ' ms' : 'KHÔNG ĐỔI'}\n  rows.tts=${r5b.cur.rows['tts-1']} fee=${r5b.cur.fee}`);
+// T5: đổi tham số riêng brand tts-1 (brands/tts-1.roi.fee = 20tr) → v119-86: kênh realtime brands → đổi ngay; cây cũ: KHÔNG có listener, chỉ refreshAdmin throttle 15 s + khi go() chạy
+const HAS86 = /danh sách brand/.test(live);
+const pushBrands = () => page.evaluate(() => window.__push('brands', { docs: window.__SCN.lists.brands.map(b => ({ id: b.id, data: () => b })) }));
+await page.evaluate(() => { window.__SCN.lists.brands.find(b => b.id === 'tts-1').roi = { fee: 20000000, cplAds: 250000 }; }); await pushBrands();
+let r5a = await waitChange(r4.cur, 2500); say(`== T5a đổi tham số riêng tts-1 (brands/…) → ${r5a.changed ? 'ĐỔI sau ' + r5a.ms + ' ms' : 'KHÔNG ĐỔI trong 2,5 s'}\n  rows.tts=${r5a.cur.rows['tts-1']} fee=${r5a.cur.fee}`);
+let r5b = r5a;
+if (!HAS86) { say('   … cây chưa có v119-86: chờ 15,5 s (throttle refreshAdmin) rồi bắn 1 snapshot lead nữa'); await page.waitForTimeout(15500);
+  await page.evaluate(() => { window.__push('leads', { docs: window.__mk(window.__LEADS) }); });
+  r5b = await waitChange(r5a.cur, 3000); say(`== T5b sau 15,5 s + snapshot lead → ${r5b.changed ? 'ĐỔI sau ' + r5b.ms + ' ms' : 'KHÔNG ĐỔI'}\n  rows.tts=${r5b.cur.rows['tts-1']} fee=${r5b.cur.fee}`); }
+// T5c: tắt brand tts-1 (active:false) → "N brand đang hoạt động" giảm; T5d: thêm brand mới có tham số riêng → thêm dòng
+await page.evaluate(() => { window.__SCN.lists.brands.find(b => b.id === 'tts-1').active = false; }); await pushBrands();
+let r5c = await waitChange(r5b.cur, 2500); say(`== T5c tắt brand tts-1 (brands/….active=false) → ${r5c.changed ? 'ĐỔI sau ' + r5c.ms + ' ms' : 'KHÔNG ĐỔI trong 2,5 s'}\n  kick="${r5c.cur.kick}" rows=${Object.keys(r5c.cur.rows).join(',')}`);
+await page.evaluate(() => { window.__SCN.lists.brands.find(b => b.id === 'tts-1').active = true; window.__SCN.lists.brands.push({ id: 'new-4', name: 'Brand Mới 4', active: true, roi: { fee: 5000000, cplAds: 250000 } }); }); await pushBrands();
+let r5d = await waitChange(r5c.cur, 2500); say(`== T5d bật lại tts-1 + thêm brand new-4 có tham số riêng → ${r5d.changed ? 'ĐỔI sau ' + r5d.ms + ' ms' : 'KHÔNG ĐỔI trong 2,5 s'}\n  kick="${r5d.cur.kick}" rows.new4=${r5d.cur.rows['new-4'] || '(không có)'}`);
+// T5e: cùng dữ liệu bắn lại (snapshot máy chủ xác nhận sau ước lượng cục bộ) → KHÔNG vẽ lại (chữ ký quản trị)
+await page.waitForTimeout(600);
+const paintsBefore = await page.evaluate(() => { window.__PAINT = 0; const v = document.getElementById('view'); new MutationObserver(m => { window.__PAINT += m.length; }).observe(v, { childList: true, subtree: true, characterData: true, attributes: true }); return 0; });
+await pushBrands(); await page.waitForTimeout(900);
+const paintsAfter = await page.evaluate(() => window.__PAINT); say(`== T5e bắn lại snapshot brands y hệt → ${paintsAfter - paintsBefore === 0 ? 'KHÔNG vẽ lại (0 mutation)' : 'CÓ ' + (paintsAfter - paintsBefore) + ' mutation'}`);
+const getDocsBrands = await page.evaluate(() => (window.__EV || []).filter(e => e[1] === 'getDocs' && e[2] === 'brands').length); say(`== refreshAdmin đọc getDocs(brands): ${getDocsBrands} lần (v119-86 kỳ vọng 0)`);
 // T6: đang gõ ô tham số (mở "Mặc định hệ thống") → lead đổi → hoãn tới khi blur
 await page.evaluate(() => { document.querySelector('[data-roisel="__default"]').click(); }); await page.waitForTimeout(400);
 const focused = await page.evaluate(() => { const i = document.querySelector('#view input[type=number]'); if (!i) return false; i.focus(); return document.activeElement === i; });
@@ -137,4 +152,9 @@ let r6a = await waitChange(b6, 2500); say(`== T6a đang gõ ô tham số (focus=
 await page.evaluate(() => { document.activeElement && document.activeElement.blur(); });
 let r6b = await waitChange(r6a.cur, 4000); say(`== T6b rời ô → ${r6b.changed ? 'ĐỔI sau ' + r6b.ms + ' ms' : 'KHÔNG ĐỔI'}\n  strip=${JSON.stringify(r6b.cur.strip)}`);
 say('-- lỗi trang: ' + (errors.length ? errors.join(' | ') : 'không'));
+if (HAS86) { const exp = [ ['T1 lead → đổi ≤1,5 s', r1.changed && r1.ms < 1500], ['T2 chốt deal → đổi', r2.changed], ['T3 config/app.roi → đổi', r3.changed], ['T4 nguồn quét → đổi', r4.changed],
+    ['T5a tham số riêng brand → đổi ≤1,5 s (KHÔNG chờ 15 s)', r5a.changed && r5a.ms < 1500 && /20 tr/.test(r5a.cur.rows['tts-1'] || '')], ['T5c tắt brand → bớt 1 brand hoạt động', r5c.changed && /1 brand/.test(r5c.cur.kick)],
+    ['T5d thêm brand → có dòng new-4', !!r5d.cur.rows['new-4']], ['T5e snapshot y hệt → không vẽ lại', paintsAfter - paintsBefore === 0], ['refreshAdmin không getDocs brands', getDocsBrands === 0],
+    ['T6a đang gõ → hoãn', !r6a.changed], ['T6b rời ô → đổi', r6b.changed], ['không lỗi JS', errors.length === 0] ];
+  const bad = exp.filter(e => !e[1]); exp.forEach(e => say((e[1] ? '  ✓ ' : '  ✗ ') + e[0])); say(bad.length ? `KỲ VỌNG v119-86: FAIL ${bad.length}/${exp.length}` : `KỲ VỌNG v119-86: PASS ${exp.length}/${exp.length}`); if (bad.length) process.exitCode = 1; }
 await browser.close(); server.close();

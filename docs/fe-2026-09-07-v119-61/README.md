@@ -223,3 +223,15 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
   Đã chốt 0 → "chưa có deal chốt trong kỳ", >0 → "tỷ lệ chốt x,y% trên lead hợp lệ · doanh thu 12,5 triệu"; bỏ "tổng đã nạp". CSS `.kpi-period`, `.kpi .meta .kchip`, `.kchip ~ .vs {flex-basis:100%}`.
 - Smoke: 2 check cũ đổi mốc caption (k78 `/AI đã đọc/`, k80 bỏ `/bộ đếm máy chủ/`) + 1 check mới v119-81 (dải kỳ có tên brand, chip "còn mở 4/6" với 1 Loại + 1 chủ bài, tooltip, Đã chốt 0/1 deal) → **117/117** cả 2 cây.
 - Tái lập: unzip v119-80 → `python3 m23.py <cây>` → `node tools/build.mjs --zip …` (ESM: cùng script trên cây v120-esm-ad, không cần đổi import vì `kpiPeriod` nội bộ 20-feed). Ảnh mockup gửi anh: `scratchpad kpi-1-hien-tai.png / kpi-2-de-xuat-brand.png / kpi-3-de-xuat-superadmin.png` (ephemeral).
+
+## v119-82 / v120-esm-af (09/09/2026 trưa) — `m24.py <cây>`: hàng KPI Bảng điều khiển 4 ô đều nhau (anh gửi ảnh: "check xem về mặt giao diện có gì cấn cấn không")
+- Cấn thấy trong ảnh (màn rộng ~2000px): ô "Lead hợp lệ" có 2 dòng meta (pill ▲ + chip "còn mở", caption ở dòng dưới) còn 3 ô kia 1 dòng → caption 4 ô không thẳng hàng, 3 ô hụt trống ở đáy;
+  ô "Đã chốt" 0 vs 0 không có mũi tên; "291 · còn mở 291" lặp số; dải kỳ dùng chữ "▲▼" còn pill dùng icon SVG. Ở 1440 ngược lại: caption ô 1/3 gãy xuống dòng 2, ô 4 ở dòng 1 (đo `VS-TOP 282,282,282,252`).
+- Sửa (chỉ hàng KPI 14 ngày khi có bộ đếm — `kpiCard(..., cls='kpi-14')`; ô KPI ở Bảng brand/Tiếp cận/Nguồn quét giữ nguyên): (1) `.kpi.kpi-14 .meta` = LƯỚI 2 hàng cố định (hàng 1 20px: pill + chip; hàng 2: caption `grid-column 1/-1`)
+  → 4 ô luôn cùng cấu trúc, caption thẳng hàng (`VS-TOP 278 ×4` ở 1440 lẫn 2000; mobile 2 cột 182/182/365/365); (2) ô nào cũng có pill: `kD(v,prevHas,prev,cur)` — không so được → pill xám `.delta.flat`
+  "không đổi" (0 vs 0) / "kỳ trước 0" / "chưa có kỳ trước"; `kDelta` 0% → 'flat' (trước xanh "+0%"); icon `SLI.minus` mới; `kpi14()`/`brandScan14()` trả thêm `prev`/`prevHas`;
+  (3) chip "còn mở N" khi N = lead hợp lệ → "tất cả còn mở"; (4) dải kỳ: "mũi tên ▲▼" → `SLI.trendUp SLI.trendDown` (`.kpi-period .vs .i` 12px xám); (5) caption "AI chấm từ 40 điểm · đã bỏ rác";
+  (6) mobile ≤639: pill/chip 10,5px + gap 5px để "tất cả còn mở" vừa 1 hàng (chip `inline-block` + ellipsis nếu vẫn thiếu chỗ — bản đầu chip inline-flex bị cắt cụt "tất cả còn m").
+- Smoke: +1 check v119-82 (4 ô `.kpi-14`, pill `flat:0%` ×2 + `up:+100%` + `flat:không đổi`, chip "tất cả còn mở", caption 4 ô cùng `top` và nằm dưới pill, dải kỳ 2 icon) → **118/118** cả 2 cây.
+- Ảnh: `scratchpad kpx2-shot.js <cây> <out.png> brand|super|brand-drop [width]` → `kpx82-brand.png` (1440) / `kpx82-brand-w.png` (2000, đúng số ảnh anh) / `kpx82-super.png` / `kpx82-brand-m.png` (390); so `kpx81-brand.png` (ephemeral).
+- Tái lập: unzip v119-81 / v120-esm-ae → `python3 m24.py <cây>` → `node tools/build.mjs --zip …` (ESM: cùng script, không đổi import/export — `kpiCard` vốn đã export, `kD/flat` nội bộ IIFE của view).

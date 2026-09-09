@@ -1,0 +1,244 @@
+fonts 18
+TỔNG (text node có chữ số, theo font | loại):
+   TikTok Sans|metric                 242
+   TikTok Sans|prose                  232
+   Plus Jakarta Sans|metric           228
+   JetBrains Mono|metric              108
+   Plus Jakarta Sans|prose            91
+   JetBrains Mono|prose               28
+   monospace|metric                   6
+   monospace|prose                    1
+
+[overview] metric: TikTok Sans=38 · JetBrains Mono=16 · Plus Jakarta Sans=11
+    TikTok Sans         7 650 12.5px  tnum div.top > span.v                                           | 312 / 268 / 218
+    TikTok Sans         6 600 12px    tnum div.fn-row > span.fn-bar                                   | 1.284 / 968 / 742
+    TikTok Sans         6 450 11.5px  tnum div.fn-row > span.pct                                      | 100% / 75% / 58%
+    TikTok Sans         5 800 11.5px       button.tk-row.nb-row > span.nb-rank                        | 1 / 2 / 3
+    TikTok Sans         5 800 15px         button.tk-row.nb-row > span.tk-sc                          | 88 / 94 / 95
+    JetBrains Mono      4 700 26px    tnum button.td-tile.zero > b.mono                               | 0
+    Plus Jakarta Sans   4 700 34px    tnum div.kpi > div.val.mono                                     | 18.432 / 1.284 / 213
+    TikTok Sans         4 800 13.5px  tnum span                                                       | 95 / 94 / 88
+    JetBrains Mono      3 650 12.5px  tnum div.temp-row > span.tv.mono                                | 213 / 486 / 585
+    JetBrains Mono      3 450 11px    tnum div.temp-row > span.tp.mono                                | 17% / 38% / 46%
+    TikTok Sans         3 700 12px         span.tk-t > b                                              | 5 / 2
+    JetBrains Mono      3 700 12.5px       button.tk-row.agy-mrow > span.agy-score.low                | 30 / 32
+    JetBrains Mono      2 700 26px    tnum button.td-tile > b.mono                                    | 2 / 1
+    TikTok Sans         1 450 12.5px       span.ops-item > span                                       | 08:22 09/09/26
+
+[agency] metric: Plus Jakarta Sans=10 · JetBrains Mono=27 · monospace=1
+    JetBrains Mono     18 450 13.5px  tnum td.mono                                                    | 2 / 100% / 1
+    Plus Jakarta Sans   4 700 34px    tnum div.kpi > div.val.mono                                     | 3 / 9 / 0
+    JetBrains Mono      3 450 13.5px  tnum td.agy-rank.mono                                           | 1 / 2 / 3
+    JetBrains Mono      3 450 11.25px tnum td.mono > small                                            | ≤60′
+    JetBrains Mono      3 700 12.5px  tnum span.agy-score.low                                         | 32 / 30
+    monospace           1 450 11px    tnum div.agy-name > code                                        | z15
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[roi] metric: Plus Jakarta Sans=12 · TikTok Sans=24
+    TikTok Sans        18 500 12.5px  tnum td.n                                                       | 2 / 38 / 18 tr₫
+    Plus Jakarta Sans   4 700 21px         div.rls > b.rls-v                                          | 52,8 tr₫ / 9 / 42 tr₫
+    TikTok Sans         4 600 12.5px  tnum tr.roi-tot > td.n                                          | 9 / 52,8 tr₫ / 42 tr₫
+    TikTok Sans         2 600 12.5px  tnum div.rlb-row > b.rlb-v                                      | 42 tr₫ / 246,5 tr₫
+    Plus Jakarta Sans   1 900 48px         div.rh-num > b                                             | 204,5 tr₫
+    Plus Jakarta Sans   1 700 21px         div.rls > b.rls-v.good                                     | 204,5 tr₫
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[reports] metric: JetBrains Mono=18 · Plus Jakarta Sans=9 · TikTok Sans=70
+    TikTok Sans        54 450 13.5px  tnum td                                                         | 312 / 56 / 268
+    TikTok Sans        16 450 11px    tnum span.muted                                                 | 50% / 0% / 100%
+    JetBrains Mono      7 450 13.5px  tnum td.mono                                                    | $0.0005 / $0.0003
+    JetBrains Mono      6 450 11px    tnum span.mono                                                  | 18% / 19% / 15%
+    JetBrains Mono      5 800 20px    tnum div.card-pad > div.mono                                    | 580 / 56 / 9.66%
+    Plus Jakarta Sans   3 700 34px    tnum div.kpi > div.val.mono                                     | 742 / 168 / 57
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[feed] metric: TikTok Sans=8 · Plus Jakarta Sans=17 · JetBrains Mono=12
+    Plus Jakarta Sans   9 700 14.5px  tnum div.score-ring > b                                         | 94 / 78 / 85
+    JetBrains Mono      4 900 12px         button.rail-temp > b                                       | 4 / 3 / 2
+    JetBrains Mono      4 700 11px         div.hd > b                                                 | 2 / 1
+    JetBrains Mono      4 700 12px         button.rail-lead > b                                       | 95 / 94 / 58
+    TikTok Sans         3 650 15px    tnum span.sb-s > b                                              | ~4,5 / 3 / 454
+    TikTok Sans         2 650 11.5px  tnum span.sb-last > b                                           | 08:22 / 312
+    TikTok Sans         1 650 15px    tnum span.sb-s.hl > b                                           | 43
+    Plus Jakarta Sans   1 600 11.5px       button.seg-dim > i                                         | 1
+    TikTok Sans         1 800 14.5px  tnum div.txt > span.ph-hl                                       | 0938 123 456
+    TikTok Sans         1 800 14px    tnum span.ph-pill > b                                           | 0907 555 888
+    Plus Jakarta Sans   1 800 16px         span.rail-sum > b                                          | 9
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+
+[tasks] metric: TikTok Sans=15 · Plus Jakarta Sans=6
+    TikTok Sans         5 800 11.5px       button.tk-row.nb-row > span.nb-rank                        | 1 / 2 / 3
+    TikTok Sans         5 800 15px         button.tk-row.nb-row > span.tk-sc                          | 88 / 94 / 95
+    TikTok Sans         3 800 15px         button.tk-row > span.tk-sc                                 | 88 / 94 / 95
+    TikTok Sans         2 800 12px         div.tk-h > i                                               | 1 / 2
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[replies] metric: TikTok Sans=2 · Plus Jakarta Sans=6
+    TikTok Sans         1 800 12px         div.tk-h > i                                               | 1
+    TikTok Sans         1 800 15px         button.tk-row.rp-row > span.tk-sc                          | 88
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[pipeline] metric: Plus Jakarta Sans=40
+    Plus Jakarta Sans  10 700 10.5px  tnum span.ksc > b                                               | 94 / 95 / 58
+    Plus Jakarta Sans   8 600 13px         div.seg > i                                                | 10 / 4 / 0
+    Plus Jakarta Sans   7 800 16px         div.pv2-fseg > div.n                                       | 4 / 2 / 1
+    Plus Jakarta Sans   7 600 11px    tnum div.kh > span.c                                            | 4 / 2 / 1
+    Plus Jakarta Sans   1 700 13.5px  tnum span.tx > b.n                                              | 1
+    Plus Jakarta Sans   1 700 11px    tnum button.pv2-nm > i                                          | 35
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[sources] metric: Plus Jakarta Sans=24 · JetBrains Mono=7
+    Plus Jakarta Sans  14 700 15px    tnum div.stat > div.v                                           | 312 / 56 / 268
+    JetBrains Mono      7 600 10.5px       div.src-share > span.pct                                   | 24% / 21% / 17%
+    Plus Jakarta Sans   4 700 34px    tnum div.kpi > div.val.mono                                     | 7 / 6 / 1.284
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[keywords] metric: Plus Jakarta Sans=6
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[scoring] metric: JetBrains Mono=4 · TikTok Sans=13 · Plus Jakarta Sans=6
+    TikTok Sans         4 450 13.5px  tnum td                                                         | 0
+    JetBrains Mono      3 450 13.5px  tnum div.kv > div.v.mono                                        | 80 – 100 điểm / 60 – 79 điểm / 40 – 59 điểm
+    TikTok Sans         3 700 13.5px  tnum td.nm                                                      | 80-100 · Nóng / 60-79 · Ấm / 40-59 · Lạnh
+    JetBrains Mono      1 800 18px    tnum div.mono                                                   | 08:22 09/09/26
+    TikTok Sans         1 650 13px    tnum div.top > span#v_intent.v                                  | 30%
+    TikTok Sans         1 650 13px    tnum div.top > span#v_fit.v                                     | 25%
+    TikTok Sans         1 650 13px    tnum div.top > span#v_timing.v                                  | 15%
+    TikTok Sans         1 650 13px    tnum div.top > span#v_industry.v                                | 12%
+    TikTok Sans         1 650 13px    tnum div.top > span#v_area.v                                    | 8%
+    TikTok Sans         1 650 13px    tnum div.top > span#v_quality.v                                 | 10%
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+
+[history] metric: Plus Jakarta Sans=15 · TikTok Sans=41 · JetBrains Mono=10
+    TikTok Sans        25 450 13.5px  tnum td                                                         | 312 / 74 / 28
+    JetBrains Mono     10 450 13.5px  tnum td.mono                                                    | 31.100 / $0.0078 / 8.820
+    Plus Jakarta Sans   8 700 34px    tnum div.kpi > div.val.mono                                     | 5 / 580 / 56
+    TikTok Sans         5 600 13.5px  tnum td.nm                                                      | 08:22 09/09/26 / 08:18 09/09/26 / 08:13 09/09/26
+    TikTok Sans         5 700 13.5px  tnum span                                                       | 1 / 0
+    TikTok Sans         4 700 12.5px       div.temp-row > b                                           | 19 / 40 / 48
+    TikTok Sans         2 450 12.5px       div.temp-row > span.lbl                                    | Ấm (60-79) / Lạnh (40-59)
+    Plus Jakarta Sans   1 700 28px    tnum div.donut-center > b.mono                                  | 145
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[scanned] metric: TikTok Sans=16 · Plus Jakarta Sans=14
+    TikTok Sans         5 650 11.5px  tnum div.tick > b                                               | 08:22 / 08:18 / 08:13
+    TikTok Sans         5 800 15px         div.sp-open > div                                          | 91 / 76 / 81
+    Plus Jakarta Sans   4 700 34px    tnum div.kpi > div.val.mono                                     | 6 / 3 / 4
+    Plus Jakarta Sans   4 600 13px         div.seg > i                                                | 7 / 4 / 3
+    TikTok Sans         3 650 15px    tnum span.sb-s > b                                              | ~4,5 / 3 / 454
+    TikTok Sans         2 650 11.5px  tnum span.sb-last > b                                           | 08:22 / 312
+    TikTok Sans         1 650 15px    tnum span.sb-s.hl > b                                           | 43
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[outreach] metric: Plus Jakarta Sans=23 · JetBrains Mono=14 · TikTok Sans=3
+    JetBrains Mono     12 450 11px    tnum div.oa-valve > span.oa-vc.mono                             | 42/80 / 16/25 / 0/10
+    Plus Jakarta Sans   8 700 18px    tnum div.oa-stat > div.n.mono                                   | 54 / 6 / 39
+    Plus Jakarta Sans   4 700 34px    tnum div.kpi > div.val.mono                                     | 3 / 128 / 189
+    TikTok Sans         2 700 13px         div.oa-vrun > b                                            | 3 / 0
+    JetBrains Mono      2 450 11px    tnum div.oa-vrow > div.oa-vver.mono                             | v2026-08-30
+    Plus Jakarta Sans   2 600 10px         div.oa-lmeta > span.chip.chip-warm                         | Ấm 74đ / Ấm 68đ
+    Plus Jakarta Sans   1 700 15px    tnum div.val.mono > span                                        | / 4
+    Plus Jakarta Sans   1 800 11px         div.oa-arow > span.chip.oa-safety.ok                       | 96
+    Plus Jakarta Sans   1 800 11px         div.oa-arow > span.chip.oa-safety.warn                     | 54
+    TikTok Sans         1 450 13px         div.oa-vrow > div                                          | 62% · 16GB
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+
+[alerts] metric: TikTok Sans=5 · Plus Jakarta Sans=11
+    TikTok Sans         5 450 11.5px       div.m > span                                               | 91/100 / 95/100 / 85/100
+    Plus Jakarta Sans   3 700 15px         button.al-sum-row.has > b                                  | 2 / 1
+    Plus Jakarta Sans   2 700 15px         button.al-sum-row > b                                      | 0
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[users] metric: Plus Jakarta Sans=10 · monospace=5 · TikTok Sans=4
+    Plus Jakarta Sans   4 700 34px    tnum div.kpi > div.val.mono                                     | 7 / 4 / 2
+    monospace           4 450 13.5px  tnum code                                                       | z15 / 0903555111 / 0901234567
+    monospace           1 400 12px         div.sub > code                                             | z15
+    TikTok Sans         1 700 12px         div.sub > b#uCount                                         | 7
+    TikTok Sans         1 700 11.5px       div.card-pad > b#crmWarnEcho                               | 15
+    TikTok Sans         1 700 11.5px       div.card-pad > b#crmBadEcho                                | 60
+    TikTok Sans         1 450 11.5px       div.card-pad > span#asstKbCount                            | 0/4000 ký tự
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[account] metric: Plus Jakarta Sans=7
+    Plus Jakarta Sans   1 600 12.5px       div.card-head > a.btn.btn-ghost.btn-sm                     | 1900.5368
+    Plus Jakarta Sans   1 700 10px    tnum button.icon-btn > span#topBadge.badge                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntFeed.count                       | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntTasks.count                      | 3
+    Plus Jakarta Sans   1 700 11px    tnum button.nav-item > span#cntReplies.count                    | 1
+    Plus Jakarta Sans   1 700 14.5px  tnum span.sidebar-hotline-text > span.sidebar-hotline-number    | 1900.5368
+    Plus Jakarta Sans   1 600 12px         div.side-user > div.av                                     | Z5
+
+[modal] metric: Plus Jakarta Sans=1 · TikTok Sans=3
+    Plus Jakarta Sans   1 700 19px    tnum div.ld-ring > b                                            | 94
+    TikTok Sans         1 800 14.5px  tnum div.tx > span.ph-hl                                        | 0938 123 456
+    TikTok Sans         1 450 11px    tnum div.row1 > span.cnt                                        | 1/7
+    TikTok Sans         1 650 11px         details.ld-tl > span.cnt                                   | 1
+errors []

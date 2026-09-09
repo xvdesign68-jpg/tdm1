@@ -1,0 +1,36 @@
+/* Audit font chữ số toàn web: node numfont.js  (SITE, FP, OUT env) — mỗi mục: mọi text node có chữ số → font đang render (computed) + class + mẫu */
+const http=require('http'),fs=require('fs'),path=require('path');
+const SITE=process.env.SITE, FP=process.env.FP, OUT=process.env.OUT; fs.mkdirSync(OUT,{recursive:true});
+const MIME={'.html':'text/html; charset=utf-8','.js':'application/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.json':'application/json','.woff2':'font/woff2'};
+const server=http.createServer((req,res)=>{ let p=decodeURIComponent(req.url.split('?')[0]); if(p==='/') p='/app.html';
+ if(p.endsWith('firebase-config.min.js')||p.endsWith('firebase-config.js')){ res.writeHead(200,{'content-type':'text/javascript'}); return res.end('window.SL_CONFIG={MODE:"demo"};'); }
+ if(p.startsWith('/fp/')){ const f=path.join(FP,p.slice(4)); if(fs.existsSync(f)){ res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream'}); return fs.createReadStream(f).pipe(res);} }
+ const f=path.join(SITE,p); if(fs.existsSync(f)&&fs.statSync(f).isFile()){
+  if(p==='/app.html'){ let h=fs.readFileSync(f,'utf8'); h=h.replace(/<link[^>]*fonts\.googleapis[^>]*>/g,'').replace(/<link[^>]*preconnect[^>]*>/g,''); h=h.replace('</head>','<link rel="stylesheet" href="/fp/fonts.css"></head>'); res.writeHead(200,{'content-type':MIME['.html']}); return res.end(h); }
+  res.writeHead(200,{'content-type':MIME[path.extname(f)]||'application/octet-stream'}); fs.createReadStream(f).pipe(res);} else { res.writeHead(404); res.end('nf'); } });
+const SCAN=()=>{ const view=document.querySelector('#view'); const roots=[view, document.getElementById('modal'), document.querySelector('.topbar'), document.getElementById('sidebar')].filter(Boolean);
+  const fam=s=>{ const f=(s.fontFamily||'').split(',')[0].replace(/["']/g,'').trim(); return f; };
+  const out={}; const seen=new Set();
+  const walk=(root)=>{ const it=document.createTreeWalker(root,NodeFilter.SHOW_TEXT); let n; while((n=it.nextNode())){ const t=n.nodeValue; if(!/\d/.test(t)) continue; const el=n.parentElement; if(!el) continue; if(seen.has(n)) continue; seen.add(n);
+      const r=el.getBoundingClientRect(); if(r.width===0||r.height===0) continue; const cs=getComputedStyle(el); if(cs.visibility==='hidden'||cs.display==='none') continue;
+      const txt=t.replace(/\s+/g,' ').trim(); if(!txt) continue; const digits=(txt.match(/\d/g)||[]).length; const metric = txt.length<=14 && digits/txt.replace(/\s/g,'').length>=0.35;
+      let sel=el.tagName.toLowerCase(); if(el.id) sel+='#'+el.id.replace(/\d+$/,''); const cls=[...el.classList].slice(0,3).join('.'); if(cls) sel+='.'+cls; let anc=el.parentElement; let up=0; while(anc&&anc!==root&&up<2){ const c=[...anc.classList].filter(x=>!/^(active|show|open)$/.test(x)).slice(0,2).join('.'); if(c){ sel=anc.tagName.toLowerCase()+'.'+c+' > '+sel; break;} anc=anc.parentElement; up++; }
+      const key=fam(cs)+'|'+(metric?'metric':'prose')+'|'+sel; const o=out[key]||(out[key]={font:fam(cs),kind:metric?'metric':'prose',sel,n:0,w:cs.fontWeight,sz:cs.fontSize,tnum:/tabular/.test(cs.fontVariantNumeric)||/tnum/.test(cs.fontFeatureSettings),samples:[]}); o.n++; if(o.samples.length<3&&!o.samples.includes(txt.slice(0,40))) o.samples.push(txt.slice(0,40)); } };
+  roots.forEach(walk); return Object.values(out); };
+(async()=>{ const {chromium}=require('playwright-core'); const port=await new Promise(r=>server.listen(0,()=>r(server.address().port)));
+ const base='/opt/pw-browsers'; let exe=null; for(const d of fs.readdirSync(base)){ for(const c of [`${base}/${d}/chrome-linux/headless_shell`,`${base}/${d}/chrome-linux/chrome`]) if(fs.existsSync(c)) exe=exe||c; }
+ const browser=await chromium.launch({executablePath:exe,headless:true}); const errs=[]; const report={};
+ const loadFonts=(page)=>page.evaluate(async()=>{ for(const f of ['TikTok Sans','Plus Jakarta Sans','JetBrains Mono']) for(const w of [400,450,500,600,700]) { try{ await document.fonts.load(`${w} 14px "${f}"`,'Ab'); }catch(e){} } await document.fonts.ready; return [...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family+':'+f.weight).slice(0,40); });
+ const ctx=await browser.newContext({viewport:{width:1440,height:900},deviceScaleFactor:1}); const page=await ctx.newPage(); page.on('pageerror',e=>errs.push('d:'+e.message));
+ await page.goto(`http://127.0.0.1:${port}/app.html`); await page.waitForTimeout(1500); console.log('fonts', (await loadFonts(page)).length);
+ const views=await page.evaluate(()=>[...document.querySelectorAll('.nav-item[data-view]')].filter(n=>n.offsetParent!==null).map(n=>n.dataset.view));
+ for(const v of views){ await page.evaluate((v)=>{ document.querySelector(`.nav-item[data-view="${v}"]`).click(); },v); await page.waitForTimeout(1200); report[v]=await page.evaluate(SCAN); }
+ await page.evaluate(()=>{ document.querySelector('.nav-item[data-view="feed"]').click(); }); await page.waitForTimeout(800); await page.click('#feedList .lead-card [data-chatbox]'); await page.waitForTimeout(900);
+ report['modal']=await page.evaluate(()=>{ const view=document.getElementById('modal'); const fam=s=>(s.fontFamily||'').split(',')[0].replace(/["']/g,'').trim(); const out={}; const it=document.createTreeWalker(view,NodeFilter.SHOW_TEXT); let n; while((n=it.nextNode())){ const t=n.nodeValue; if(!/\d/.test(t)) continue; const el=n.parentElement; const r=el.getBoundingClientRect(); if(r.width===0) continue; const cs=getComputedStyle(el); const txt=t.replace(/\s+/g,' ').trim(); const digits=(txt.match(/\d/g)||[]).length; const metric=txt.length<=14&&digits/txt.replace(/\s/g,'').length>=0.35; let sel=el.tagName.toLowerCase()+([...el.classList].slice(0,3).join('.')?'.'+[...el.classList].slice(0,3).join('.'):''); let anc=el.parentElement,up=0; while(anc&&anc!==view&&up<2){ const c=[...anc.classList].slice(0,2).join('.'); if(c){ sel=anc.tagName.toLowerCase()+'.'+c+' > '+sel; break;} anc=anc.parentElement; up++; } const key=fam(cs)+'|'+(metric?'metric':'prose')+'|'+sel; const o=out[key]||(out[key]={font:fam(cs),kind:metric?'metric':'prose',sel,n:0,w:cs.fontWeight,sz:cs.fontSize,tnum:/tabular/.test(cs.fontVariantNumeric),samples:[]}); o.n++; if(o.samples.length<3) o.samples.push(txt.slice(0,40)); } return Object.values(out); });
+ await ctx.close(); await browser.close(); server.close();
+ fs.writeFileSync(`${OUT}/numfont.json`, JSON.stringify(report,null,1));
+ // tổng hợp
+ const tot={}; for(const v in report) for(const r of report[v]){ const k=r.font+'|'+r.kind; tot[k]=(tot[k]||0)+r.n; }
+ console.log('TỔNG (text node có chữ số, theo font | loại):'); Object.entries(tot).sort((a,b)=>b[1]-a[1]).forEach(([k,n])=>console.log('  ',k.padEnd(34),n));
+ for(const v in report){ const rows=report[v].filter(r=>r.kind==='metric'); const byF={}; rows.forEach(r=>{ byF[r.font]=(byF[r.font]||0)+r.n; }); console.log(`\n[${v}] metric: `+Object.entries(byF).map(([f,n])=>f+'='+n).join(' · ')); rows.sort((a,b)=>b.n-a.n).slice(0,14).forEach(r=>console.log('   ',r.font.padEnd(17),String(r.n).padStart(3),r.w,r.sz.padEnd(7),r.tnum?'tnum':'    ',r.sel.slice(0,58).padEnd(58),'| '+r.samples.join(' / '))); }
+ console.log('errors',JSON.stringify(errs)); })().catch(e=>{console.log('ERR',e.stack);process.exit(1);});

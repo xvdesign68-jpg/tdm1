@@ -236,6 +236,14 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
 - Ảnh: `scratchpad kpx2-shot.js <cây> <out.png> brand|super|brand-drop [width]` → `kpx82-brand.png` (1440) / `kpx82-brand-w.png` (2000, đúng số ảnh anh) / `kpx82-super.png` / `kpx82-brand-m.png` (390); so `kpx81-brand.png` (ephemeral).
 - Tái lập: unzip v119-81 / v120-esm-ae → `python3 m24.py <cây>` → `node tools/build.mjs --zip …` (ESM: cùng script, không đổi import/export — `kpiCard` vốn đã export, `kD/flat` nội bộ IIFE của view).
 
+## v119-84 / v120-esm-ah (09/09/2026 chiều) — `m26.py <cây>`: toast "Đã chép" trên điện thoại hết thành cục bầu dục che modal (anh gửi ảnh iPhone bấm "Sao chép gợi ý": "em check lại nhé")
+- Trước: bấm "Sao chép gợi ý" trong modal lead → `__slCopy` toast `'Đã chép: '+val` in NGUYÊN đoạn gợi ý AI (~300–500 ký tự) + `toast()` bo góc 999px + **phần tử fixed `left:50%` không đặt width → chỉ được dùng nửa màn hình còn lại (390px → 195px)** → cột đen 195×360px hình bầu dục che kín hồ sơ nhu cầu (tái lập đúng ảnh anh gửi: `toast83-390.png`).
+- Sau: `__slCopy(el,val,label)` — có nhãn → "Đã chép <nhãn>." (modal gọi `'gợi ý phản hồi'`); không nhãn: giá trị ≤48 ký tự giữ "Đã chép: <giá trị>" (SĐT/email/mã lead vẫn đối chiếu được), dài hơn cắt 44 + "…".
+  `toast()`: `width:max-content` + `max-width:min(92vw,520px)`, bo 22px (1 dòng ~44px vẫn dạng pill, nhiều dòng = hộp bo góc), `line-height:1.4`, căn giữa, `overflow-wrap:anywhere`, tin >200 ký tự cắt "…" (toast là báo nhanh 2,6 s). Rule mobile `pipeline-v2.css` (top 14px) giữ nguyên.
+- Đo (`scratchpad toast-shot.js <cây> <out.png> [width]`): 390px trước 195×360px bo 999px → sau **199×44px** bo 22px ở đỉnh; 1440px 199×44px ở đáy. Ảnh: `toast83-390.png` (trước) · `toast84-390.png` · `toast84-1440.png` · ghép `toast-before-after-390.png`.
+- Smoke +2 check (trong khối mobile 390 sau "Mobile modal dạng bottom-sheet"): bấm `#copyReply` với reply 400+ ký tự → toast "Đã chép gợi ý phản hồi." cao ≤48px, trong màn, bo 22px, top <60; `__slCopy` SĐT → "Đã chép: 0912 345 678"; giá trị dài không nhãn → cắt 44 + "…"; nhãn dài → toast nhiều dòng ≤92vw, bo 22px, căn giữa → **121/121** cả 2 cây.
+- Tái lập: unzip v119-83 / v120-esm-ag → `python3 m26.py <cây>` → build (ESM: cùng script — `toast` đã export từ 65, `__slCopy` là `window.*`, không thêm import/export).
+
 ## v119-83 / v120-esm-ag (09/09/2026 trưa) — `m25.py <cây>`: Pipeline "Việc cần chú ý" gom nhóm thay bức tường tên (anh gửi ảnh 488 việc: "số liệu nhiều quá thì có cách nào hiển thị thật thông minh tiện lợi hơn được không")
 - Trước (30-pipeline `pvParts`): khối liệt kê TỪNG lead kẹt nối dấu phẩy ("Hoà Nguyễn (72) kẹt 7 ngày ở Lead mới, …") → 488 lead = ~30 dòng chữ đặc, không đọc/không bấm được, đẩy kanban xuống dưới.
 - Sau: mỗi NHÓM 1 dòng = số đếm đậm `.n` + việc cần làm + 3 lead điểm cao nhất (chip `.pv2-nm[data-lead]` bấm → `openLead`) + nút Lọc thu hẹp đúng nhóm:

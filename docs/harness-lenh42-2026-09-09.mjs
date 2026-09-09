@@ -1,0 +1,42 @@
+/* harness LỆNH #42 — dựng stats.js = #17 (.md) + #36 + #40 + #41 + #42 trong thư mục tạm có SDK giả → người bán/chủ bài không cộng new/hot, gắn vai sau khi đếm → trừ lại, recount bỏ vai. Chạy: node docs/harness-lenh42-2026-09-09.mjs */
+import fs from 'fs'; import path from 'path'; import os from 'os'; import { execFileSync } from 'child_process'; import { pathToFileURL } from 'url';
+const D = path.dirname(new URL(import.meta.url).pathname);
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'l42-')); const fn = path.join(tmp, 'functions'); fs.mkdirSync(fn);
+const nm = path.join(fn, 'node_modules'); fs.mkdirSync(path.join(nm, 'firebase-admin'), { recursive: true }); fs.mkdirSync(path.join(nm, 'firebase-functions', 'v2'), { recursive: true });
+fs.writeFileSync(path.join(nm, 'firebase-admin', 'package.json'), JSON.stringify({ name: 'firebase-admin', exports: { './app': './app.js', './firestore': './firestore.js' } }));
+fs.writeFileSync(path.join(nm, 'firebase-admin', 'app.js'), "export const initializeApp=()=>({}); export const getApps=()=>[{}]; export const applicationDefault=()=>({});");
+fs.writeFileSync(path.join(nm, 'firebase-admin', 'firestore.js'), "export const getFirestore=()=>({}); export const FieldValue={increment:n=>({inc:n})};");
+fs.writeFileSync(path.join(nm, 'firebase-functions', 'package.json'), JSON.stringify({ name: 'firebase-functions', exports: { './v2/firestore': './v2/firestore.js' } }));
+fs.writeFileSync(path.join(nm, 'firebase-functions', 'v2', 'firestore.js'), "export const onDocumentWritten=(o,f)=>({o,f}); export const onDocumentCreated=(o,f)=>({o,f});");
+const md = fs.readFileSync(path.join(D, 'lenh-2026-09-04-nhom3.md'), 'utf8'); const m17 = md.match(/cat > stats\.js <<'EOF_STATS'\n([\s\S]*?)\nEOF_STATS/); if (!m17) throw new Error('không thấy stats.js #17');
+const S = path.join(fn, 'stats.js'); fs.writeFileSync(S, m17[1] + '\n');
+let ok = 0, fail = 0; const t = (name, c) => { if (c) ok++; else { fail++; console.log('FAIL', name); } };
+const run = (cjs, arg) => { try { return execFileSync('node', [path.join(D, cjs), arg], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); } catch (e) { return 'EXIT' + e.status + ' ' + String(e.stderr || ''); } };
+/* fail-closed: #42 trên bản chưa qua #41 → dừng, không ghi */
+const s17 = fs.readFileSync(S, 'utf8'); t('#42 từ chối khi chưa có #41', /EXIT1/.test(run('lenh-2026-09-09-42-stats-patch.cjs', S)) && fs.readFileSync(S, 'utf8') === s17);
+t('#36', /PATCH OK/.test(run('lenh-2026-09-06-36-stats-patch.cjs', S)));
+t('#40', /PATCH OK/.test(run('lenh-2026-09-08-40-stats-patch.cjs', S)));
+t('#41', /PATCH OK/.test(run('lenh-2026-09-09-41-stats-patch.cjs', S)));
+t('#42', /PATCH OK/.test(run('lenh-2026-09-09-42-stats-patch.cjs', S)));
+t('#42 idempotent', /ĐÃ patch/.test(run('lenh-2026-09-09-42-stats-patch.cjs', S)));
+execFileSync('node', ['--check', S]);
+const m = await import(pathToFileURL(S).href);
+const DET = Date.parse('2026-09-08T01:00:00Z'); const inc = ev => Object.assign({}, ...ev.filter(e => e.day === '2026-09-08').map(e => e.inc));
+t('tạo lead thường → new 1 hot 1 (không đổi)', (() => { const i = inc(m.statsEvents(null, { brand: 'x', score: 85, detected_at: DET }, Date.now())); return i.new === 1 && i.hot === 1; })());
+t('tạo lead role seller → 0 sự kiện', m.statsEvents(null, { brand: 'x', score: 85, detected_at: DET, role: 'seller' }, Date.now()).length === 0);
+t('tạo lead role poster_self → 0 sự kiện', m.statsEvents(null, { brand: 'x', score: 70, detected_at: DET, role: 'poster_self' }, Date.now()).length === 0);
+t('tạo lead self_comment:true → 0 sự kiện', m.statsEvents(null, { brand: 'x', score: 70, detected_at: DET, self_comment: true }, Date.now()).length === 0);
+t('role "buyer"/"other" vẫn đếm', (() => { const a = inc(m.statsEvents(null, { brand: 'x', score: 85, detected_at: DET, role: 'buyer' }, Date.now())); const b = inc(m.statsEvents(null, { brand: 'x', score: 50, detected_at: DET, role: 'other' }, Date.now())); return a.new === 1 && a.hot === 1 && b.new === 1 && b.cold === 1; })());
+t('đã đếm rồi mới gắn poster_self (+dropped, LỆNH #31b) → new −1 hot −1 đúng ngày phát hiện', (() => { const ev = m.statsEvents({ brand: 'x', score: 85, detected_at: DET }, { brand: 'x', score: 85, detected_at: DET, role: 'poster_self', dropped: true, dropped_at: DET + 5 * 864e5 }, Date.now()); const i = inc(ev); return i.new === -1 && i.hot === -1 && ev.some(e => e.inc.dropped === 1); })());
+t('gắn self_comment sau khi đếm → new −1 warm −1', (() => { const i = inc(m.statsEvents({ brand: 'x', score: 62, detected_at: DET }, { brand: 'x', score: 62, detected_at: DET, self_comment: true }, Date.now())); return i.new === -1 && i.warm === -1; })());
+t('gỡ vai (poster_self → buyer) → cộng lại new 1', (() => { const i = inc(m.statsEvents({ brand: 'x', score: 85, detected_at: DET, role: 'poster_self' }, { brand: 'x', score: 85, detected_at: DET, role: 'buyer' }, Date.now())); return i.new === 1 && i.hot === 1; })());
+t('lead rác bị gắn vai → junk −1 (không đụng new)', (() => { const i = inc(m.statsEvents({ brand: 'x', score: 20, detected_at: DET }, { brand: 'x', score: 20, detected_at: DET, role: 'seller' }, Date.now())); return i.junk === -1 && i.new == null; })());
+t('update thường (đã đếm, không vai) → không đếm lại', (() => { const ev = m.statsEvents({ brand: 'x', score: 85, detected_at: DET }, { brand: 'x', score: 85, detected_at: DET, stage: 'inbox', stage_at: DET + 1 }, Date.now()); return ev.every(e => e.inc.new == null && e.inc.hot == null); })());
+t('#41 ghi 2 bước vẫn đúng (tạo rồi mới chấm điểm)', (() => { const i0 = m.statsEvents(null, { brand: 'x', detected_at: DET }, Date.now()); const i = inc(m.statsEvents({ brand: 'x', detected_at: DET }, { brand: 'x', score: 62, detected_at: DET }, Date.now())); return i0.length === 0 && i.new === 1 && i.warm === 1; })());
+t('#40 sla vẫn chạy', (() => { const i = inc(m.statsEvents(null, { brand: 'x', score: 85, detected_at: DET, first_care_at: DET + 600000 }, Date.now(), { slaBad: 60 })); return i.new === 1 && i.slaN === 1 && i.slaOk === 1; })());
+/* recount #42 bỏ vai */
+fs.copyFileSync(path.join(D, 'lenh-2026-09-09-42-recount.mjs'), path.join(fn, '_l42_recount.mjs')); const R = await import(pathToFileURL(path.join(fn, '_l42_recount.mjs')).href);
+const r = R.newAgg([{ brand: 'a', score: 85, detected_at: DET }, { brand: 'a', score: 70, detected_at: DET, role: 'poster_self', dropped: true }, { brand: 'a', score: 70, detected_at: DET, self_comment: true }, { brand: 'a', score: 70, detected_at: DET, role: 'seller' }, { brand: 'a', score: 50, detected_at: DET, dropped: true }], '2026-08-01');
+t('recount: 5 lead → 2 hợp lệ (bỏ 3 vai; lead Loại tay vẫn tính) · skipped.roleBad 3', r.agg['a__2026-09-08'] && r.agg['a__2026-09-08'].new === 2 && r.agg['a__2026-09-08'].hot === 1 && r.agg['a__2026-09-08'].cold === 1 && r.skipped.roleBad === 3);
+fs.rmSync(tmp, { recursive: true, force: true });
+console.log(ok + '/' + (ok + fail) + ' PASS'); process.exit(fail ? 1 : 0);

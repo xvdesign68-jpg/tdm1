@@ -212,3 +212,14 @@ Harness (ms từ DOMContentLoaded): normal 1,1 s (bản máy chủ), cache nóng
 ### Cập nhật 09/09 sáng (sau khi anh deploy v119-80 + chạy LỆNH #39/#40)
 - LỆNH #39 OK (scanStatsOnRun ACTIVE, 94 doc `scanned`), LỆNH #40 OK (statsOnLead slaN/slaOk, Rules stage_log 32 field, 90 doc). Kết quả ghi cuối `docs/lenh-2026-09-08-39.md` / `-40.md`.
 - **Lỗi lộ ra từ output**: `daily_stats.new/hot` = 0 ở mọi doc 07–09/09 dù cùng doc có `slaN` > 0 → trigger #17 không đếm lead mới từ sau backfill 04/09 → KPI "Lead hợp lệ/Lead nóng" 14 ngày (v119-80, từ bộ đếm) và Bảng brand "Lead 7 ngày" thiếu số → **LỆNH #41** (`docs/lenh-2026-09-09-41.md`): vá trigger đếm ở lần đầu doc đủ brand + điểm, recount tuyệt đối 60 ngày, chẩn đoán kiểu dữ liệu lead + log lỗi. Không cần zip mới (FE tự đúng khi bộ đếm đúng). **→ ĐÃ CHẠY OK 09/09 07:10 VN**: trigger 341 lượt/24h toàn 200 (lỗi logic, không phải trigger hỏng), 13/13 doc 4 ngày `∅` → LỆCH, deploy ACTIVE, recount 1998 lead → 90 doc/60 ngày, doc 07–09/09 new/hot đúng (vd z15mrc-tts-1 08/09 51/20). Kết quả cuối trong `docs/lenh-2026-09-09-41.md`.
+
+## v119-81 / v120-esm-ae (09/09/2026) — `m23.py <cây>`: hàng KPI Bảng điều khiển hiển thị dễ hiểu (anh chốt ảnh 2)
+- Bối cảnh: anh hỏi "Lead hợp lệ là thế nào"; khối kiểm `docs/lenh-2026-09-09-41-kpi14check.mjs` cho thấy bộ đếm khớp kho lead 1.029/1.029 nhưng caption 4 ô lặp "so với 14 ngày trước · bộ đếm máy chủ" 9 lần,
+  "tổng đã nạp 570" là số cửa sổ trình duyệt (không phải kỳ 14 ngày), và 91/1.029 lead "hợp lệ" là vai người bán/chủ bài (→ LỆNH #42).
+- Thay đổi (20-feed): `kpiCard(ic,bg,fg,val,lbl,delta,dir,cap,tip,chip)` (tooltip `title` + chip `.kchip` cạnh mũi tên); `kpiPeriod(q)` = dải kỳ 1 lần trên hàng KPI
+  ("14 ngày qua · dd/mm – dd/mm · <tên brand | Tất cả brand> · mũi tên ▲▼ so với 14 ngày liền trước (dd/mm – dd/mm)", chỉ khi có bộ đếm); `kpi14()` trả thêm `deal` (Σ daily_stats.deal) + `open`
+  ("còn mở" = lead đã nạp trong kỳ, không rác, không Loại/Không thành/người bán — CHỈ khi `seen ≥ cur.new`, tức cửa sổ đã nạp phủ đủ kỳ; super gộp mọi brand thường ẩn); caption:
+  Bài đã quét "bài viết và bình luận AI đã đọc" · Lead hợp lệ "AI chấm từ 40 điểm, đã bỏ rác" + chip "còn mở N" · Lead nóng "AI chấm từ 80 điểm · N% lead hợp lệ" ·
+  Đã chốt 0 → "chưa có deal chốt trong kỳ", >0 → "tỷ lệ chốt x,y% trên lead hợp lệ · doanh thu 12,5 triệu"; bỏ "tổng đã nạp". CSS `.kpi-period`, `.kpi .meta .kchip`, `.kchip ~ .vs {flex-basis:100%}`.
+- Smoke: 2 check cũ đổi mốc caption (k78 `/AI đã đọc/`, k80 bỏ `/bộ đếm máy chủ/`) + 1 check mới v119-81 (dải kỳ có tên brand, chip "còn mở 4/6" với 1 Loại + 1 chủ bài, tooltip, Đã chốt 0/1 deal) → **117/117** cả 2 cây.
+- Tái lập: unzip v119-80 → `python3 m23.py <cây>` → `node tools/build.mjs --zip …` (ESM: cùng script trên cây v120-esm-ad, không cần đổi import vì `kpiPeriod` nội bộ 20-feed). Ảnh mockup gửi anh: `scratchpad kpi-1-hien-tai.png / kpi-2-de-xuat-brand.png / kpi-3-de-xuat-superadmin.png` (ephemeral).

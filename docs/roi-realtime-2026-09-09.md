@@ -50,3 +50,9 @@ Super Admin đăng ký `brands` bằng onSnapshot; `refreshAdmin` không đọc 
 
 KỲ VỌNG v119-86: PASS 12/12 (IIFE + ESM). Kiểm âm: harness trên bản min v119-85 FAIL 4/12 đúng các mục T5.
 Không đổi: đang gõ ô tham số → hoãn tới blur (cố ý); số tính trên lead đã tải (≤4.000).
+
+## Tiếp theo (10/09/2026)
+- v119-86 / v120-esm-aj: `brands` đi kênh realtime cho super (mục "KHÔNG realtime" ở trên đã đóng; harness PASS 12/12).
+- v119-87 / v120-esm-ak: trang ROI super viết lại toàn cảnh (CPL 2 cách A/B, phí gói theo Gói giải pháp, bảng 17 cột cùng số Bảng brand,
+  Xem như khách) — harness này vẫn PASS 12/12 trên bản mới (READ bảng mở rộng `slice(1,20)` vì cột phí dời sang ô thứ 7).
+  Chi tiết: `docs/fe-2026-09-07-v119-61/README.md` mục v119-87.

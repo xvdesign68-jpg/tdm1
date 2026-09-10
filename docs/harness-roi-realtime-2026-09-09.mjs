@@ -104,7 +104,7 @@ await page.waitForFunction(() => window.SL_LIVE_READY === true, null, { timeout:
 await page.evaluate(() => document.querySelector('.nav-item[data-view="roi"]').click()); await page.waitForTimeout(900);
 const READ = () => { const v = document.getElementById('view'); const q = s => (v.querySelector(s) || {}).textContent || ''; const stats = [...v.querySelectorAll('.rl-strip .rl-stat, .rl-strip [class*=stat]')];
   const st = {}; v.querySelectorAll('.rl-strip > *').forEach(e => { const lb = (e.querySelector('.rl-lb, .lb, small, .rl-stat-lb') || e.firstElementChild || {}).textContent || ''; const val = (e.querySelector('b, .rl-v, .v') || {}).textContent || ''; if (lb) st[lb.trim().slice(0, 22)] = val.trim(); });
-  const rows = {}; v.querySelectorAll('tr[data-roibrand]').forEach(tr => { const tds = [...tr.querySelectorAll('td')].map(td => td.textContent.trim()); rows[tr.dataset.roibrand] = tds.slice(1, 7).join(' | '); });
+  const rows = {}; v.querySelectorAll('tr[data-roibrand]').forEach(tr => { const tds = [...tr.querySelectorAll('td')].map(td => td.textContent.trim()); rows[tr.dataset.roibrand] = tds.slice(1, 20).join(' | '); });
   const fc = [...v.querySelectorAll('.rl-fc, .roi-fc, [class*=forecast]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()).join(' ‖ ');
   return { kick: q('.rl-kick').trim(), hero: q('.rh-num').trim(), fee: q('.rl-eq').trim(), strip: st, rows, tot: (v.querySelector('tr.roi-tot') || {}).textContent ? [...v.querySelector('tr.roi-tot').querySelectorAll('td')].map(t => t.textContent.trim()).join(' | ') : '', fc: fc.slice(0, 400), title: (document.getElementById('vTitle') || {}).textContent }; };
 const read = () => page.evaluate(READ);

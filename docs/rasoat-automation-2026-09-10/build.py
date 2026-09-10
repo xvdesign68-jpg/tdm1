@@ -13,7 +13,7 @@ def findings_table(items):
         rows.append(f"""<tr class="{SEV.get(f['sev'],'')}"><td class="id">{E(f['id'])}</td><td><span class="pill {SEV.get(f['sev'],'')}">{E(f['sev'])}</span></td>
 <td><b>{E(f['title'])}</b><div class="where">{md(f.get('where',''))}</div><div class="desc">{md(f.get('desc',''))}</div>{('<div class="fix"><span>Sửa:</span> '+md(f['fix'])+'</div>') if f.get('fix') else ''}</td>
 <td class="conf">{E(f.get('conf',''))}</td></tr>""")
-    return '<table class="tbl"><thead><tr><th>Mã</th><th>Mức</th><th>Phát hiện · bằng chứng · cách sửa</th><th>Độ chắc</th></tr></thead><tbody>'+''.join(rows)+'</tbody></table>'
+    return '<div class="tw"><table class="tbl"><thead><tr><th>Mã</th><th>Mức</th><th>Phát hiện · bằng chứng · cách sửa</th><th>Độ chắc</th></tr></thead><tbody>'+''.join(rows)+'</tbody></table></div>'
 def proposals(items):
     out=[]
     for p in items:
@@ -54,6 +54,7 @@ details{{margin:10px 0 0;color:var(--ink-2)}} summary{{cursor:pointer;font-weigh
 .prop{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:10px 0}} .prop-h{{display:flex;gap:10px;align-items:center;flex-wrap:wrap}} .pid{{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-3)}}
 .tag{{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-family:'Plus Jakarta Sans',sans-serif}} .tag.eff-nhỏ{{background:var(--lo-bg);color:var(--lo)}} .tag.eff-lớn{{background:var(--md-bg);color:var(--md)}}
 .prop p{{margin:8px 0 0;color:var(--ink-2)}} .prop .how span{{font-weight:700;color:var(--ink)}}
+.tw{{overflow-x:auto;max-width:100%}} .tbl td,.tbl th{{overflow-wrap:anywhere}} code{{overflow-wrap:anywhere}}
 .muted{{color:var(--ink-3)}} ul.road{{padding-left:20px}} ul.road li{{margin:6px 0}}
 pre{{background:var(--code);padding:12px 14px;border-radius:12px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.5}}
 .toc{{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}} .toc a{{font-size:12.5px;color:var(--brand);text-decoration:none;background:var(--brand-soft);padding:4px 10px;border-radius:999px}}
@@ -65,7 +66,7 @@ pre{{background:var(--code);padding:12px 14px;border-radius:12px;overflow-x:auto
 <nav class="toc">{''.join(f'<a href="#{E(g["key"])}">{E(g["short"])}</a>' for g in J['groups'])}<a href="#props">Đề xuất</a><a href="#road">Lộ trình</a><a href="#lenh">LỆNH #43</a></nav>
 <div class="kpis"><div class="kpi hi"><b>{cnt['Cao']}</b><span>phát hiện mức Cao</span></div><div class="kpi md"><b>{cnt['Vừa']}</b><span>mức Vừa</span></div><div class="kpi lo"><b>{cnt['Thấp']}</b><span>mức Thấp</span></div><div class="kpi"><b>{len(J['proposals'])}</b><span>đề xuất thông minh</span></div><div class="kpi"><b>{E(J['meta']['coverage'])}</b><span>độ phủ đọc code</span></div></div>
 <section><h2>Tóm tắt</h2>{md(J['summary'])}</section>
-<section><h2>Bảng điểm theo phân hệ</h2><table class="tbl"><thead><tr><th>Phân hệ</th><th>Điểm</th><th>Nhận xét</th></tr></thead><tbody>{score_rows}</tbody></table></section>
+<section><h2>Bảng điểm theo phân hệ</h2><div class="tw"><table class="tbl"><thead><tr><th>Phân hệ</th><th>Điểm</th><th>Nhận xét</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 {''.join(sections)}
 <section id="props"><h2>Đề xuất thông minh</h2><p class="lead">{md(J['props_intro'])}</p>{proposals(J['proposals'])}</section>
 <section id="road"><h2>Lộ trình đề xuất</h2><ul class="road">{road}</ul></section>

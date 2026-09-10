@@ -1,0 +1,679 @@
+{
+ "meta": {
+  "subtitle": "Kiểm toàn diện mảng \"Tiếp cận\" (engine Cloud Function · worker AdsPower · nội dung AI · giao diện) — 10/09/2026 · chỉ đánh giá, chưa sửa code · chờ anh chốt",
+  "coverage": "3/3 lớp"
+ },
+ "summary": "**Kết luận ngắn: chưa \"oke hết\".** Lớp an toàn nick đã qua 3 vòng rà (v119-36/38/39) và vững: giành task nguyên tử, chống làm lại bước, hoàn van, huỷ cứng zombie, fail-closed cho comment-lead, cổng vai người bán. Nhưng còn **3 lỗ hệ thống** khiến automation tuần qua \"chạy mà không ai biết nó đã ngừng\":\n1. **Vòng phản hồi khách gần như mù** — worker chỉ đọc inbox khi nick có việc mới, bỏ thread sau 6 giờ, không bắt phản hồi qua bình luận; kết quả thật: đã inbox nhưng `replyFound = 0` (W-1, W-5, E-11).\n2. **Engine chọn lead và kế toán van có lỗ** — chạm chồng lead sales đang chăm/đã chốt, lead nóng không được ưu tiên và lead cũ đói, phễu kẹt qua ngày chạy lại là vượt van 2×, thread mồ côi khi nick chết (E-1, E-2, E-4, E-6).\n3. **Không có giám sát chủ động** — 4/5 nick chết một tuần, 11/12 thread kẹt, chỉ phát hiện khi chạy script tay; web không realtime cờ nick, không email/push (E-12, F-1).\nNgoài ra 2 đường còn có thể **đăng bình luận 2 lần** (API mơ hồ → DOM; tắt worker giữa bước) và cách đếm lỗi nick sẽ **tự tắt nick khoẻ** khi anh nâng số nick cùng lúc (W-2, W-3, W-8, W-10).\n\n**Nên làm gì trước:** chạy **LỆNH #43** (chỉ đọc, 2 phút) để có số thật → em chốt danh sách sửa. Đợt 1 (worker bản mới + 1 LỆNH engine nhỏ + zip FE nhỏ) đóng được 8/11 mục Cao mà không đổi kiến trúc.",
+ "scorecard": [
+  {
+   "name": "An toàn nick (worker)",
+   "score": "7,5",
+   "note": "Cơ chế chống double/zombie/checkpoint tốt; còn 2 đường đôi comment (W-2/W-10), đếm lỗi theo task (W-3), Safety không suy giảm (W-8)."
+  },
+  {
+   "name": "Vòng phản hồi khách",
+   "score": "4,0",
+   "note": "Chỉ đọc inbox khi có việc mới, bỏ sau 6 giờ, không bắt bình luận; `replyFound = 0` thực tế."
+  },
+  {
+   "name": "Engine chọn lead · van · thread",
+   "score": "5,5",
+   "note": "Cổng vai + ma trận đúng; thiếu lọc người thật, ưu tiên nóng, kế toán van theo ngày, sweeper mồ côi."
+  },
+  {
+   "name": "Nội dung AI (content.js)",
+   "score": "7,0",
+   "note": "Prompt/CTA/opt-out/cmpFinish/meta tốt; spam score chưa gate, CTA lặp, template/reply chưa stripForbid, đo hiệu quả lệch."
+  },
+  {
+   "name": "Giám sát · vận hành",
+   "score": "4,5",
+   "note": "Không cảnh báo chủ động; thao tác cứu thread bằng script tay; web cờ nick không realtime."
+  },
+  {
+   "name": "Giao diện Tiếp cận · Content Studio",
+   "score": "7,5",
+   "note": "Tenancy/revert/realtime đúng; van hiển thị vượt trần worker, chip máy thiếu tên nick, sales không thấy máy đã nói gì."
+  }
+ ],
+ "groups": [
+  {
+   "key": "worker",
+   "short": "Worker VPS",
+   "title": "1. Worker AdsPower (worker.mjs 2026-09-06d) — em đọc hết 1.496 dòng, agent đối kháng đọc lại, em kiểm chứng từng mục Cao/Vừa trên code",
+   "intro": "Nền tảng vững: giành task transaction, doneSteps chống làm lại, refund van, huỷ cứng zombie, fail-closed comment-lead. Các lỗ còn lại tập trung ở **vòng đọc phản hồi khách**, **đếm lỗi theo task thay vì theo phiên nick**, và **đường comment bài khi API mơ hồ**.",
+   "findings": [
+    {
+     "id": "W-1",
+     "sev": "Cao",
+     "title": "Đọc phản hồi khách chỉ chạy KHI nick có việc mới → nick rảnh / brand tắt automation / hết van = không bao giờ đọc inbox",
+     "where": "worker.mjs:1302 (`checkReplies` gọi cuối `runNick`) · `runNick` chỉ chạy khi `claimBatch` có task của nick (1361–1418); gate hoãn hết task → return sớm (1249)",
+     "desc": "Kịch bản thật hiện nay: hscl-01 có 1 nick sống, engine mỗi tick chỉ đẩy lead MỚI; ngày ít lead hoặc cap hết → không task → không mở nick → khách trả lời inbox từ hôm qua không ai thấy. Tắt automation brand (gate `brand đã TẮT`) cũng tắt luôn việc đọc phản hồi của các lead ĐÃ inbox. Đây là lý do `replyFound = 0` toàn hệ thống dù đã inbox (kiểm 07/09).",
+     "fix": "Tách 'phiên đọc phản hồi' khỏi việc outbound: engine mỗi 60′ (trong giờ VN) tạo task nhẹ `check_replies` cho nick có thread đã inbox chưa replied (hoặc worker tự tạo phiên khi rảnh + `replyCheckAt` quá hạn); gate cho phép task này chạy kể cả khi brand tắt automation.",
+     "conf": "Chắc (đọc code)"
+    },
+    {
+     "id": "W-2",
+     "sev": "Cao",
+     "title": "Comment BÀI qua API 'mơ hồ' rơi thẳng xuống DOM → có thể đăng bình luận 2 lần",
+     "where": "worker.mjs:494–495 (`gqlComment` chỉ trả `ok`), 1037–1047 (`!ok` → `domComment` ngay)",
+     "desc": "Đường comment-lead (`gqlReply`) đã có nhánh `ambiguous → verifyComment → mới DOM`; đường comment bài thì API không thấy key `comment_create/feedback_comment_edge` là coi như FAIL rồi gõ DOM. FB đổi shape response (đã xoay doc_id 29/08 → 06/09) hoặc trả kèm `errors` phụ → API đã đăng, DOM đăng lần 2 công khai trên bài khách = spam signal mạnh nhất.",
+     "fix": "`gqlComment` trả `{ok, ambiguous}` như `gqlReply`; ambiguous → reload + `verifyCommentPosted`, thấy = done, không thấy = log 'cần kiểm tay', KHÔNG gõ DOM. Xoá luôn nhánh per-step `execOnPage` comment (1142–1151) còn retry-toggle kiểu cũ.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-3",
+     "sev": "Cao",
+     "title": "1 lần đăng xuất / checkpoint bị đếm N lần (mỗi task) → nick tự tắt sau 1 phiên khi nâng số nick cùng lúc",
+     "where": "worker.mjs:1261 `for (const t of tasks) await onNeedLogin(t)` · 883–888 `needLoginCount+1` mỗi task · 1266 checkpoint → `onFail` từng task (`failCount+N`, `tries+1` mỗi thread)",
+     "desc": "Hôm nay `maxConcurrent 1` → 1 task/nick/vòng nên chưa lộ. Khi anh nâng lên 3 (panel VPS), `claimBatch` gom 3 task cùng nick → 1 lần đăng xuất = `needLoginCount 3` → `active:false` ngay + Safety −30; checkpoint 1 lần → 3 thread mất 1 lượt oan.",
+     "fix": "Counter nick tính 1 lần/phiên; task còn lại chỉ hoãn thread (`taskStatus paused`, nextAt) không đốt tries.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-4",
+     "sev": "Vừa",
+     "title": "Worker không kiểm trạng thái lead/thread trước khi hành động → vẫn chăm lead đã Loại / Không thành / Đã chốt / khách đã phản hồi kênh khác",
+     "where": "worker.mjs:123–136 `gateCheck` chỉ soi nick/brand/giờ; 928 `runFunnel` chỉ đọc `doneSteps`",
+     "desc": "Task nằm hàng đợi 20–30′ (lease) — trong lúc đó sales bấm Không thành/Đã chốt, khách phản hồi qua bình luận/func webhook (thread `replied`), LỆNH #31 tắt thread vai người bán → worker vẫn react/comment/kết bạn/inbox trọn phễu.",
+     "fix": "Trước phiên: đọc `outreach_threads/{leadId}` (`active===false || step ∈ replied/skipped_role/done`) + `leads/{leadId}` (`dropped|lost|closed_at|stage ∈ responded/booked/closed`) → markTask skipped + refund van. Kiểm lại 1 lần trước bước inbox (bước đắt nhất).",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-5",
+     "sev": "Vừa",
+     "title": "`checkReplies` bỏ hẳn thread sau 6 lần kiểm (≈6 giờ) + `limit(80)` không sắp xếp → khách trả lời tối/hôm sau không bao giờ được thấy; nick nhiều thread cũ thì thread mới không vào danh sách",
+     "where": "worker.mjs:1170 `.where('step','==','done').limit(80)` · 1177 `replyChecks >= 6` · 1215",
+     "desc": "Đa số khách trả lời sau vài giờ tới 1–2 ngày (ngoài giờ làm việc). 6 lần × 60′ = mù sau 6 giờ. Sau vài tuần, 80 thread `done` cũ nhất chiếm hết chỗ → thread mới không được kiểm.",
+     "fix": "Backoff theo `replyCheckedAt` (1h·4h·12h·24h·48h·7 ngày), query `orderBy('nextAt','desc')`, hoặc đọc danh sách hội thoại 'Chưa đọc' 1 lần rồi chỉ mở thread có tín hiệu (đề xuất R-2).",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-6",
+     "sev": "Vừa",
+     "title": "Nhận diện 'khách đã phản hồi' có thể khớp nhãn trạng thái 'Đã gửi/Sent' của chính tin mình → báo phản hồi GIẢ (text rỗng)",
+     "where": "worker.mjs:1205–1211: `els = [aria-label] khớp /(đã gửi|sent)\\s*$/` · `own = /^(bạn đã gửi|you sent)/` · `replied = !!after.length`",
+     "desc": "Nếu messenger vẽ dấu giao nhận của tin mình là phần tử `aria-label=\"Đã gửi\"` đứng sau bong bóng → khớp filter, không phải `own` → `replied:true`, `replyText:''` → lead nhảy 'Đã phản hồi', note rỗng, KPI phản hồi thổi. Thực tế `replyFound = 0` tới 07/09 nên chưa thấy ca giả — nhưng code không có lớp loại trừ.",
+     "fix": "Chỉ nhận phần tử có `innerText` ≠ rỗng, nhãn dạng `<Tên> đã gửi` với Tên ≠ Bạn/You, loại nhãn thuần trạng thái (Đã gửi/Đã nhận/Đã xem/Sent/Delivered/Seen); `replied` chỉ khi `replyText` khác rỗng.",
+     "conf": "Nghi ngờ mạnh — cần dump aria-label 1 thread thật (LỆNH #43 mục D)"
+    },
+    {
+     "id": "W-7",
+     "sev": "Vừa",
+     "title": "`checkReplies` ghi đè `stage='responded'` không điều kiện",
+     "where": "worker.mjs:1220",
+     "desc": "Lead đã `booked/closed/lost` mà khách nhắn thêm → tụt về 'Đã phản hồi', `daily_stats.responded` +1 lần nữa, không có `stage_log`.",
+     "fix": "Đọc lead; chỉ đổi stage khi đang new/contacted/inbox; luôn ghi `outreach_replied*` + `stage_log` + note.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-8",
+     "sev": "Vừa",
+     "title": "Safety Score không suy giảm với nick chạy hằng ngày → `failCount` cộng dồn vô hạn, nick khoẻ cũng tự dừng sau vài tuần",
+     "where": "worker.mjs:281–284 (`days = floor((now − safetyAt)/1d)`, `safetyAt=now` ghi MỖI phiên) · 911 `onFail` +1 failCount cho mọi lỗi kể cả lỗi selector",
+     "desc": "Nick có phiên mỗi ngày → `days` luôn 0 → không bao giờ trừ. FB đổi 1 nhãn nút → ~2 fail/nick/ngày → ~3 tuần dưới 60 (giãn nhịp), ~5 tuần dưới 30 (tự dừng cả dàn) dù không hề checkpoint.",
+     "fix": "Mốc suy giảm riêng `safetyDecayAt` chỉ tiến theo số ngày đã trừ; lỗi selector/nội dung (không thấy nút, ô soạn…) không cộng `failCount` (chỉ checkpoint/needLogin/rate-limit mới tính).",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-9",
+     "sev": "Vừa",
+     "title": "`detectChallengeStrict` quét toàn bộ `div[role=dialog]` — bài permalink của FB chính là dialog → lỗi 1 bước có thể gắn cờ checkpoint OAN từ nội dung bài người lạ",
+     "where": "worker.mjs:243 · gọi ở 1088/1099 khi bước lỗi",
+     "desc": "Bài mở dạng `POST_PERMALINK_DIALOG` (đúng feedLocation đã capture 06/09) → `zones` gồm text bài + bình luận (≤4.000 ký tự); nhóm mua bán/tuyển dụng hay có chữ 'tài khoản bị khoá', 'tạm thời bị chặn' → `flagChallenge` → needLogin + challengeCount, 3 lần → tự tắt nick, Safety −20/lần.",
+     "fix": "Bỏ qua dialog chứa `div[role=article]`; chỉ tin dialog/form không có article + URL checkpoint.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-10",
+     "sev": "Vừa",
+     "title": "Tắt worker (đóng cửa sổ / run.bat chạy lại / SIGINT) giữa bước → mất `doneSteps` → reaper requeue → làm lại bước = comment/inbox đôi",
+     "where": "worker.mjs:1419 `goOffline` = 1 write rồi `process.exit(0)` ngay · 1479 SIGINT/SIGTERM → goOffline · thứ tự 1091→1094 (Enter gửi rồi mới markDone)",
+     "desc": "Quy trình vận hành chính thức là 'đóng cửa sổ worker → chạy lại run.bat' — rơi đúng cửa sổ vài giây giữa 'đã gửi' và 'ghi doneSteps' thì task còn `running` → reaper 20′ → queued → bước chạy lại.",
+     "fix": "SIGINT → `stopping=true`, chờ `busy===false` (trần 3′) rồi mới offline; ghi `doneSteps + log + leads.outreach` trong 1 `db.batch()` ngay sau hành động.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-11",
+     "sev": "Vừa",
+     "title": "`nextMorningVN()` tính sai trong khung 00:00–08:00 VN → hoãn thêm nguyên 1 ngày",
+     "where": "worker.mjs:120 (`setUTCDate(+1)` vô điều kiện)",
+     "desc": "Lúc 00:30–07:59 VN (đã sang ngày mới) trả về 8h sáng NGÀY KIA. Bỏ 'Dừng tất cả' lúc 7:00 / worker khởi động lại 6:00 với task queued → lead nóng chờ 26–31 giờ.",
+     "fix": "Nếu giờ VN < `hoursVN[0]` thì không +1 ngày.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-12",
+     "sev": "Vừa",
+     "title": "Lỗi hạ tầng (AdsPower/CDP/mạng) hẹn lại 10′ vô hạn, không backoff, không cảnh báo",
+     "where": "worker.mjs:859–865 `onInfra` nextAt+10′, không đếm; engine re-enqueue mỗi khi tới hạn",
+     "desc": "AdsPower treo cả buổi → mỗi thread lặp mở nick thất bại 6 lần/giờ, log 'retry' đầy 'Hoạt động gần đây', không ai được báo (Cảnh báo hệ thống chỉ thấy VPS offline theo heartbeat, còn worker vẫn online).",
+     "fix": "Đếm `infraCount` trên thread → backoff 10′·30′·2h; worker ghi `workers/{id}.infraErrors` → Cảnh báo hệ thống 'AdsPower không mở được nick N lần/giờ'.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-13",
+     "sev": "Vừa",
+     "title": "Config merge nông: khai 1 khoá con là mất các khoá con còn lại (van tầng 2 tắt ngầm)",
+     "where": "worker.mjs:29–57 `Object.assign(defaults, config.json)` · 140 `if (!cap) return null`",
+     "desc": "Viết `\"hardCaps\": {\"react\": 60}` → comment/friend/inbox không còn trần cứng; `\"inbox\": {\"enabled\": true}` (đúng như config hiện tại) → mất `maxThreads/everyMin/days` mặc định (may là code có `|| 5/60/7`).",
+     "fix": "Merge sâu từng nhóm (`hardCaps`, `inbox`, `safety`, `graphql`).",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-14",
+     "sev": "Thấp",
+     "title": "Checkpoint ở trang chủ bị phân loại 'cần đăng nhập lại' thay vì challenge",
+     "where": "worker.mjs:315 `loggedOut()` khớp `checkpoint` → 1261 `onNeedLogin` chạy TRƯỚC `detectChallengeStrict` (1265)",
+     "desc": "Web mất loại challenge (badge không nói là checkpoint gì), Safety −10 thay vì −20, nick cần xử lý tay nhưng hiện như 'đăng nhập lại'.",
+     "fix": "Kiểm `detectChallengeStrict` trước `loggedOut`.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-15",
+     "sev": "Thấp",
+     "title": "`nickTimeoutMs` 8′ cố định không theo số việc/phiên → 2 task cùng nick + đọc phản hồi dễ bị huỷ cứng oan",
+     "where": "worker.mjs:40, 1404–1408",
+     "desc": "1 phễu 2–4′ + checkReplies 5 thread (có giải mã uid) 1–2′ → 2 task/phiên gần chắc vượt 8′ → task 2 thành 'hạ tầng 10′' lặp.",
+     "fix": "`timeout = base + perTask×n + ngân sách inbox`.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-16",
+     "sev": "Thấp",
+     "title": "Hành vi gõ/đóng phiên chưa 'giống người': gõ 45–50 ký tự/giây đều tăm tắp, `adspowerStop` không timeout, `docCache` không dọn",
+     "where": "worker.mjs:103–109 `typeMsg`, 306, 111–118",
+     "desc": "Tốc độ gõ đều + không ngừng nghỉ là tín hiệu automation FB đo được ở phía client.",
+     "fix": "delay `rand(45,140)` ms/ký tự + ngừng 300–900 ms mỗi 8–20 ký tự; `AbortSignal.timeout(20000)` cho stop; dọn cache theo TTL.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "W-17",
+     "sev": "Thấp",
+     "title": "Nút 'đã là bạn' khớp `aria-label*=\"Bạn bè\"` quá rộng ('Bạn bè chung'…) → bỏ bước kết bạn rồi inbox vào Message Request",
+     "where": "worker.mjs:558, 1058, 1122",
+     "desc": "Kịch bản: profile có nút 'Bạn bè chung' role=button → `already` → hoàn quota, đi tiếp inbox không có quan hệ bạn bè.",
+     "fix": "Khớp chính xác `^Bạn bè$` + 'Huỷ lời mời/Đã gửi lời mời'.",
+     "conf": "Nghi ngờ — cần kiểm 1 profile thật"
+    }
+   ],
+   "ok": [
+    "Giành task bằng transaction (1379–1383); reaper transaction + cutoff 20′ > watchdog 8′ (1343–1350).",
+    "Huỷ cứng `ctl.aborted` + `abortCheck` + `onInfra` không đốt tries, `doneSteps` nguyên (1085, 1287, 1299); `runGen/superseded` chặn `adspowerStop` nhầm.",
+    "`doneSteps` chống làm lại; `markDone` thất bại → `active:false` + throw; `refundQuota` chỉ bước chưa done.",
+    "React API cần `feedback_react` thật; DOM best-effort không toggle-retry; comment-lead `findCommentEl` regex ranh giới fail-closed; `replyComment` chọn ô theo focus/mới/vị trí; `gqlReply` mơ hồ → verify trước DOM.",
+    "Inbox loại ô 'bình luận', verify ô sạch, bám tab mới; `resolveProfileUid` loại uid mình, fail-closed.",
+    "`hardCapCheck` + `pausedAll` giữa bước; `gateCheck` trước mở nick; `pageLang` ≠ vi hoãn 60′; `onSkip` + hoàn quota; `flagChallenge` ≥3 → tắt nick, thành công reset.",
+    "Shape Firestore khớp FE (`outreach_log`/`outreach_stats` ngày VN/`leads.outreach` merge sâu/`outreach_map`/TTL `expireAt` mọi sink).",
+    "Backoff tick, heartbeat, `watchMyNicks` giữ danh sách cũ khi lỗi, recycle chỉ giữa 2 tick, `withTimeout` không rò timer."
+   ]
+  },
+  {
+   "key": "engine",
+   "short": "Engine + nội dung",
+   "title": "2. Engine Cloud Function (outreach.js · content.js · stats) — dựng lại từ 14 script patch/harness đã áp thật + ghi chép; KHÔNG có file nguồn đầy đủ ở đây nên mục nào chưa thấy code ghi rõ \"Suy luận\" và có mục kiểm trong LỆNH #43",
+   "intro": "Cổng vai (LỆNH #31), gate ma trận/van brand (v119-35, #37), task id tất định + doneSteps + maxInstances 1 là đúng và đã được nghiệm thu. Lỗ hổng nằm ở **chọn lead** (chồng người thật, không ưu tiên nóng, lead cũ đói), **kế toán van khi phễu kẹt qua ngày**, **thread mồ côi khi nick chết**, và **không có giám sát chủ động** — chính 3 điều này làm hệ thống \"chạy mà không ai biết nó đã ngừng\" suốt tuần qua (4/5 nick chết, 11/12 thread kẹt, replyFound 0).",
+   "findings": [
+    {
+     "id": "E-1",
+     "sev": "Cao",
+     "title": "Engine không lọc lead ĐÃ CÓ NGƯỜI THẬT CHĂM / đã hẹn / đã chốt → máy chạm chồng sales",
+     "where": "Lead loop func (patch #37 mốc A2: chỉ `dropped/lost/junk/brandAllow/roleBlockOf/commentIdOf`) · AdsPower path theo harness-selfcmt + CLAUDE.md v119-35 (`bỏ dropped/junk/đã có thread/không post_id`) · script vận hành (`_l34_regen`, `_l32_brand`) phải tự thêm `isOpen` → xác nhận engine không lọc `stage/assignee/first_care_at/closed_at/outreach_replied`",
+     "desc": "Sales đã gọi/hẹn (stage `booked`), hoặc lead đã `closed` → nick vẫn comment công khai \"nhắn riêng em báo giá\" + inbox mở đầu → khách nhận 2 giọng cùng brand, có ca chào bán lại người vừa mua. Worker cũng không kiểm (W-4) nên không có lớp nào chặn.",
+     "fix": "Engine: chỉ bốc lead `stage ∈ {new}` (hoặc `contacted` chưa `first_care_at`), không `assignee` (trừ khi brand cho phép), không `closed_at/lost/dropped/outreach_replied`; trigger `statsOnLead`: lead đổi `stage ≥ responded` / có `first_care_at` / `assignee` → tắt thread + huỷ task queued (`active:false, step:'human'`) + hoàn van. Worker: pre-flight (W-4).",
+     "conf": "Chắc (thấy bộ lọc trong patch #37 + script vận hành)"
+    },
+    {
+     "id": "E-2",
+     "sev": "Cao",
+     "title": "Chọn lead `detected_at desc` + bỏ lead đã có thread → lead cũ đói, lead NÓNG không được ưu tiên, lead lạnh tiêu hết van",
+     "where": "CLAUDE.md ENGINE (`leads where brand==code orderBy detected_at desc`); harness-lenh37 stub có `orderBy/limit` nhưng `limit` thật chưa thấy",
+     "desc": "1 nick ≈ 40 react/ngày (van + pace) trong khi scanner ra 60–140 lead/ngày/brand → lead buổi sáng bị lead buổi chiều đè mãi; lead **nóng** 14:00 gặp 40 suất react đã bị lead **lạnh** (ma trận lạnh = react) tiêu từ sáng → hôm sau không còn \"mới nhất\" → không bao giờ chạm. Nếu query không `limit` thì lead 30 ngày vẫn bị comment lên bài cũ (spam signal). Mỗi lead đã có thread còn tốn 1 `tref.get()`/nick/tick.",
+     "fix": "Hàng đợi ưu tiên: điểm = nhiệt (nóng 3 · ấm 2 · lạnh 1) × suy giảm theo tuổi, trần 7 ngày; engine đóng dấu `leads.outreach.queued_at` lúc enqueue để query `where outreach.queued_at == null` thay vì đọc thread từng lead; van react dành riêng ≥50% cho nóng+ấm.",
+     "conf": "Chắc (thứ tự) / Suy luận (`limit`) — LỆNH #43 (b) dump `stepNickAdspower`"
+    },
+    {
+     "id": "E-3",
+     "sev": "Vừa",
+     "title": "Lead ghi 2 bước (LỆNH #41 phát hiện) → engine có thể bốc lead khi `temp`/`role` chưa có",
+     "where": "#37 mốc A2 `const temp37 = lead.temp || 'cold'`",
+     "desc": "Tick rơi đúng khe giữa tạo doc và chấm điểm → lead nóng bị coi lạnh → thread `steps:['react']`; sau đó AI chấm `hot`/`seller` nhưng thread đã tồn tại → không nâng phễu, không tắt (`roleBlockOf` chỉ chạy lúc tạo thread).",
+     "fix": "Bỏ qua lead thiếu `score/temp` hoặc `detected_at` < 3′; trigger: lead ghi `role seller/poster_self` sau khi có thread → tắt thread + huỷ task.",
+     "conf": "Suy luận — LỆNH #43 (b)"
+    },
+    {
+     "id": "E-4",
+     "sev": "Cao",
+     "title": "Re-enqueue thread kẹt \"nguyên fpayload, KHÔNG reserve van lại\" → VƯỢT VAN khi phễu chạy vào ngày khác",
+     "where": "CLAUDE.md FUNNEL 1-LEAD-1-PHIÊN (\"re-enqueue nguyên fpayload (không reserve cap lại)\"); `_l34_move.mjs` (\"Không đụng cap\"); kiểm #34: 11/12 thread hscl-01 kẹt 6 ngày",
+     "desc": "11 phễu reserve ngày D; ngày D+6 nick sống lại → 11 × (react+comment+kết bạn+inbox) trong ~1,5 h mà `outreach_usage/{pid}__{D+6}` = 0 → lead mới hôm đó vẫn đủ 40/12/10/8 → nick vừa hồi chạy ~2× van; `hardCapCheck` của worker đọc cùng doc usage nên cũng mù. Đây chính là cảnh báo em đã nêu khi chạy LỆNH #28 (nick mới nhận 11 phễu/1,5 h).",
+     "fix": "Thread lưu `reservedDay`; khác ngày VN → `tryConsume` lại các bước chưa `doneSteps` (hết van → hẹn mai); hoặc chuyển sang kế toán lúc THỰC HIỆN (worker `increment` khi bước done, engine kiểm `usage + đang queued < cap`).",
+     "conf": "Chắc (thiết kế) — LỆNH #43 (b) đối chiếu code"
+    },
+    {
+     "id": "E-5",
+     "sev": "Vừa",
+     "title": "Hoàn van ghi vào doc NGÀY HIỆN TẠI + `increment(-1)` trên doc chưa có → usage ÂM → cấp thừa suất",
+     "where": "harness-worker-refund kịch bản A khẳng định `usage.friend === -1`; doc worker 2026-09-06 ghi \"hạn chế đã biết\"",
+     "desc": "Dead-letter/skip lúc 00:30 VN cho phễu reserve hôm qua → usage hôm nay −1 mỗi bước → `tryConsume` (`u.react >= cap`) cấp thừa; nhiều thread chết qua đêm → âm sâu.",
+     "fix": "Refund theo `reservedDay` (chỉ cùng ngày), clamp ≥ 0 trong transaction. LỆNH #43 mục 5 in `⚠ ÂM` nếu đang có.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "E-6",
+     "sev": "Cao",
+     "title": "Thread MỒ CÔI khi nick chết: engine không tự chuyển/đóng; lead không ai chạm nhưng thẻ brand vẫn \"đang chạy\"",
+     "where": "Kiểm #34 (nick tự tắt → engine không re-enqueue 6 ngày; nick needLogin còn active → task `paused` lặp mỗi giờ); `_l34_move.mjs` là thao tác tay",
+     "desc": "Nick `active:false` (needLoginCount ≥ 3 / safetyPaused / challenge ≥ 3) rơi khỏi `fb_accounts where active==true` → thread `active:true` nằm mãi; `tries` chỉ đếm fail thật nên không có trần thời gian. Brand có 5 nick mà 4 chết = 80% lead vào phễu bị treo mà không ai biết.",
+     "fix": "Sweeper trong `outreachTick`: thread active mà `pid` không sống > 2 h → chia round-robin sang nick sống cùng brand (giãn 10′) hoặc đặt `step:'orphan'` + hoàn van + cảnh báo (E-12); thread active > 72 h → đóng.",
+     "conf": "Chắc (đã thấy qua kiểm #34/#36)"
+    },
+    {
+     "id": "E-7",
+     "sev": "Cao",
+     "title": "Re-enqueue khi task cùng id đang `running` → có thể ĐÔI hành động công khai",
+     "where": "CLAUDE.md FUNNEL (lease `nextAt+30′`; thread tới hạn → re-enqueue), task id tất định `{leadId}__funnel`; worker `reapStale` chỉ requeue `running` > max(15′, nickTimeout+12′)",
+     "desc": "VPS bận (maxConcurrent 1, nhiều nick) → task `queued` > 30′ → engine `set` đè task (status → queued?) đúng lúc worker vừa claim `running` → lượt sau claim lại → comment đã đăng nhưng `doneSteps` chưa ghi → comment 2 lần. Cần chốt bằng code thật.",
+     "fix": "Engine đọc task trước khi ghi: `running` → chỉ gia hạn lease; `queued` → chỉ cập nhật `nextAt`, không đụng payload/status; dùng transaction.",
+     "conf": "Suy luận — LỆNH #43 (b) dump `apEnqueueTask` để chốt"
+    },
+    {
+     "id": "E-8",
+     "sev": "Vừa",
+     "title": "Cùng 1 NGƯỜI bị chạm nhiều lần qua nhiều lead (đăng cùng bài ở 3 group = 3 lead)",
+     "where": "Thread khoá theo `leadId`; `outreach_map/{uid}` chỉ để khớp reply; không khoá theo `author_url`/uid/SĐT",
+     "desc": "3 lời mời kết bạn + 3 inbox gần giống (có thể từ 3 nick khác nhau) → khách report → bay nick.",
+     "fix": "`outreach_people/{key = uid | author_url | phone}` lưu `lastTouchAt`; đã chạm < 30 ngày hoặc đã reply → bỏ qua; comment-lead cùng người → chỉ reply, không inbox lại.",
+     "conf": "Suy luận — LỆNH #43 kiểm nhóm theo `author_url`"
+    },
+    {
+     "id": "E-9",
+     "sev": "Vừa",
+     "title": "Thiếu van theo GROUP/ngày và theo VPS/IP; burst 08:00 khi mọi nick cùng đến hạn",
+     "where": "CLAUDE.md v119-35 (`caps` theo nick), v120-scale (ngoài giờ 8–22 `return sớm`)",
+     "desc": "10 lead cùng group/ngày → 1 nick comment 10 bài cùng group với CTA na ná → admin group xoá/kick (kênh mất nick #1, `cmpFinish` không chữa được); 08:00 mọi nick `nextFreeAt<=now` → CONC 25 mở phễu đồng loạt trên cùng proxy/VPS.",
+     "fix": "`outreach_usage` thêm khoá `g:<gid>` (≤3/group/nick/ngày, ≤8/group/brand); đầu ngày rải `nextFreeAt` 0–120′ theo hash pid; van trượt theo giờ (W-16).",
+     "conf": "Suy luận"
+    },
+    {
+     "id": "E-10",
+     "sev": "Vừa",
+     "title": "Nội dung: `spam` AI trả 0–10 KHÔNG được dùng để chặn; CTA brand nối NGUYÊN VĂN → 12 comment/ngày cùng câu kết; template/reply không `stripForbid`, không lọc SĐT",
+     "where": "`…34-patch.cjs` A13 (`spam` chỉ vào `out/meta`); `…30-c30.cjs` `ensureCta` (`cta = c.cta` ≤140 → nối nguyên văn; `CTA_DEF` 3 câu xưng \"mình\" trong khi AI xưng \"em\"); `CMP_DEF` 2 · `Q_DEF` 3 · `IBX_TPL` 2 mẫu; A4/A5 template/reply không `stripForbid`",
+     "desc": "Brand ghi CTA cố định → mọi comment thiếu CTA kết bằng cùng chuỗi = duplicate-content signal; AI trả `spam 8` vẫn đăng; chế độ reply đưa `lead.reply` (có thể chứa giá/từ cấm) ra công khai.",
+     "fix": "`spam ≥ 7` → sinh lại 1 lần rồi rơi mẫu nhẹ; pool CTA 6–8 câu paraphrase chọn theo hash leadId + khớp xưng hô; Jaccard với 20 comment gần nhất của nick (`outreach_log`) → sinh lại khi > 0,6; `stripForbid` + lọc SĐT cho cả 3 chế độ.",
+     "conf": "Chắc (patch)"
+    },
+    {
+     "id": "E-11",
+     "sev": "Cao",
+     "title": "Khách trả lời bằng BÌNH LUẬN / react dưới comment của nick → KHÔNG AI BẮT; `checkReplies` chỉ phủ thread có uid số",
+     "where": "`docs/lenh-2026-09-05-worker-uid.md` (chỉ đọc `messages/t/<uid>`, cần uid số); kiểm #36(f): \"đã inbox 1 · replied 0\"; funcWebhook chỉ cho nick func (không dùng)",
+     "desc": "Comment-lead \"Giá\" → nick trả lời \"em nhắn riêng chị nhé\" → khách hỏi lại ngay dưới comment → không ai đọc, lead vẫn `new`, nick trông như bot. ~2/3 lead-bài không có `author_url` → không bao giờ có uid → inbox của họ không được kiểm phản hồi. Cộng với W-1 (chỉ đọc khi có việc mới) → vòng phản hồi gần như mù.",
+     "fix": "Worker cuối phiên mở `facebook.com/notifications` 1 lần → khớp \"đã trả lời bình luận của bạn / đã thích / đã nhắn\" với `post_id/comment_id` trong thread → `replied` + note + stage responded + push; scanner (BrightData quét comment) gắn `parent_author == tên nick` → reply. Fallback: recheck permalink comment sau 6 h / 24 h.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "E-12",
+     "sev": "Cao",
+     "title": "Không giám sát chủ động: brand bật + 0 nick sống, task queued hàng giờ, dead-letter, nick chết — không email/push; log engine chưa chắc kích alert policy #9",
+     "where": "LỆNH #36(f) phát hiện 4/5 nick chết chỉ nhờ chạy tay; bài học LỆNH #21 (`console.error` = severity DEFAULT) mới áp cho scanner; FE `sysAlertCard` chỉ hiện khi super MỞ tab Cảnh báo",
+     "desc": "VPS mất điện / AdsPower treo → task queued tích 3 ngày, web vẫn xanh, không ai biết. Với khách trả tiền theo gói thì đây là mất doanh thu âm thầm.",
+     "fix": "Cuối `outreachTick` tính health (brand on & alive=0 · queued > 60′ · dead hôm nay · nick needLogin/uiLang/checkpoint · usage âm) → `console.log(JSON.stringify({severity:'ERROR', message:'[OUTREACH-HEALTH] …'}))` (kích policy #9) + `system_status/outreach` (banner FE như BrightData) + việc Hộp việc super + push FCM.",
+     "conf": "Chắc (thiếu cơ chế) / Suy luận (severity log)"
+    },
+    {
+     "id": "E-13",
+     "sev": "Vừa",
+     "title": "Đo hiệu quả nội dung (`content_stats`) lệch: chỉ tính lead ĐÃ INBOX; `rep` gồm stage sales đổi tay; reply qua bình luận không tính",
+     "where": "`…36-stats-patch.cjs`: `sentNow = !!ao.inbox_at`; `isRep` gồm `stage ∈ {responded,booked,closed}`",
+     "desc": "Phễu ấm/lạnh (không inbox) không vào `sent` → hiệu quả kiểu bình luận/bài gốc không đo; sales gọi chốt sau khi máy inbox → tính là \"phản hồi nhờ nội dung\".",
+     "fix": "Tách `sentCmt/repCmt` (theo `comment_at`) và `sentIbx/repIbx`; `rep` chỉ nhận `outreach_replied/replied_at`; stage tay → chỉ số riêng \"chốt sau khi máy chạm\".",
+     "conf": "Chắc"
+    },
+    {
+     "id": "E-14",
+     "sev": "Vừa",
+     "title": "`genForLead` 11–16 s/lead chạy TRƯỚC khi biết nick chạy được; không lọc nick ốm ở đầu tick",
+     "where": "CLAUDE.md LỆNH #4/#5 (16 s/lead, CONC 25 vs timeout 300 s); #34 (`_l34_regen` = gọi LLM lần 2 cho 12 thread)",
+     "desc": "Nick `needLogin` nhưng `active:true` (chưa đủ 3 lần) vẫn được bốc lead mới → LLM + reserve → worker gate hoãn → lặp mỗi giờ; 25 nick cùng tick × 15 s = timeout.",
+     "fix": "Lọc `needLogin/challenge/uiLang≠vi/safetyPaused` ngay đầu tick; deadline mềm 240 s; soạn LƯỜI (worker gọi `genContent` nội bộ ngay trước bước comment) hoặc `LLM_CONTENT_MODEL` nhanh.",
+     "conf": "Chắc (thời gian) / Suy luận (lọc nick)"
+    },
+    {
+     "id": "E-15",
+     "sev": "Thấp",
+     "title": "funcWebhook nhận secret qua `?key=` → lộ trong Cloud Logging `httpRequest.requestUrl`",
+     "where": "CLAUDE.md ENGINE (\"verify `FUNC_WEBHOOK_SECRET` qua Bearer/`?key=`\")",
+     "desc": "Func path đang không dùng nên rủi ro thấp; secret từng lỡ dán chat đã xoay.",
+     "fix": "Chỉ nhận Bearer; xoay secret lần nữa khi bật lại func.",
+     "conf": "Chắc (thiết kế)"
+    }
+   ],
+   "ok": [
+    "Cổng vai LỆNH #31 đặt đúng vị trí (sau kiểm thread tồn tại, trước enqueue); func path #37 gate tương thích AdsPower.",
+    "LLM chỉ gọi khi phễu có bước comment/inbox; `cmpFinish` bình luận nhẹ dưới bài đối thủ; opt-out/CTA khớp xưng hô; `clean` cắt cuối câu.",
+    "Task id tất định + `doneSteps` + reaper transaction + `maxInstances 1` + watchdog 06d → không double do tick chồng.",
+    "Rules `outreach_log/outreach_stats/content_stats` lọc theo brand (emulator #38 8/8); collection engine (`outreach_tasks/threads/usage/map`) chỉ Admin SDK, FE không đọc.",
+    "Index đủ cho query đang chạy (threads pid+active+nextAt · tasks workerId+status+createdAt · log brandCode+at · status+at)."
+   ]
+  },
+  {
+   "key": "fe",
+   "short": "Web Tiếp cận",
+   "title": "3. Giao diện automation (Tiếp cận · Content Studio · Cảnh báo · chip máy · Phản hồi khách) — v119-87",
+   "intro": "Tenancy, revert model khi lỗi, signature-guard, morph panel VPS: đều đúng. Điểm yếu là **cờ nick không realtime** (người quản trị nhìn bảng nick cũ trong khi nick đã chết), **van hiển thị vượt trần cứng worker**, và sales **không thấy máy đã nói gì** với khách.",
+   "findings": [
+    {
+     "id": "F-1",
+     "sev": "Cao",
+     "title": "Cờ nick (needLogin / checkpoint / Safety / worker tự tắt) KHÔNG hiện realtime ở Tiếp cận & Cảnh báo",
+     "where": "`live.js:545` `rebuild(['users','roi','overview','agency'])` không có `outreach/alerts`; `fb_accounts` chỉ đọc bằng `getDocs` trong `refreshAdmin` (live.js:534), không `onSnapshot`; `oaSigMain()` (1016–1023) không băm cờ nick",
+     "desc": "Worker `flagChallenge` ghi cờ + 1 dòng log → log snapshot → vẽ lại với mảng `fbAccounts` CŨ → bảng nick vẫn \"bật, không cờ\" trong khi Hoạt động gần đây đã ghi ⛔ checkpoint; rời tab quay lại: `go()` vẽ từ D cũ, `refreshAdmin` xong nhưng danh sách rebuild không có `outreach` → im lặng. Chỉ khi có thêm log/stats mới thì chip + nút ✓ Đã xử lý hiện.",
+     "fix": "Super subscribe `onSnapshot(collection 'fb_accounts')` trong `lazyOutreach` (Rules read super sẵn, collection nhỏ) → gán `fbAccounts` + đưa cờ nick vào chữ ký; tối thiểu thêm `'outreach','alerts'` vào danh sách rebuild.",
+     "conf": "Chắc (em kiểm live.js:534/545)"
+    },
+    {
+     "id": "F-2",
+     "sev": "Vừa",
+     "title": "Van hiển thị/ô nhập cho phép tới 200/100/30/30 nhưng worker chặn cứng 80/30/20/15 → UI báo còn suất, worker đẩy sang mai",
+     "where": "`45-outreach.js:320` `OA_CAP_MAX = {react:200, comment:100, friend:30, inbox:30}` · worker `hardCaps {80,30,20,15}`",
+     "desc": "Super đặt inbox 30/nick → thẻ brand vẽ `0/30`; worker dừng ở 15 → thread `paused… đẩy sang sáng mai` dù thanh van mới nửa.",
+     "fix": "Hạ `OA_CAP_MAX` = hardCaps hoặc chú thích \"trần cứng máy chủ: N\" cạnh ô; thanh van dùng `min(cap brand, hardCap)`.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-3",
+     "sev": "Vừa",
+     "title": "Nick đổi sang AdsPower nhưng chưa có Profile ID vẫn `active:true` → engine reserve van + đẩy task không ai chạy",
+     "where": "`live.js:615` `setFbAccountEngine` chỉ ghi `engine`; `45:739–751` không đụng `active`; `45:383–385` chỉ hiện nút \"Gán Profile ID\"",
+     "desc": "Engine chọn nick → `tryConsume` trừ van → task `adspower_id` rỗng; VPS gán nick không claim; VPS `takeUnassigned` claim → `adspowerStart` lỗi → hạ tầng 10′ lặp; lead bị lease 30′ liên tục.",
+     "fix": "Đổi engine → adspower thiếu `adspower_id` thì ghi kèm `active:false`; chip đỏ \"thiếu Profile ID – nick không chạy\"; dòng Cảnh báo hệ thống.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-4",
+     "sev": "Vừa",
+     "title": "Sales/admin không thấy MÁY ĐÃ NÓI GÌ với khách",
+     "where": "`leads.outreach` chỉ có `steps/last/at/pid/content{meta}/comment_at/inbox_at`; nội dung gửi nằm ở `outreach_log.text` (super-only); modal `65:314` chỉ vẽ \"Máy đã react → comment → inbox · nick X\"",
+     "desc": "Khách trả lời \"giá combo bao nhiêu?\" → sales không biết nick đã hứa gì → trả lời lệch.",
+     "fix": "Worker `stampExtra` ghi thêm `outreach.comment_text/inbox_text` (≤300 ký tự) → modal + tab Phản hồi hiện \"Máy đã nhắn: …\".",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-5",
+     "sev": "Vừa",
+     "title": "Status lạ trong `outreach_log` rơi về chip xanh \"✓ Đã gửi\" (fail-open)",
+     "where": "`45:617` `OA_STATUS[r.status] || OA_STATUS.done`; `OA_STATUS` thiếu `queued/running`",
+     "desc": "Worker hiện chỉ ghi done/fail/retry/paused/skip/reply nên chưa lộ; status mới thêm sau này sẽ hiện xanh.",
+     "fix": "Fallback chip xám in nguyên status; thêm `queued`.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-6",
+     "sev": "Thấp",
+     "title": "`botChip` đọc `o.nick` — field không tồn tại (worker ghi `pid`); tab Phản hồi in mã thô `nick apk1gm6por` cho sales",
+     "where": "`20-feed.js:737` `${o.nick?…}`; `70:128/139`",
+     "desc": "Chip máy trên thẻ lead không bao giờ hiện tên nick; tab Phản hồi in mã kỹ thuật (trái quy ước v119-61).",
+     "fix": "Dùng `nickLabel(o.pid)` ở cả 2 chỗ.",
+     "conf": "Chắc (em kiểm 20-feed:737)"
+    },
+    {
+     "id": "F-7",
+     "sev": "Thấp",
+     "title": "Brand \"BẬT\" nhưng không có nick chạy được → KPI vẫn xanh, engine im lặng",
+     "where": "`45:634` `onCount`; `45:48` `oaNickCount` đếm `active!==false` kể cả nick needLogin/challenge/safetyPaused/uiLang≠vi",
+     "desc": "Thẻ brand hiện \"1 nick · xoay vòng\" trong khi nick đó cần đăng nhập lại — đúng ca hscl-01 tuần qua.",
+     "fix": "Tách `usable`; chip đỏ \"BẬT nhưng 0/N nick chạy được\"; dòng Cảnh báo hệ thống (LỆNH #43 mục 2 đã in cờ này).",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-8",
+     "sev": "Thấp",
+     "title": "Content Studio chặn Lưu chế độ AI khi trống hồ sơ, trong khi hint nói backend dùng Hồ sơ AI",
+     "where": "`45:297` vs `45:229`; backend `contentOf` → mode ai khi có `brand.ai`",
+     "desc": "Super phải chép Hồ sơ AI sang mới lưu được dù engine đã tự dùng.",
+     "fix": "Cho lưu khi Hồ sơ AI có, hoặc tự điền.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-9",
+     "sev": "Thấp",
+     "title": "\"Dừng tất cả\" lấy trạng thái từ heartbeat, không từ `worker_config.pauseAll` → VPS offline hiện sai",
+     "where": "`45:469–470` `on=!w.paused`; `live.js:625` ghi `worker_config`",
+     "desc": "VPS offline: bấm Dừng → rời tab quay lại → nút hiện \"Dừng tất cả\" dù `pauseAll=true`; Cảnh báo không có dòng.",
+     "fix": "Subscribe `worker_config` làm nguồn sự thật + dòng Cảnh báo \"VPS X đang Dừng tất cả (từ …)\".",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-10",
+     "sev": "Thấp",
+     "title": "Timer hạ 🔴 VPS chỉ chạy khi hash === outreach → tab Cảnh báo giữ \"online\" cho VPS chết cứng",
+     "where": "`live.js:1061`; `50:424`",
+     "desc": "Cảnh báo hệ thống bỏ sót VPS offline nếu người dùng chỉ mở tab Cảnh báo.",
+     "fix": "Chạy timer ở cả `alerts/agency`.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-11",
+     "sev": "Thấp",
+     "title": "Log `paused` lặp mỗi giờ đẩy hoạt động thật ra khỏi 100 dòng Hoạt động gần đây",
+     "where": "`live.js:1054` limit 100; `45:652`",
+     "desc": "Brand có 3 nick needLogin → 72 dòng hoãn/ngày chiếm hết bảng.",
+     "fix": "Gộp dòng liên tiếp cùng `leadId+action+status` thành \"×N\" + bộ lọc Trạng thái/Brand/Nick.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-12",
+     "sev": "Thấp",
+     "title": "`replyTrace` khớp format worker nhưng format note của func path có thể không khớp",
+     "where": "`70:126–127` regex; worker ghi `💬 Khách đã phản hồi (inbox): \"…\" · nick pid` ✓",
+     "desc": "Note từ func webhook (\"… + giờ + nick\") có thể hiện cả câu hệ thống thành \"câu khách nói\".",
+     "fix": "Chuẩn hoá 1 format note ở cả 2 nguồn.",
+     "conf": "Nghi ngờ — func path đang không dùng"
+    },
+    {
+     "id": "F-13",
+     "sev": "Thấp",
+     "title": "Mốc \"x phút trước\" đứng yên tới snapshot kế (cố ý bỏ khỏi chữ ký)",
+     "where": "`live.js:1055` `when: relAt(x.at)` lúc snapshot",
+     "desc": "Bảng mở lâu hiện \"2 phút trước\" suốt 20 phút.",
+     "fix": "Tính từ `oaLogMs(r)` lúc vẽ.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-14",
+     "sev": "Thấp",
+     "title": "`rebuild(['outreach','agency','alerts'])` thiếu `overview` → card Bảng brand trên Tổng quan không cập nhật automation hôm nay",
+     "where": "`live.js:1047`",
+     "desc": "Số automation trên Tổng quan chỉ đổi khi có tín hiệu khác.",
+     "fix": "Thêm `overview`.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-15",
+     "sev": "Thấp",
+     "title": "Card Hiệu quả nội dung (đếm local) coi `stage ∈ responded/booked/closed` là phản hồi bất kể trước/sau inbox → tỉ lệ cao giả khi chưa có counter",
+     "where": "`45:202`",
+     "desc": "Trước khi `content_stats` có số, card có thể hiện 60–70% \"phản hồi\".",
+     "fix": "Chỉ nhận `outreach_replied/replied_at` sau `inbox_at`.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-16",
+     "sev": "Thấp",
+     "title": "Danh sách \"Sinh thử\" Content Studio gồm cả lead `lost/seller/poster_self/self_comment` (engine không bao giờ chạm)",
+     "where": "`45:231`",
+     "desc": "Sinh thử tốn LLM cho lead máy không chạm.",
+     "fix": "Lọc như engine.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-17",
+     "sev": "Thấp",
+     "title": "Xoá nick chỉ cảnh báo token; thread `outreach_threads.pid` = nick đã xoá → engine re-enqueue mãi",
+     "where": "`45:811`",
+     "desc": "Xoá nick AdsPower có thread mở → thread mồ côi (E-6).",
+     "fix": "Đổi lời: \"tắt nick thay vì xoá nếu còn thread\"; hoặc xoá kèm chuyển thread.",
+     "conf": "Chắc"
+    },
+    {
+     "id": "F-18",
+     "sev": "Thấp",
+     "title": "Mô tả \"⚡ Xử lý ngay\" lỗi thời — từ K3 funnel AdsPower luôn làm liền 1 phiên, `immediate` chỉ còn ảnh hưởng func path",
+     "where": "`45:161`",
+     "desc": "Người quản trị bật/tắt công tắc không có tác dụng với nick AdsPower.",
+     "fix": "Sửa mô tả hoặc ẩn khi brand chỉ có nick AdsPower.",
+     "conf": "Chắc"
+    }
+   ],
+   "ok": [
+    "Tenancy: `SUPER_ONLY_VIEWS` chặn cả hash gõ tay; palette/nav ẩn; brand user chỉ `where brandCode==byBrand`; `workers`/timer chỉ super.",
+    "Nguồn số: `oaBrandStats` ưu tiên `outreach_stats` đúng ngày VN, fallback chỉ đếm `done`; regex đếm bắt đúng \"Thả cảm xúc vào bình luận\"/\"Trả lời bình luận\"; `OA_ENGINE_CAP` 40/12/10/8 khớp engine; van Kết bạn có.",
+    "Thao tác: 3 toggle + 3 select revert CẢ model + re-render; ép Inbox⇒Kết bạn lúc lưu và trong wizard; `setDoc merge` không xoá key khác; audit wrap đủ 12 method.",
+    "Wizard: brand mới TẮT automation; \"Giữ tuỳ chỉnh\" không ghi đè; banner đỏ khi đang BẬT.",
+    "Realtime: sig-guard + gộp 500 ms + re-check focus; panel VPS morph riêng; dọn timer khi đổi phiên; permission-denied → banner + 4 lượt đăng ký lại.",
+    "XSS: mọi giá trị Firestore qua `esc()`; số ép `Number()`."
+   ]
+  }
+ ],
+ "props_intro": "Xếp theo giá trị ÷ công sức. Mỗi mục ghi rõ đóng phát hiện nào, sửa ở đâu (worker chép đè VPS · engine = LỆNH Cloud Shell · FE = zip), độ khó Nhỏ/Vừa/Lớn.",
+ "proposals": [
+  {
+   "id": "R-1",
+   "title": "Máy tự DỪNG khi người thật vào — không bao giờ chạm lead sales đang chăm, đã hẹn, đã chốt",
+   "why": "Đóng E-1 + W-4: khách nhận 1 giọng duy nhất; sales tin máy hơn; giảm khiếu nại \"đã mua rồi còn chào\".",
+   "how": "Engine chỉ bốc lead `stage new` không `assignee`; trigger `statsOnLead` thấy `first_care_at/assignee/stage≥responded/closed/lost/dropped` → tắt thread + huỷ task + hoàn van; worker pre-flight đọc thread+lead trước phiên và trước bước inbox.",
+   "effort": "Nhỏ",
+   "value": "An toàn + tỉ lệ chốt"
+  },
+  {
+   "id": "R-2",
+   "title": "Vòng phản hồi độc lập với việc mới: phiên \"đọc inbox\" riêng, backoff dài ngày, lưu `thread_id` messenger",
+   "why": "Đóng W-1/W-5/W-6: hôm nay replyFound = 0 vì nick rảnh không đọc và bỏ thread sau 6 giờ; khách VN trả lời tối/hôm sau là bình thường.",
+   "how": "Engine mỗi 60′ trong giờ VN tạo task nhẹ `check_replies` cho nick có thread inbox chưa reply (gate cho chạy kể cả brand tắt automation); lịch kiểm 1h·4h·12h·24h·48h·7d; sau bấm Nhắn tin lưu URL `/messages/t/<id>` lên thread để mở thẳng (bắt cả pfbid); mở danh sách hội thoại \"Chưa đọc\" 1 lần rồi chỉ vào thread có tín hiệu; regex nhận diện loại nhãn trạng thái \"Đã gửi/Đã xem\".",
+   "effort": "Vừa",
+   "value": "Tỉ lệ chốt (phản hồi tới tay sales đúng lúc)"
+  },
+  {
+   "id": "R-3",
+   "title": "Bắt phản hồi qua BÌNH LUẬN/react bằng trang Thông báo + scanner",
+   "why": "Đóng E-11: 2/3 lead không có uid nên inbox không kiểm được; comment-lead trả lời ngay dưới comment là kênh phản hồi phổ biến nhất ở nhóm bán hàng.",
+   "how": "Cuối phiên nick mở `facebook.com/notifications` 1 lần → khớp \"X đã trả lời bình luận của bạn / đã thích\" với `post_id/comment_id` của thread → `replied` + note + stage + push; scanner BrightData gắn `parent_author == tên nick` → reply. Fallback recheck permalink comment sau 6 h / 24 h.",
+   "effort": "Vừa",
+   "value": "Tỉ lệ chốt"
+  },
+  {
+   "id": "R-4",
+   "title": "Hàng đợi lead ưu tiên: nóng trước, tuổi ≤ 7 ngày, công bằng cho lead cũ",
+   "why": "Đóng E-2: hôm nay lead lạnh buổi sáng tiêu hết van, lead nóng buổi chiều bị bỏ; lead 30 ngày vẫn có thể bị comment lên bài cũ.",
+   "how": "Điểm = nhiệt × suy giảm tuổi; dành ≥50% van react cho nóng+ấm; `leads.outreach.queued_at` để query lead chưa xếp (bỏ đọc thread từng lead); trần tuổi 7 ngày; bỏ lead thiếu `temp/score` < 3′ (E-3).",
+   "effort": "Vừa",
+   "value": "Tỉ lệ chốt + chi phí read"
+  },
+  {
+   "id": "R-5",
+   "title": "Kế toán van đúng theo ngày thực hiện + van theo group + rải giờ mở cửa",
+   "why": "Đóng E-4/E-5/E-9: phễu kẹt qua ngày làm nick vừa hồi chạy 2× van; usage âm cấp thừa; 10 comment/group/ngày là cách mất nick nhanh nhất.",
+   "how": "Thread lưu `reservedDay`, khác ngày → reserve lại bước chưa làm; refund clamp ≥ 0 cùng ngày; `outreach_usage` thêm `g:<gid>` ≤3/nick/ngày; 08:00 rải `nextFreeAt` 0–120′ theo hash pid; van trượt 60′/nick ở worker.",
+   "effort": "Vừa",
+   "value": "An toàn nick"
+  },
+  {
+   "id": "R-6",
+   "title": "Sweeper thread mồ côi + tự chuyển nick + đóng thread quá 72 h",
+   "why": "Đóng E-6: 11/12 thread hscl-01 kẹt 6 ngày chỉ vì nick chết; hiện phải chạy `_l34_move.mjs` tay.",
+   "how": "`outreachTick` quét thread active mà nick không sống > 2 h → round-robin nick sống cùng brand (giãn 10′), không có → `step:'orphan'` + hoàn van + cảnh báo; > 72 h → đóng.",
+   "effort": "Nhỏ",
+   "value": "Vận hành"
+  },
+  {
+   "id": "R-7",
+   "title": "Giám sát chủ động: `system_status/outreach` + severity ERROR + Cảnh báo/Hộp việc/push cho super",
+   "why": "Đóng E-12/W-12/F-7: 4/5 nick chết một tuần mà web vẫn xanh; AdsPower treo cả buổi không ai biết.",
+   "how": "Cuối tick tính health (brand bật & 0 nick sống · queued > 60′ · dead hôm nay · nick needLogin/checkpoint/uiLang · usage âm · VPS offline · infra lặp) → log JSON severity ERROR (kích policy #9 → email) + `system_status/outreach` → banner FE + việc Hộp việc + push FCM super.",
+   "effort": "Vừa",
+   "value": "Vận hành + doanh thu gói"
+  },
+  {
+   "id": "R-8",
+   "title": "Ghi tiến độ nguyên tử + tắt worker êm + API mơ hồ thì kiểm rồi mới gõ DOM",
+   "why": "Đóng W-2/W-10: 2 con đường còn lại có thể đăng comment 2 lần công khai.",
+   "how": "`db.batch()` ghi doneSteps + log + leads.outreach ngay sau hành động; SIGINT → chờ `busy=false` (trần 3′) rồi offline; `gqlComment` trả `ambiguous` → reload + `verifyCommentPosted`, không thấy thì ghi \"cần kiểm tay\", không gõ DOM; xoá nhánh per-step cũ.",
+   "effort": "Nhỏ",
+   "value": "An toàn nick"
+  },
+  {
+   "id": "R-9",
+   "title": "Đếm lỗi nick theo PHIÊN, Safety suy giảm đúng, dò checkpoint bỏ dialog bài, không tính lỗi selector",
+   "why": "Đóng W-3/W-8/W-9: khi nâng số nick cùng lúc, 1 lần đăng xuất = tắt nick; nick khoẻ tự dừng sau vài tuần vì lỗi giao diện.",
+   "how": "Counter nick 1 lần/phiên; `safetyDecayAt` riêng; `failCount` chỉ tính checkpoint/needLogin/rate-limit; strict bỏ `dialog` chứa `article`; kiểm challenge trước `loggedOut`; sửa `nextMorningVN` 0–8h; merge config sâu.",
+   "effort": "Nhỏ",
+   "value": "An toàn nick"
+  },
+  {
+   "id": "R-10",
+   "title": "Quality gate nội dung + khoá theo NGƯỜI",
+   "why": "Đóng E-8/E-10: 12 comment/ngày cùng câu kết và 3 inbox cho 1 người là 2 tín hiệu spam rõ nhất.",
+   "how": "`spam ≥ 7` → sinh lại rồi rơi mẫu nhẹ; pool CTA paraphrase theo hash lead; Jaccard với 20 comment gần nhất của nick > 0,6 → sinh lại; `stripForbid` + lọc SĐT cho cả 3 chế độ; `outreach_people/{uid|author_url|phone}` chạm < 30 ngày → bỏ.",
+   "effort": "Vừa",
+   "value": "An toàn nick + tỉ lệ chốt"
+  },
+  {
+   "id": "R-11",
+   "title": "Follow-up lần 2 sau 24–48 h chưa trả lời (1 lần, biến thể khác, van riêng)",
+   "why": "Anh đã nêu ý này 06/09; ở thị trường VN tin nhắn thứ 2 nhẹ (\"chị còn quan tâm không ạ?\") thường tăng phản hồi 20–40% mà không tăng rủi ro nếu chỉ 1 lần.",
+   "how": "Engine: thread `done` có `inbox_at` > 24 h, chưa reply, chưa `fu2` → task `inbox_fu` (van riêng ≤ 4/nick/ngày); content.js mẫu follow-up ngắn kết bằng câu hỏi; worker gửi trên thread đã lưu (R-2); đo `rep` riêng cho fu2.",
+   "effort": "Vừa",
+   "value": "Tỉ lệ chốt"
+  },
+  {
+   "id": "R-12",
+   "title": "Web: nick realtime + dải sức khoẻ + màn \"Hàng đợi & kẹt\" + máy đã nói gì",
+   "why": "Đóng F-1/F-4/F-7 và câu hỏi thường trực \"vì sao lead X chưa được chạm\": người quản trị tự trả lời trên web, không cần script.",
+   "how": "`onSnapshot(fb_accounts)` + cờ vào chữ ký; dải đầu tab: brand bật · nick chạy được/N · VPS · task kẹt · lượt gần nhất; màn hàng đợi (Rules read super `outreach_threads/tasks` + index) với nút Chuyển nick/Mở lại/Bỏ; `outreach.comment_text/inbox_text` → modal + tab Phản hồi; trần van = hardCaps; gộp log lặp + bộ lọc.",
+   "effort": "Vừa",
+   "value": "Vận hành"
+  },
+  {
+   "id": "R-13",
+   "title": "`dryRun` + bộ dò \"FB đổi giao diện\" tự Dừng tất cả",
+   "why": "Nghiệm thu nick/brand mới không tốn hành động thật; FB đổi nhãn nút thì dừng cả dàn thay vì mỗi nick đốt 5 lượt + failCount.",
+   "how": "config `dryRun:true` (điều hướng thật, không click/Enter/graphql, log \"sẽ làm…\"); worker thấy ≥3 lead/≥2 nick cùng lỗi `không thấy nút…` trong 60′ → `pauseAll` + `system_status/outreach`.",
+   "effort": "Nhỏ",
+   "value": "Vận hành + an toàn nick"
+  },
+  {
+   "id": "R-14",
+   "title": "Hành vi giống người rẻ tiền",
+   "why": "Tốc độ gõ đều 45–50 ký tự/giây, không dừng, click `force` là những tín hiệu client-side FB đo được.",
+   "how": "Gõ `rand(45,140)` ms + ngừng 300–900 ms mỗi 8–20 ký tự; \"đọc\" theo độ dài bài; cuộn tới bình luận trước react; di chuột trước click; xác nhận giao tin inbox (\"Không gửi được\") → fail thật.",
+   "effort": "Nhỏ",
+   "value": "An toàn nick"
+  }
+ ],
+ "roadmap": [
+  {
+   "name": "Bước 0 — số thật",
+   "when": "hôm nay, 2 phút",
+   "items": "anh chạy **LỆNH #43** (chỉ đọc) → em điền số vào báo cáo, chốt 3 mục còn \"Suy luận\" (E-2 limit · E-7 re-enqueue running · E-4 reserve lại) và danh sách sửa đợt 1."
+  },
+  {
+   "name": "Đợt 1 — đóng lỗ an toàn + phản hồi (worker 2026-09-10 + LỆNH #44 engine nhỏ + zip FE nhỏ)",
+   "when": "1–2 ngày",
+   "items": "R-1 (máy dừng khi người thật vào), R-2 phần phiên đọc inbox độc lập + backoff + regex trạng thái, R-8, R-9, R-6 sweeper, F-1 nick realtime, F-2 trần van, F-6 tên nick. Kiểm: harness worker (t_flow/t_reply/t_zombie) + harness engine + smoke."
+  },
+  {
+   "name": "Đợt 2 — engine thông minh hơn (LỆNH #45)",
+   "when": "2–3 ngày",
+   "items": "R-4 hàng đợi ưu tiên + `queued_at`, R-5 kế toán van theo ngày + van group + rải giờ, R-7 giám sát chủ động + `system_status/outreach` + push, E-13 đo nội dung tách comment/inbox, E-14 lọc nick ốm đầu tick."
+  },
+  {
+   "name": "Đợt 3 — tăng tỉ lệ chốt",
+   "when": "3–5 ngày",
+   "items": "R-3 bắt phản hồi qua Thông báo/scanner, R-10 quality gate + khoá theo người, R-11 follow-up lần 2, R-12 màn \"Hàng đợi & kẹt\" + máy đã nói gì, R-13/R-14."
+  }
+ ],
+ "lenh": "`docs/lenh-2026-09-10-43.md` — 1 khối dán vào Cloud Shell (`~/firebase-s13/functions`), **không ghi gì**, ~2 phút: (1) VPS online/phiên bản · (2) brand bật ↔ nick sống ↔ VPS (cờ ⚠ BẬT nhưng 0 nick sống) · (3) task theo trạng thái, queued mồ côi, running > 30′ · (4) thread theo bước, thread kẹt trên nick chết, quá hạn nextAt · (5) van hôm nay reserve vs đã làm, phát hiện usage ÂM · (6) log 7 ngày theo trạng thái/bước, top lý do fail/skip/paused · (7) lead máy đã chạm, đã inbox, khách phản hồi, **người thật đã chăm trước khi máy chạm**, trễ phát hiện→chạm, backlog lead chưa chạm theo nhiệt độ · (8) content_stats theo mode/cta/variant · (b) dump 4 hàm engine (`stepNickAdspower · apEnqueueFunnel · apEnqueueTask · tryConsume`, che chuỗi dài) để em chốt các mục \"Suy luận\". Đã dry-run với fake Firestore có ca lỗi mẫu (exit 0).",
+ "method": "3 agent đối kháng chỉ-đọc chạy song song: **A** đọc hết `worker.mjs` 2026-09-06d (1.496 dòng) + config + 3 tài liệu + 5 harness; **B** đọc hết `45-outreach.js` + các đoạn live.js/50/87/20/70/25 liên quan; **C** dựng lại engine từ 14 script patch/harness đã áp thật + ghi chép CLAUDE.md (không có `outreach.js`/`content.js` đầy đủ ở đây). Em kiểm chứng từng mục Cao/Vừa trên code (đọc lại `runNick`, `checkReplies`, `claimBatch`, `reapStale`, `gateCheck`, `onFail/onInfra/onNeedLogin`, `safetyRecalc`, `detectChallengeStrict`, `gqlComment`, merge config; `live.js:534/545`, `45:320`, `20-feed:737`) — mục nào chỉ suy từ tài liệu ghi rõ \"Suy luận\" và có mục kiểm trong LỆNH #43. Không sửa dòng code nào. Báo cáo gốc 3 agent: `docs/rasoat-automation-2026-09-10/agent-{A,B,C}-*.md`."
+}

@@ -57,9 +57,9 @@
      "sev": "Cao",
      "title": "Bình luận vào BÀI thất bại 82% (105 fail / 23 done trong 7 ngày) — đường DOM dự phòng không mở được ô soạn",
      "where": "log 7 ngày: `không thấy ô Bình luận (đúng nhãn)` = 65 · `không thấy nút Trả lời/Phản hồi của bình luận` = 30 · `không thấy ô trả lời TRONG khung` = 6 · react `không thấy nút Thích` = 15 · kết bạn `không thấy nút Thêm bạn bè` = 5; worker.mjs:607–613 `domComment` chỉ tìm `div[role=textbox][aria-label*=\"Bình luận\"|\"comment\"|\"Viết bình luận\"]`, KHÔNG bấm nút \"Bình luận\" để mở ô",
-     "desc": "React qua API vẫn OK (43 done / 16 fail) nên trang bài có mở được; comment thì gần như luôn rơi xuống DOM (API comment trả FAIL — nghi `config.json.graphql.commentDocId` trên VPS còn doc_id cũ đã bị FB xoay 06/09, hoặc FB xoay tiếp) rồi DOM không thấy ô soạn (FB ẩn ô tới khi bấm \"Bình luận\", hoặc nhãn khác). Mỗi lần fail = `tries+1` + `failCount+1` → 21 phễu dead-letter, 39 thread `tries≥5`, và chính là nguồn kéo Safety xuống 28 (W-18). Trả lời comment-lead cũng 36 fail/0 done → luồng comment-lead thực tế chưa chạy được sau 05c.",
-     "fix": "Cần 2 thứ từ VPS để chốt: (1) giá trị `graphql.commentDocId/replyDocId` trong `config.json` (phải = 28781864408106143); (2) 2 ảnh `errors/<leadId>__comment_*.png` + dòng console `comment API: FAIL <sample>`. Sửa: domComment bấm nút \"Bình luận\"/\"Viết bình luận\" trước, nhận ô theo focus-sau-cú-bấm như 05c; API FAIL do doc_id → dò `doc_id` mới tự động từ 1 lần capture hoặc cảnh báo \"cần capture lại\"; lỗi selector không đốt `tries` quá 2 lần/lead.",
-     "conf": "CHẮC về con số; nguyên nhân gốc cần ảnh errors + config.json (không đọc được VPS từ đây)"
+     "desc": "React qua API vẫn OK (43 done / 16 fail) nên trang bài có mở được; comment thì rơi xuống DOM rồi DOM không thấy ô soạn. **`config.json` VPS (anh gửi 10/09) ĐÃ đúng doc_id** (`commentDocId`/`replyDocId` = 28781864408106143, react 27646120298312844, friend 28400389149651601) → loại giả thuyết \"doc_id chưa cập nhật\". Còn 2 giả thuyết: (a) FB xoay doc_id tiếp sau 06/09 hoặc bộ biến comment cấp 1 (`gqlComment` giữ bộ biến 29/08: feedLocation GROUP/feedbackSource 0/AUTO_TRANSLATE) không khớp doc mới → API luôn FAIL → DOM; (b) DOM không thấy ô soạn trên ~½ bài (FB ẩn ô tới khi bấm \"Bình luận\", bài tắt bình luận, bài ảnh/video). Mỗi lần fail = `tries+1` + `failCount+1` → 21 phễu dead-letter, 39 thread `tries≥5`, và là nguồn kéo Safety xuống 28 (W-18). Trả lời comment-lead 36 fail / 0 done → luồng comment-lead thực tế chưa chạy được.",
+     "fix": "Phân định bằng **LỆNH #43b** (chỉ đọc: log theo ngày × nick × bước; lead thất bại ↔ thành công theo dạng URL bài/kind/lỗi cuối) + 2 ảnh `errors/<leadId>__comment_0.png` từ VPS. Sửa (R-15): domComment bấm nút \"Bình luận\" trước, nhận ô theo focus như 05c; API FAIL kèm mã lỗi doc_id → cờ `docIdStale` + cảnh báo \"cần capture lại\" (chạy `--capture` 1 lần cho comment cấp 1 với doc mới); lỗi selector không đốt `tries` quá 2 lần/lead và không trừ Safety.",
+     "conf": "CHẮC về con số; nguyên nhân gốc còn 2 giả thuyết — LỆNH #43b + ảnh errors sẽ chốt"
     },
     {
      "id": "W-1",
@@ -223,7 +223,8 @@
     "Inbox loại ô 'bình luận', verify ô sạch, bám tab mới; `resolveProfileUid` loại uid mình, fail-closed.",
     "`hardCapCheck` + `pausedAll` giữa bước; `gateCheck` trước mở nick; `pageLang` ≠ vi hoãn 60′; `onSkip` + hoàn quota; `flagChallenge` ≥3 → tắt nick, thành công reset.",
     "Shape Firestore khớp FE (`outreach_log`/`outreach_stats` ngày VN/`leads.outreach` merge sâu/`outreach_map`/TTL `expireAt` mọi sink).",
-    "Backoff tick, heartbeat, `watchMyNicks` giữ danh sách cũ khi lỗi, recycle chỉ giữa 2 tick, `withTimeout` không rò timer."
+    "Backoff tick, heartbeat, `watchMyNicks` giữ danh sách cũ khi lỗi, recycle chỉ giữa 2 tick, `withTimeout` không rò timer.",
+    "`config.json` VPS (10/09): `graphql` 4 doc_id đúng bản 06/09 · `maxConcurrent 1` (W-3 chưa lộ) · `profiles []` + không `takeUnassigned` → chỉ nhận nick gán `workerId vps-1` (đúng) · `inbox.enabled true` (checkReplies đang bật nhưng replyFound 0 → W-1/W-5 là nguyên nhân, không phải tắt) · không khai `hardCaps/safety/nickTimeoutMs/requireViUI` → dùng mặc định 80/30/20/15 · Safety 30/60 · 8′ · bắt buộc tiếng Việt (merge nông W-13 không gây hại ở cấu hình này)."
    ]
   },
   {
@@ -702,7 +703,7 @@
   {
    "name": "Bước 0 — số thật",
    "when": "ĐÃ CHẠY 10/09 15:45 VN",
-   "items": "LỆNH #43 xong; số + 3 mục Suy luận đã chốt (mục \"Kết quả LỆNH #43\"). Còn thiếu 3 thứ từ VPS để chốt nguyên nhân gốc W-19 (config.json doc_id · ảnh errors comment · dòng console comment API)."
+   "items": "LỆNH #43 xong; số + 3 mục Suy luận đã chốt. `config.json` VPS đã đúng doc_id. Còn: **LỆNH #43b** (chỉ đọc, phân định API vs DOM cho W-19) + 2 ảnh `errors/*__comment_0.png` từ VPS."
   },
   {
    "name": "Đợt 1 — sống lại + đóng lỗ an toàn (worker 2026-09-10 + LỆNH #44 engine + zip FE nhỏ)",
@@ -812,6 +813,6 @@
    "**E-3 → nửa chắc**: `lead.temp || 'cold'` — lead chưa chấm điểm bị coi là lạnh (react)."
   ],
   "new": "Số thật lộ 4 mục mới: **W-18** Safety Score tự tắt nick khoẻ vì lỗi selector của chính mình (đã xảy ra 09/09) · **W-19** bình luận vào bài thất bại 82 % — đường DOM dự phòng không mở được ô soạn, nghi thêm doc_id comment lỗi thời trên VPS · **E-16** engine xếp việc cho nick needLogin mỗi giờ (160 dòng log, thread không được chuyển) · **E-17** trần mở lead mới dùng cap toàn cục 40 trong khi web vẽ x/100.",
-  "ask": "Để chốt nguyên nhân gốc W-19 em cần từ VPS (anh chụp/dán): (1) `config.json` → giá trị `graphql.commentDocId` và `replyDocId` (phải là `28781864408106143`); (2) 2 ảnh trong `errors/` tên `<leadId>__comment_*.png`; (3) 1 dòng console worker `comment API: FAIL …`. Không cần gửi token."
+  "ask": "`config.json` anh gửi 10/09 ĐÃ đúng doc_id → loại giả thuyết doc_id cũ. Còn cần: (1) chạy **LỆNH #43b** (`docs/lenh-2026-09-10-43b.md`, chỉ đọc) → phân định API vs DOM; (2) 2 ảnh `errors/<leadId>__comment_0.png` từ VPS; (3) nếu cửa sổ worker còn mở: 1 dòng `comment API: FAIL …`. Không gửi token."
  }
 }

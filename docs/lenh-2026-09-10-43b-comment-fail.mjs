@@ -1,0 +1,64 @@
+/* LỆNH #43b — CHỈ ĐỌC: soi vì sao "Bình luận vào bài" thất bại 82 % (sau khi config.json VPS đã đúng doc_id).
+   Đặt trong ~/firebase-s13/functions. Không ghi gì. Không in nội dung bình luận/tin nhắn, không in secret.
+   Dùng: node _cmt_fail.mjs [--days=10] [--brand=hscl-01]                                            (10/09/2026) */
+import admin from 'firebase-admin';
+if (!admin.apps.length) admin.initializeApp();
+const db = admin.firestore();
+const arg = k => { const a = process.argv.find(x => x.startsWith('--' + k + '=')); return a ? a.split('=').slice(1).join('=') : null; };
+const DAYS = Math.max(1, Number(arg('days')) || 10), ONLY = arg('brand') || '';
+const H = 3600e3, D = 24 * H, now = Date.now(), since = now - DAYS * D;
+const toMs = v => !v ? 0 : (v.toMillis ? v.toMillis() : (v._seconds ? v._seconds * 1000 : (typeof v === 'number' ? v : (Date.parse(v) || 0))));
+const dayVN = ms => new Date(ms + 7 * H).toISOString().slice(5, 10);
+const hhmm = ms => ms ? new Date(ms + 7 * H).toISOString().slice(5, 16).replace('T', ' ') : '—';
+const inc = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; return o; };
+const top = (o, n = 10) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k}=${v}`).join(' · ') || '—';
+const sec = t => console.log('\n=== ' + t + ' ===');
+const safe = async (t, f) => { try { await f(); } catch (e) { console.log('  (lỗi mục này: ' + String(e && e.message || e).slice(0, 160) + ')'); } };
+const stepOf = a => /cảm xúc/.test(a) ? 'react' : /Trả lời bình luận/.test(a) ? 'reply' : /[Bb]ình luận/.test(a) ? 'comment' : /kết bạn/.test(a) ? 'friend' : /[Ii]nbox/.test(a) ? 'inbox' : /[Pp]hễu/.test(a) ? 'funnel' : /phản hồi/.test(a) ? 'replyFound' : /Tạm hoãn|Tạm dừng|Safety/.test(a) ? 'pause' : 'khác';
+const shape = u => { u = String(u || ''); if (!u) return 'trống'; if (/pfbid/.test(u)) return 'pfbid'; if (/\/groups\/\d+\/posts\/\d+/.test(u)) return 'group/posts'; if (/\/groups\/\d+\/permalink\/\d+/.test(u)) return 'group/permalink'; if (/\/groups\/[^/]+\/posts\//.test(u)) return 'group-slug/posts'; if (/photo|fbid=/.test(u)) return 'photo'; if (/\/videos\/|\/reel\//.test(u)) return 'video'; if (/permalink\.php/.test(u)) return 'permalink.php'; if (/\/posts\/\d+/.test(u)) return 'profile/posts'; return 'khác'; };
+console.log(`LỆNH #43b comment-fail · ${hhmm(now)} VN · ${DAYS} ngày${ONLY ? ' · brand ' + ONLY : ''}`);
+
+// 1) Ma trận ngày × nick × bước × trạng thái (log)
+const logs = [];
+await safe('log', async () => { sec('1) outreach_log theo NGÀY VN × nick × bước:trạng thái');
+  const s = await db.collection('outreach_log').where('at', '>=', admin.firestore.Timestamp.fromMillis(since)).orderBy('at', 'desc').limit(5000).get();
+  s.forEach(d => { const x = d.data() || {}; if (ONLY && x.brandCode !== ONLY) return; logs.push(Object.assign({ id: d.id, ms: toMs(x.at) }, x)); });
+  const byDay = {};
+  for (const x of logs) { const k = dayVN(x.ms) + ' ' + (x.pid || '—').slice(-9); const st = stepOf(String(x.action || '')); inc(byDay[k] = byDay[k] || {}, st + ':' + (x.status || '?')); }
+  for (const k of Object.keys(byDay).sort()) console.log(`  ${k}  ${top(byDay[k], 14)}`);
+  console.log(`  (${logs.length} dòng; worker 06b/06c chép VPS 06/09, 06d chép 07/09 sáng — so cột ngày để biết fail có từ trước hay sau)`);
+  // lỗi comment: text đầy đủ (không lộ nội dung bình luận vì text lỗi là thông báo của worker)
+  const why = {}; for (const x of logs) if ((x.status === 'fail' || x.status === 'retry') && /comment|reply/.test(stepOf(String(x.action || '')))) inc(why, String(x.text || '').replace(/\(\d\/\d\)/, '').slice(0, 110));
+  console.log('  text lỗi comment/reply (đủ câu): ' + top(why, 12)); });
+
+// 2) Lead có bước comment/reply THẤT BẠI vs THÀNH CÔNG: dạng URL bài, kind, lỗi cuối, nick, thời điểm
+await safe('lead', async () => { sec('2) Lead comment THẤT BẠI ↔ THÀNH CÔNG — dạng bài, kind, tries, lỗi cuối');
+  const fail = new Map(), ok = new Map();
+  for (const x of logs) { const st = stepOf(String(x.action || '')); if (st !== 'comment' && st !== 'reply') continue; if (!x.leadId) continue;
+    if (x.status === 'done') { if (!ok.has(x.leadId)) ok.set(x.leadId, x); } else if (x.status === 'fail' || x.status === 'retry') { const f = fail.get(x.leadId) || { n: 0, first: x.ms, last: 0, pid: x.pid, st }; f.n++; f.first = Math.min(f.first, x.ms); f.last = Math.max(f.last, x.ms); fail.set(x.leadId, f); } }
+  const failOnly = [...fail.keys()].filter(id => !ok.has(id)), both = [...fail.keys()].filter(id => ok.has(id));
+  console.log(`  lead có fail comment/reply: ${fail.size} (trong đó cuối cùng vẫn không xong ${failOnly.length}, xong sau vài lần ${both.length}) · lead comment xong: ${ok.size}`);
+  const descr = async (id) => { const [t, l] = await Promise.all([db.collection('outreach_threads').doc(id).get(), db.collection('leads').doc(id).get()]); const th = t.exists ? t.data() : {}, ld = l.exists ? l.data() : {}; const fp = th.fpayload || {};
+    return { th, ld, fp, shape: shape(ld.post_url || fp.post_url), kind: fp.kind || (ld.comment_id ? 'comment?' : 'post'), group: /\/groups\//.test(String(ld.post_url || '')), keys: Object.keys(ld) }; };
+  const grp = (rows, name) => { const sh = {}, kd = {}, ds = {}; for (const r of rows) { inc(sh, r.shape); inc(kd, r.kind); (r.th.doneSteps || []).forEach(k => inc(ds, k)); } console.log(`  ${name}: dạng bài ${top(sh)} · kind ${top(kd)} · bước đã xong ${top(ds)}`); };
+  const F = [], O = [];
+  for (const id of failOnly.slice(0, 60)) F.push(Object.assign({ id }, await descr(id), fail.get(id)));
+  for (const id of [...ok.keys()].slice(0, 60)) O.push(Object.assign({ id }, await descr(id)));
+  grp(F, 'THẤT BẠI hẳn'); grp(O, 'THÀNH CÔNG');
+  console.log('  chi tiết lead thất bại (tối đa 25):');
+  for (const r of F.slice(0, 25)) console.log(`    ${r.id} ${r.kind.padEnd(8)} ${r.shape.padEnd(15)} nick=${String(r.pid || r.th.pid || '').slice(-9)} tries=${r.th.tries || 0} active=${!!r.th.active} done=[${(r.th.doneSteps || []).join(',')}] fail×${r.n} ${hhmm(r.first)}→${hhmm(r.last)} · ${String(r.th.lastError || '').slice(0, 80)}`);
+  const allKeys = {}; for (const r of [...F, ...O]) r.keys.forEach(k => inc(allKeys, k)); console.log('  field lead thấy (đếm): ' + top(allKeys, 40)); });
+
+// 3) Nick t7 (nick sống cuối) — thread theo thời gian: xem chuỗi fail → Safety
+await safe('t7', async () => { sec('3) Thread của từng nick AdsPower: tries · lastError · doneSteps (mới nhất trước, 15/nick)');
+  const s = await db.collection('outreach_threads').get(); const byPid = {};
+  s.forEach(d => { const x = d.data() || {}; if (ONLY && (x.brandCode || x.brand) !== ONLY) return; if (!/^ap/.test(String(x.pid || ''))) return; (byPid[x.pid] = byPid[x.pid] || []).push(Object.assign({ id: d.id }, x)); });
+  for (const [pid, rows] of Object.entries(byPid)) { rows.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt)); const st = {}; rows.forEach(r => inc(st, (r.step || '?') + '/' + (r.taskStatus || '?') + (r.tries >= 5 ? '/chết' : '')));
+    console.log(`  ${pid}: ${rows.length} thread · ${top(st, 8)}`);
+    for (const r of rows.slice(0, 15)) console.log(`    ${hhmm(toMs(r.createdAt))} ${r.id} ${(r.fpayload && r.fpayload.kind) || 'post'} steps=[${((r.fpayload || {}).steps || []).join(',')}] done=[${(r.doneSteps || []).join(',')}] tries=${r.tries || 0} ${r.active ? 'active' : 'off'} · ${String(r.lastError || '').slice(0, 70)}`); } });
+
+// 4) Reply/skip/paused theo ngày (để thấy checkReplies và onSkip có chạy không)
+await safe('misc', async () => { sec('4) replyFound · skip · paused theo ngày'); const m = {};
+  for (const x of logs) { const st = stepOf(String(x.action || '')); if (st === 'replyFound' || x.status === 'skip' || x.status === 'paused') inc(m[dayVN(x.ms)] = m[dayVN(x.ms)] || {}, st === 'replyFound' ? 'replyFound' : x.status); }
+  for (const k of Object.keys(m).sort()) console.log(`  ${k}: ${top(m[k])}`); if (!Object.keys(m).length) console.log('  (không có)'); });
+console.log('\nXONG — gửi em nguyên output.');

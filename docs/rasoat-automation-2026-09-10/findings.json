@@ -8,7 +8,7 @@
   {
    "name": "An toàn nick (worker)",
    "score": "6,5",
-   "note": "Cơ chế chống double/zombie/checkpoint tốt; nhưng Safety Score đã tự tắt nick khoẻ vì lỗi selector (W-18), đường comment bài thất bại 82% (W-19), đếm lỗi theo task (W-3)."
+   "note": "Cơ chế chống double/zombie/checkpoint tốt; nhưng Safety tự tắt nick khoẻ vì lỗi selector (W-18), đường comment bài thất bại 82 % từ 06/09 (W-19), nghi đăng trùng khi API không nhận ra (W-20), onSkip chưa kích (W-21)."
   },
   {
    "name": "Vòng phản hồi khách",
@@ -55,11 +55,29 @@
     {
      "id": "W-19",
      "sev": "Cao",
-     "title": "Bình luận vào BÀI thất bại 82% (105 fail / 23 done trong 7 ngày) — đường DOM dự phòng không mở được ô soạn",
-     "where": "log 7 ngày: `không thấy ô Bình luận (đúng nhãn)` = 65 · `không thấy nút Trả lời/Phản hồi của bình luận` = 30 · `không thấy ô trả lời TRONG khung` = 6 · react `không thấy nút Thích` = 15 · kết bạn `không thấy nút Thêm bạn bè` = 5; worker.mjs:607–613 `domComment` chỉ tìm `div[role=textbox][aria-label*=\"Bình luận\"|\"comment\"|\"Viết bình luận\"]`, KHÔNG bấm nút \"Bình luận\" để mở ô",
-     "desc": "React qua API vẫn OK (43 done / 16 fail) nên trang bài có mở được; comment thì rơi xuống DOM rồi DOM không thấy ô soạn. **`config.json` VPS (anh gửi 10/09) ĐÃ đúng doc_id** (`commentDocId`/`replyDocId` = 28781864408106143, react 27646120298312844, friend 28400389149651601) → loại giả thuyết \"doc_id chưa cập nhật\". Còn 2 giả thuyết: (a) FB xoay doc_id tiếp sau 06/09 hoặc bộ biến comment cấp 1 (`gqlComment` giữ bộ biến 29/08: feedLocation GROUP/feedbackSource 0/AUTO_TRANSLATE) không khớp doc mới → API luôn FAIL → DOM; (b) DOM không thấy ô soạn trên ~½ bài (FB ẩn ô tới khi bấm \"Bình luận\", bài tắt bình luận, bài ảnh/video). Mỗi lần fail = `tries+1` + `failCount+1` → 21 phễu dead-letter, 39 thread `tries≥5`, và là nguồn kéo Safety xuống 28 (W-18). Trả lời comment-lead 36 fail / 0 done → luồng comment-lead thực tế chưa chạy được.",
-     "fix": "Phân định bằng **LỆNH #43b** (chỉ đọc: log theo ngày × nick × bước; lead thất bại ↔ thành công theo dạng URL bài/kind/lỗi cuối) + 2 ảnh `errors/<leadId>__comment_0.png` từ VPS. Sửa (R-15): domComment bấm nút \"Bình luận\" trước, nhận ô theo focus như 05c; API FAIL kèm mã lỗi doc_id → cờ `docIdStale` + cảnh báo \"cần capture lại\" (chạy `--capture` 1 lần cho comment cấp 1 với doc mới); lỗi selector không đốt `tries` quá 2 lần/lead và không trừ Safety.",
-     "conf": "CHẮC về con số; nguyên nhân gốc còn 2 giả thuyết — LỆNH #43b + ảnh errors sẽ chốt"
+     "title": "Bình luận vào BÀI thất bại 82 % — bắt đầu đúng ngày 06/09 (worker 06b đổi sang API comment với doc_id mới), 20/20 lead thất bại hẳn đều là bài group có gid SỐ, 9/9 bài group dạng slug đều thành công",
+     "where": "LỆNH #43b (10/09 16:52): theo ngày nick t7 — 05/09 comment done 2 / fail 0 · **06/09 3 / 20 · 07/09 2 / 30 · 08/09 3 / 15**; trả lời comment-lead 05/09 (DOM 05c) done 11 / fail 20 → 07–08/09 (API 06b trước) done 1 / fail 20. Lead thất bại hẳn 20 (13 bài + 7 comment-lead): 100 % `group/posts` (gid số), tries 5 trong ~2 h cùng ngày, `done=[react]`; lead thành công 28: `group/posts` 19 + **`group-slug/posts` 9** (0 slug thất bại). worker.mjs:470–495 `gqlComment` gid số → `feedLocation:GROUP` + `feedback_source:PROFILE` + `groupID`; slug → `DEDICATED_COMMENTING_SURFACE`/`OBJECT` không groupID; 607–613 `domComment` chỉ tìm ô theo nhãn, không bấm \"Bình luận\"",
+     "desc": "Chuỗi sự kiện khớp: bản 06b (06/09) đổi `commentDocId` sang doc mới capture từ 1 lượt TRẢ LỜI (feedLocation POST_PERMALINK_DIALOG) nhưng `gqlComment` cấp 1 vẫn gửi bộ biến cũ 29/08 (GROUP/PROFILE/groupID) → với bài group gid số API gần như luôn FAIL → rơi DOM → `domComment` không thấy ô soạn ~½ bài → 5 lần/lead trong 2 h → 7 lead/ngày × 5 = 35 `failCount`/ngày → Safety t7 100 → 28 trong 3 ngày (W-18). Bài group slug không có gid → biến OBJECT → API OK. Trả lời comment-lead cũng đi API mới rồi rơi DOM 05c ở trạng thái trang khác (`gotoCmtPage` rồi `gotoComment`) → \"không thấy nút Trả lời\" 30. Xác suất 0/20 thất bại rơi vào slug nếu chỉ do DOM ngẫu nhiên ≈ 1,5 % → biến API theo gid là nghi phạm chính. Chốt cuối cùng cần 1 lượt `--capture` bình luận cấp 1 trên bài group gid số (lấy đúng bộ biến + response của doc mới) hoặc dòng console `comment API: FAIL`.",
+     "fix": "R-15: `gqlComment` dựng biến theo đúng capture doc mới (thử biến thể OBJECT/không groupID khi FB báo lỗi biến trước khi rơi DOM); ghi mẫu lỗi API (`sample` 140 ký tự, không secret) vào `outreach_log.text` để chẩn đoán từ web thay vì console; `domComment` bấm \"Bình luận\" mở ô + nhận ô theo focus (05c); lỗi selector cùng loại không đốt quá 2 tries/lead và không trừ Safety; comment-lead sau API lỗi → về đúng `gotoComment()` trước DOM. Nghiệm thu `dryRun` rồi 1 nick 1 ngày.",
+     "conf": "CHẮC về con số + mốc thời gian + tương quan gid số/slug; cơ chế cụ thể của API còn cần 1 capture"
+    },
+    {
+     "id": "W-20",
+     "sev": "Cao",
+     "title": "Nguy cơ ĐĂNG TRÙNG bình luận lên bài: API có thể đã đăng nhưng worker không nhận ra (`comment_create` không thấy) → coi là lỗi → 5 lượt retry = tới 5 bình luận giống nhau",
+     "where": "worker.mjs:493–495 `gqlComment` trả `ok=false` khi response 200 không có `comment_create/feedback_comment_edge/comment` (KHÔNG có nhánh `ambiguous` như `gqlReply` 503–530) · 1039–1047 `!ok → domComment` → throw → onFail 15′ → tick sau chạy lại API từ đầu",
+     "desc": "Nếu doc_id mới trả response hình dạng khác (key khác), mỗi lượt retry là 1 lần API đăng thật rồi DOM báo lỗi → 20 bài thất bại hẳn 06–08/09 có thể đang mang 1–5 bình luận trùng của nick t7 = spam công khai (bay nick + xấu mặt brand). Chưa xác nhận — cần mở 1–2 bài trong danh sách thất bại đếm bình luận của nick, hoặc xem ảnh `errors/<leadId>__comment_0.png` (ảnh chụp trang bài lúc DOM thất bại sẽ thấy bình luận đã đăng nếu có).",
+     "fix": "Post-comment nhận nhánh `ambiguous` giống reply: 200 không có key → reload + `verifyCommentPosted` (chữ của mình trong article) → có → done, không → mới DOM; trước MỌI lần retry comment: kiểm bài đã có bình luận của mình chưa (theo `uid` nick + 60 ký tự đầu) → có → done + log \"đã có từ lượt trước\". Nếu xác nhận có trùng: script chỉ đọc liệt kê bài để anh xoá tay.",
+     "conf": "NGHI — cần ảnh errors hoặc mở bài thật"
+    },
+    {
+     "id": "W-21",
+     "sev": "Vừa",
+     "title": "Bộ dò \"nội dung không hiển thị\" (onSkip) chưa từng kích trong 10 ngày dù có bài react/comment thất bại 5 lượt",
+     "where": "#43b mục 4: `skip` = 0 mọi ngày; mục 3: thread `Gz4FoJaYkWriJSuMGZau`, `hBUYIIlDlcbLR2CwvxK97` + 8 thread t4 03/09 dừng ở bước react \"không thấy nút Thích\" 4–5 lượt",
+     "desc": "Bài bị xoá / nhóm riêng tư / bài tắt bình luận đáng lẽ bị bỏ qua sau 1 lượt (05b) nhưng vẫn đốt 5 tries + 5 `failCount`. Có thể văn bản FB đã đổi (\"Nội dung này hiện không hiển thị\" → câu khác) hoặc bài vẽ được nhưng khu vực nút không có → không rơi vào nhánh skip.",
+     "fix": "Mở rộng dấu hiệu skip: không thấy `div[role=article]` có nút Thích sau `waitForContent` → chụp ảnh + skip sau 2 lượt thay vì 5; thêm câu FB tiếng Việt/Anh mới; log lý do rõ.",
+     "conf": "Chắc (số 0/10 ngày)"
     },
     {
      "id": "W-1",
@@ -162,12 +180,12 @@
     },
     {
      "id": "W-12",
-     "sev": "Vừa",
+     "sev": "Thấp",
      "title": "Lỗi hạ tầng (AdsPower/CDP/mạng) hẹn lại 10′ vô hạn, không backoff, không cảnh báo",
      "where": "worker.mjs:859–865 `onInfra` nextAt+10′, không đếm; engine re-enqueue mỗi khi tới hạn",
      "desc": "AdsPower treo cả buổi → mỗi thread lặp mở nick thất bại 6 lần/giờ, log 'retry' đầy 'Hoạt động gần đây', không ai được báo (Cảnh báo hệ thống chỉ thấy VPS offline theo heartbeat, còn worker vẫn online).",
      "fix": "Đếm `infraCount` trên thread → backoff 10′·30′·2h; worker ghi `workers/{id}.infraErrors` → Cảnh báo hệ thống 'AdsPower không mở được nick N lần/giờ'.",
-     "conf": "CHẮC — số thật 7 ngày: `funnel:retry` = 97 dòng (lỗi hạ tầng hẹn lại 10′), không cảnh báo"
+     "conf": "Chắc về mã; số thật 10 ngày: lỗi hạ tầng thật chỉ **1 dòng** (`↻ Lỗi hạ tầng`) — 97 dòng \"Phễu … thử lại\" của #43 là retry sau lỗi bước (onFail 15′), KHÔNG phải hạ tầng → hạ ưu tiên"
     },
     {
      "id": "W-13",
@@ -703,7 +721,7 @@
   {
    "name": "Bước 0 — số thật",
    "when": "ĐÃ CHẠY 10/09 15:45 VN",
-   "items": "LỆNH #43 xong; số + 3 mục Suy luận đã chốt. `config.json` VPS đã đúng doc_id. Còn: **LỆNH #43b** (chỉ đọc, phân định API vs DOM cho W-19) + 2 ảnh `errors/*__comment_0.png` từ VPS."
+   "items": "LỆNH #43 + #43b xong, config.json đúng. Nguyên nhân W-19 thu hẹp: bùng phát từ 06/09 (worker 06b), 100 % bài group gid số, slug OK → biến API theo gid. Còn: đếm bình luận nick trên 2 bài thất bại (W-20) · 1 ảnh errors · 1 capture bình luận cấp 1 bài group gid số."
   },
   {
    "name": "Đợt 1 — sống lại + đóng lỗ an toàn (worker 2026-09-10 + LỆNH #44 engine + zip FE nhỏ)",
@@ -794,7 +812,7 @@
    ],
    [
     "Log 7 ngày",
-    "586 dòng: paused 164 · fail 147 · retry 106 · sched 92 · done 77. Theo bước: react done 43 / fail 16 · comment done 23 / fail 105 · kết bạn done 7 / fail 5 · inbox done 4 · phễu retry (lỗi hạ tầng) 97 · phễu dead-letter 21. Lý do fail: không thấy ô Bình luận 65 · không thấy nút Trả lời 30 · không thấy nút Thích 15 · không thấy ô trả lời trong khung 6 · không thấy nút Thêm bạn bè 5. Skip 0 (bộ dò \"nội dung không hiển thị\" chưa từng kích)."
+    "586 dòng: paused 164 · fail 147 · retry 106 · sched 92 · done 77. Theo bước: react done 43 / fail 16 · comment done 23 / fail 105 · kết bạn done 7 / fail 5 · inbox done 4 · phễu **thử lại sau lỗi bước** 97 (onFail 15′ — #43b đính chính: KHÔNG phải hạ tầng; lỗi hạ tầng thật 1 dòng) · phễu dead-letter 21. Lý do fail: không thấy ô Bình luận 65 · không thấy nút Trả lời 30 · không thấy nút Thích 15 · không thấy ô trả lời trong khung 6 · không thấy nút Thêm bạn bè 5. Skip 0."
    ],
    [
     "Lead",
@@ -803,6 +821,14 @@
    [
     "Nội dung",
     "content_stats hscl-01: sent 3 · rep 1 · tagged 20 — mẫu quá nhỏ, chưa kết luận A/B."
+   ],
+   [
+    "#43b theo ngày (16:52)",
+    "nick t7: 05/09 comment 2 / 0 · reply 11 / 20 (DOM 05c) → **06/09 3 / 20 · 07/09 2 / 30 · 08/09 3 / 15**, reply 07–08/09 1 / 20 → thất bại bùng lên đúng ngày worker 06b (API comment doc mới). 08/09 t7 chạy 11 thread: 4 xong (2 trọn phễu tới inbox), 7 chết 5 lượt → tối 09/09 Safety 28. Lỗi hạ tầng thật: 1 dòng/10 ngày."
+   ],
+   [
+    "#43b dạng bài",
+    "thất bại hẳn 20 (13 bài · 7 comment-lead): **100 % group gid số**, `done=[react]`, 5 lượt trong ~2 h; thành công 28: group gid số 19 + **group slug 9** (0 slug thất bại) → biến API theo gid (`GROUP/PROFILE/groupID`) là nghi phạm chính; DOM chỉ cứu ~½. replyFound 0/10 ngày · skip 0/10 ngày."
    ]
   ],
   "verdicts": [
@@ -810,9 +836,10 @@
    "**E-4 (reserve lại) → CHẮC**: re-enqueue `fpayload` nguyên khối, không `tryConsume`, không kiểm ngày → phễu kẹt qua ngày chạy lại là vượt van.",
    "**E-7 (đè task đang running) → có đường trong mã nhưng hạ THẤP**: `set()` đè không đọc trạng thái, nhưng watchdog 8′ < lease 30′ và `running > 30′ = 0` → sửa kèm R-8, không ưu tiên.",
    "**E-1 → CHẮC hơn**: AdsPower path chỉ lọc `dropped` (dump 307) — cả `lost` cũng không; số chồng người thật thấp (2 %) chỉ vì sales hscl-01 ít vào web.",
-   "**E-3 → nửa chắc**: `lead.temp || 'cold'` — lead chưa chấm điểm bị coi là lạnh (react)."
+   "**E-3 → nửa chắc**: `lead.temp || 'cold'` — lead chưa chấm điểm bị coi là lạnh (react).",
+   "**W-12 đính chính**: 97 dòng \"Phễu… thử lại\" = retry sau lỗi bước, lỗi hạ tầng thật 1 dòng → hạ Thấp."
   ],
-  "new": "Số thật lộ 4 mục mới: **W-18** Safety Score tự tắt nick khoẻ vì lỗi selector của chính mình (đã xảy ra 09/09) · **W-19** bình luận vào bài thất bại 82 % — đường DOM dự phòng không mở được ô soạn, nghi thêm doc_id comment lỗi thời trên VPS · **E-16** engine xếp việc cho nick needLogin mỗi giờ (160 dòng log, thread không được chuyển) · **E-17** trần mở lead mới dùng cap toàn cục 40 trong khi web vẽ x/100.",
-  "ask": "`config.json` anh gửi 10/09 ĐÃ đúng doc_id → loại giả thuyết doc_id cũ. Còn cần: (1) chạy **LỆNH #43b** (`docs/lenh-2026-09-10-43b.md`, chỉ đọc) → phân định API vs DOM; (2) 2 ảnh `errors/<leadId>__comment_0.png` từ VPS; (3) nếu cửa sổ worker còn mở: 1 dòng `comment API: FAIL …`. Không gửi token."
+  "new": "Số thật lộ 4 mục mới: **W-18** Safety Score tự tắt nick khoẻ vì lỗi selector của chính mình (đã xảy ra 09/09) · **W-19** bình luận vào bài thất bại 82 % — đường DOM dự phòng không mở được ô soạn, nghi thêm doc_id comment lỗi thời trên VPS · **E-16** engine xếp việc cho nick needLogin mỗi giờ (160 dòng log, thread không được chuyển) · **E-17** trần mở lead mới dùng cap toàn cục 40 trong khi web vẽ x/100. **#43b thêm**: W-20 nghi đăng TRÙNG bình luận (API đã đăng mà worker không nhận ra → 5 lượt) · W-21 onSkip chưa từng kích.",
+  "ask": "ĐÃ có #43 + #43b + config.json. Còn 3 thứ (độc lập, làm cùng lúc): (1) mở trên Facebook 2 bài của lead thất bại `zt4t59NCvZigXs9tlRmF` và `VMjR1TEGGOOtcNIpvJoS` (Lead mới → tìm mã lead → \"mở bài gốc\") đếm bình luận của nick t7: 0 / 1 / nhiều → chốt W-20; (2) 1 ảnh `errors/zt4t59NCvZigXs9tlRmF__comment_0.png` (hoặc lead 08/09 bất kỳ) từ VPS; (3) chạy `node worker.mjs --capture k1gm6por` rồi tự bình luận 1 câu lên 1 bài group (link có số, không phải tên) → gửi `capture-<ts>.log` → em lấy đúng bộ biến doc mới cho R-15."
  }
 }

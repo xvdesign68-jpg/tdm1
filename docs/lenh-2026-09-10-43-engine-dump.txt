@@ -1,0 +1,64 @@
+288: async function stepNickAdspower(brand, acct) {
+289:   const pid = acct.id || acct.pid;
+290:   if (!acct.adspower_id) { await addLog({ pid, brand: brand.name, brandCode: brand.code, action: 'Bo qua: nick AdsPower thieu Profile ID', status: 'sched' }); return false; }
+291:   const threads = db().collection('outreach_threads');
+292:   const retry = await threads.where('pid', '==', pid).where('active', '==', true).where('nextAt', '<=', nowMs()).orderBy('nextAt', 'asc').limit(1).get();
+293:   if (!retry.empty) {
+294:     const d = retry.docs[0], th = d.data();
+295:     if (th.fpayload) {
+296:       await db().collection('outreach_tasks').doc(d.id + '__funnel').set({ leadId: d.id, name: th.name, brandName: th.brandName, brandCode: th.brandCode || th.brand, temp: th.temp, score: th.score, pid, adspower_id: acct.adspower_id || null, action: 'funnel', workerId: acct.workerId || '', payload: th.fpayload, status: 'queued', createdAt: FieldValue.serverTimestamp() });
+297:       await d.ref.set({ taskStatus: 'queued', nextAt: nowMs() + 30 * 60000 }, { merge: true });
+298:       return true;
+299:     }
+300:     await d.ref.set({ active: false }, { merge: true });
+301:   }
+302:   const u = await usageOf(pid);
+303:   if (u.react >= CAPS.react) return false;
+304:   const leadsSnap = await db().collection('leads').where('brand', '==', brand.code).orderBy('detected_at', 'desc').limit(40).get();
+305:   for (const ld of leadsSnap.docs) {
+306:     const lead = ld.data(); lead.id = ld.id;
+307:     if (lead.dropped) continue;
+308:     if ((lead.temp || 'cold') === 'junk') continue;
+309:     const tref = threads.doc(lead.id);
+310:     if ((await tref.get()).exists) continue;
+311:     { const __rb = roleBlockOf(lead); if (__rb) { await skipLeadRole(lead, brand, acct, __rb); continue; } } /* v-selfcmt */
+312:     if (!parsePost(lead.post_url).post_id) continue;
+313:     if (await apEnqueueFunnel(acct, brand, lead, tref)) return true;
+314:   }
+315:   return false;
+316: }
+244: async function apEnqueueFunnel(acct, brand, lead, tref) {
+245:   const pid = acct.id || acct.pid;
+246:   const temp = lead.temp || 'cold';
+247:   if (temp === 'junk') return false;
+248:   const caps = brandCaps(brand);
+249:   const allow = a => brandAllow(brand, temp, a);
+250:   const hasProfile = !!lead.author_url;
+251:   const uid = uidFromAuthor(lead.author_url);
+252:   const steps = [];
+253:   if (allow('react') && await tryConsume(pid, 'react', caps.react)) steps.push('react');
+254:   if (allow('comment') && await tryConsume(pid, 'comment', caps.comment)) steps.push('comment');
+255:   if (allow('friend') && hasProfile && await tryConsume(pid, 'friend', caps.friend)) steps.push('add_friend');
+256:   if (allow('inbox') && hasProfile && steps.indexOf('add_friend') >= 0 && await tryConsume(pid, 'inbox', caps.inbox)) steps.push('inbox');
+257:   if (!steps.length) return false;
+258:   /* v119-41 Content Studio: comment + inbox RIÊNG theo bài của lead + hồ sơ brand (brands/{code}.content); AI lỗi → mẫu/lead.reply, không chặn phễu */
+259:   const gen = (steps.includes('comment') || steps.includes('inbox')) ? await genForLead(brand, lead) : { comment: '', inbox: '', mode: 'none' };
+260:   const payload = { post_url: lead.post_url, reaction: pick(REACT_MIX), comment_msg: gen.comment, inbox_msg: gen.inbox, content_meta: (gen && gen.meta) || null, /* LENH #34: meta nội dung → worker ghi lên lead.outreach.content */ content_mode: gen.mode || '', uid: uid || null, profile_url: lead.author_url || '', steps };
+261:   const _cid = commentIdOf(lead); const _curl = _cid ? commentUrlOf(lead, _cid) : null;
+262:   if (_cid && _curl) { payload.kind = 'comment'; payload.comment_id = _cid; payload.comment_url = _curl; }
+263:   const meta = { leadId: lead.id, name: lead.name || 'An danh', brandName: brand.name || brand.code, brandCode: brand.code, temp: lead.temp || 'cold', score: Number(lead.score) || 0 };
+264:   await db().collection('outreach_tasks').doc(lead.id + '__funnel').set(Object.assign({}, meta, { pid, adspower_id: acct.adspower_id || null, action: 'funnel', workerId: acct.workerId || '', payload, status: 'queued', createdAt: FieldValue.serverTimestamp() }));
+265:   await tref.set(Object.assign({}, meta, { brand: brand.code, pid, step: 'funnel', active: true, taskStatus: 'queued', nextAt: nowMs() + 30 * 60000, fpayload: payload, createdAt: FieldValue.serverTimestamp() }), { merge: true });
+266:   return true;
+267: }
+105: async function tryConsume(pid, kind, capOverride) {
+106:   const ref = db().collection('outreach_usage').doc(`${pid}__${dayKey()}`);
+107:   return db().runTransaction(async tx => {
+108:     const s = await tx.get(ref); const d = s.exists ? s.data() : {};
+109:     const used = Number(d[kind]) || 0;
+110:     const cap = (Number(capOverride) > 0) ? Number(capOverride) : CAPS[kind];
+111:     if (used >= cap) return false;
+112:     tx.set(ref, { [kind]: used + 1, pid, day: dayKey(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+113:     return true;
+114:   });
+115: }

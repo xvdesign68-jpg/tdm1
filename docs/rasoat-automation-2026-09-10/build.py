@@ -28,6 +28,13 @@ for g in J['groups']:
     for f in g['findings']: cnt[f['sev']]=cnt.get(f['sev'],0)+1
 score_rows=''.join(f'<tr><td>{E(s["name"])}</td><td class="n"><b>{E(s["score"])}</b>/10</td><td>{md(s["note"])}</td></tr>' for s in J['scorecard'])
 road=''.join(f'<li><b>{E(r["name"])}</b> <span class="muted">({E(r["when"])})</span>: {md(r["items"])}</li>' for r in J['roadmap'])
+L=J.get('lenh43')
+if L:
+    kp=''.join(f'<div class="kpi {E(k["c"])}"><b>{E(k["v"])}</b><span>{E(k["l"])}</span></div>' for k in L['kpis'])
+    rows=''.join(f'<tr><td class="id">{E(r[0])}</td><td>{md(r[1])}</td></tr>' for r in L['rows'])
+    ver=''.join(f'<li>{md(v)}</li>' for v in L['verdicts'])
+    l43=f'<section id="l43"><h2>Kết quả LỆNH #43 — số thật</h2><p class="lead">{md(L["when"])}</p><div class="kpis">{kp}</div><div class="tw"><table class="tbl"><thead><tr><th>Mục</th><th>Số thật · nhận xét</th></tr></thead><tbody>{rows}</tbody></table></div><h4 style="margin-top:14px">Chốt 3 mục "Suy luận" từ dump engine</h4><ul class="road">{ver}</ul><p>{md(L["new"])}</p><p class="ask"><b>Cần anh gửi:</b> {md(L["ask"])}</p></section>'
+else: l43=''
 page=f"""<title>Rà soát automation SmartLead</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -55,7 +62,7 @@ details{{margin:10px 0 0;color:var(--ink-2)}} summary{{cursor:pointer;font-weigh
 .tag{{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-family:'Plus Jakarta Sans',sans-serif}} .tag.eff-nhỏ{{background:var(--lo-bg);color:var(--lo)}} .tag.eff-lớn{{background:var(--md-bg);color:var(--md)}}
 .prop p{{margin:8px 0 0;color:var(--ink-2)}} .prop .how span{{font-weight:700;color:var(--ink)}}
 .tw{{overflow-x:auto;max-width:100%}} .tbl td,.tbl th{{overflow-wrap:anywhere}} code{{overflow-wrap:anywhere}}
-.muted{{color:var(--ink-3)}} ul.road{{padding-left:20px}} ul.road li{{margin:6px 0}}
+.muted{{color:var(--ink-3)}} .ask{{background:var(--md-bg);border-radius:12px;padding:10px 14px}} ul.road{{padding-left:20px}} ul.road li{{margin:6px 0}}
 pre{{background:var(--code);padding:12px 14px;border-radius:12px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.5}}
 .toc{{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}} .toc a{{font-size:12.5px;color:var(--brand);text-decoration:none;background:var(--brand-soft);padding:4px 10px;border-radius:999px}}
 @media (max-width:640px){{.tbl th:nth-child(4),.tbl td:nth-child(4){{display:none}} h1{{font-size:23px}}}}
@@ -63,9 +70,10 @@ pre{{background:var(--code);padding:12px 14px;border-radius:12px;overflow-x:auto
 <div class="wrap">
 <h1>Rà soát automation SmartLead</h1>
 <p class="sub">{E(J['meta']['subtitle'])}</p>
-<nav class="toc">{''.join(f'<a href="#{E(g["key"])}">{E(g["short"])}</a>' for g in J['groups'])}<a href="#props">Đề xuất</a><a href="#road">Lộ trình</a><a href="#lenh">LỆNH #43</a></nav>
+<nav class="toc">{''.join(f'<a href="#{E(g["key"])}">{E(g["short"])}</a>' for g in J['groups'])}<a href="#l43">Số thật #43</a><a href="#props">Đề xuất</a><a href="#road">Lộ trình</a><a href="#lenh">LỆNH #43</a></nav>
 <div class="kpis"><div class="kpi hi"><b>{cnt['Cao']}</b><span>phát hiện mức Cao</span></div><div class="kpi md"><b>{cnt['Vừa']}</b><span>mức Vừa</span></div><div class="kpi lo"><b>{cnt['Thấp']}</b><span>mức Thấp</span></div><div class="kpi"><b>{len(J['proposals'])}</b><span>đề xuất thông minh</span></div><div class="kpi"><b>{E(J['meta']['coverage'])}</b><span>độ phủ đọc code</span></div></div>
 <section><h2>Tóm tắt</h2>{md(J['summary'])}</section>
+{l43}
 <section><h2>Bảng điểm theo phân hệ</h2><div class="tw"><table class="tbl"><thead><tr><th>Phân hệ</th><th>Điểm</th><th>Nhận xét</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 {''.join(sections)}
 <section id="props"><h2>Đề xuất thông minh</h2><p class="lead">{md(J['props_intro'])}</p>{proposals(J['proposals'])}</section>

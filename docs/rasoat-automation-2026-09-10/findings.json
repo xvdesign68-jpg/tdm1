@@ -1,14 +1,14 @@
 {
  "meta": {
-  "subtitle": "Kiểm toàn diện mảng \"Tiếp cận\" (engine Cloud Function · worker AdsPower · nội dung AI · giao diện) — 10/09/2026 · chỉ đánh giá, chưa sửa code · chờ anh chốt",
+  "subtitle": "Kiểm toàn diện mảng \"Tiếp cận\" (engine Cloud Function · worker AdsPower · nội dung AI · giao diện) — 10/09/2026 · đã đối chiếu SỐ THẬT từ LỆNH #43 (15:45 VN) · chưa sửa code · chờ anh chốt đợt 1",
   "coverage": "3/3 lớp"
  },
- "summary": "**Kết luận ngắn: chưa \"oke hết\".** Lớp an toàn nick đã qua 3 vòng rà (v119-36/38/39) và vững: giành task nguyên tử, chống làm lại bước, hoàn van, huỷ cứng zombie, fail-closed cho comment-lead, cổng vai người bán. Nhưng còn **3 lỗ hệ thống** khiến automation tuần qua \"chạy mà không ai biết nó đã ngừng\":\n1. **Vòng phản hồi khách gần như mù** — worker chỉ đọc inbox khi nick có việc mới, bỏ thread sau 6 giờ, không bắt phản hồi qua bình luận; kết quả thật: đã inbox nhưng `replyFound = 0` (W-1, W-5, E-11).\n2. **Engine chọn lead và kế toán van có lỗ** — chạm chồng lead sales đang chăm/đã chốt, lead nóng không được ưu tiên và lead cũ đói, phễu kẹt qua ngày chạy lại là vượt van 2×, thread mồ côi khi nick chết (E-1, E-2, E-4, E-6).\n3. **Không có giám sát chủ động** — 4/5 nick chết một tuần, 11/12 thread kẹt, chỉ phát hiện khi chạy script tay; web không realtime cờ nick, không email/push (E-12, F-1).\nNgoài ra 2 đường còn có thể **đăng bình luận 2 lần** (API mơ hồ → DOM; tắt worker giữa bước) và cách đếm lỗi nick sẽ **tự tắt nick khoẻ** khi anh nâng số nick cùng lúc (W-2, W-3, W-8, W-10).\n\n**Nên làm gì trước:** chạy **LỆNH #43** (chỉ đọc, 2 phút) để có số thật → em chốt danh sách sửa. Đợt 1 (worker bản mới + 1 LỆNH engine nhỏ + zip FE nhỏ) đóng được 8/11 mục Cao mà không đổi kiến trúc.",
+ "summary": "**Kết luận: chưa \"oke\", và hôm nay automation hscl-01 đang ĐỨNG mà web vẫn báo bật.** Số thật LỆNH #43 (10/09 15:45 VN): brand BẬT + ⚡ngay nhưng **0/6 nick sống**; 12 thread kẹt 5–10 ngày trên 4 nick chết; 133 lead hợp lệ 30 ngày chưa được chạm (32 nóng, cũ nhất 13 ngày); không một cảnh báo nào. Chuỗi sự cố tuần qua (lần theo log + dump):\n1. **Bình luận vào bài thất bại 82 %** (105 fail / 23 done trong 7 ngày; \"không thấy ô Bình luận\" 65 lần) — API comment gần như luôn FAIL (nghi doc_id trên VPS lỗi thời từ 06/09) rồi DOM dự phòng không mở được ô soạn (W-19). Trả lời comment-lead 36 fail / 0 done.\n2. **Mỗi lần fail = `failCount+1`, và Safety Score coi đó như FB phạt** → nick khoẻ cuối cùng (t7: 74 ok / 43 fail / 0 checkpoint) rơi xuống 28 → worker tự tắt 09/09 (W-18). Từ đó brand không còn nick.\n3. **Engine không biết nick chết**: vẫn xếp việc cho nick needLogin mỗi giờ (160 dòng log \"Tạm hoãn\"), thread trên nick tắt nằm mãi, không chuyển, không hoàn van, không báo (E-16, E-6, E-12).\n4. **Vòng phản hồi khách mù**: 4 lead đã inbox, 1 khách phản hồi (sales tự đổi giai đoạn), máy phát hiện 0 (W-1, W-5, E-11).\nDump 4 hàm engine chốt 3 mục còn \"Suy luận\": **E-2 CHẮC** (chỉ xét 40 lead mới nhất, không ưu tiên nóng), **E-4 CHẮC** (re-enqueue không reserve van lại), **E-7 hạ Thấp** (có đường đè task nhưng watchdog chặn thực tế). Thêm **E-17**: trần mở lead mới dùng cap toàn cục 40 trong khi web cho đặt 100 → 3 con số van không khớp nhau.\n\n**Nên làm gì trước:** (a) hôm nay — anh gửi 3 thứ từ VPS (config.json doc_id · 2 ảnh errors comment · 1 dòng console comment API) để em chốt W-19; đưa van hscl-01 về Cân bằng 40/12/10/8; CHƯA bật lại nick tới khi có worker mới (bật lại là chết lại trong ~2 ngày). (b) Đợt 1 (worker 2026-09-10 + LỆNH #44 engine + zip FE nhỏ) đóng W-18/W-19/E-16/E-17 + R-1/R-2/R-6/R-8/R-9/F-1/F-2/F-6 — chi tiết ở Lộ trình.",
  "scorecard": [
   {
    "name": "An toàn nick (worker)",
-   "score": "7,5",
-   "note": "Cơ chế chống double/zombie/checkpoint tốt; còn 2 đường đôi comment (W-2/W-10), đếm lỗi theo task (W-3), Safety không suy giảm (W-8)."
+   "score": "6,5",
+   "note": "Cơ chế chống double/zombie/checkpoint tốt; nhưng Safety Score đã tự tắt nick khoẻ vì lỗi selector (W-18), đường comment bài thất bại 82% (W-19), đếm lỗi theo task (W-3)."
   },
   {
    "name": "Vòng phản hồi khách",
@@ -17,8 +17,8 @@
   },
   {
    "name": "Engine chọn lead · van · thread",
-   "score": "5,5",
-   "note": "Cổng vai + ma trận đúng; thiếu lọc người thật, ưu tiên nóng, kế toán van theo ngày, sweeper mồ côi."
+   "score": "5,0",
+   "note": "Dump xác nhận: chỉ xét 40 lead mới nhất, lọc trạng thái duy nhất là `dropped`, re-enqueue không reserve lại van, không lọc nick cờ (E-1/E-2/E-4/E-16/E-17)."
   },
   {
    "name": "Nội dung AI (content.js)",
@@ -27,8 +27,8 @@
   },
   {
    "name": "Giám sát · vận hành",
-   "score": "4,5",
-   "note": "Không cảnh báo chủ động; thao tác cứu thread bằng script tay; web cờ nick không realtime."
+   "score": "3,5",
+   "note": "Brand BẬT + 0/6 nick sống, 12 thread kẹt 5–10 ngày, 160 dòng log lặp — không một cảnh báo; chỉ lộ khi chạy LỆNH #43."
   },
   {
    "name": "Giao diện Tiếp cận · Content Studio",
@@ -43,6 +43,24 @@
    "title": "1. Worker AdsPower (worker.mjs 2026-09-06d) — em đọc hết 1.496 dòng, agent đối kháng đọc lại, em kiểm chứng từng mục Cao/Vừa trên code",
    "intro": "Nền tảng vững: giành task transaction, doneSteps chống làm lại, refund van, huỷ cứng zombie, fail-closed comment-lead. Các lỗ còn lại tập trung ở **vòng đọc phản hồi khách**, **đếm lỗi theo task thay vì theo phiên nick**, và **đường comment bài khi API mơ hồ**.",
    "findings": [
+    {
+     "id": "W-18",
+     "sev": "Cao",
+     "title": "Safety Score đếm LỖI DO CHÍNH MÌNH (không thấy nút/ô soạn) như FB phạt → nick khoẻ duy nhất bị tự dừng 09/09",
+     "where": "worker.mjs:911 `onFail` +1 `failCount` cho mọi lỗi · 274 `safety = 100 − 20·cp − 10·nl − 2·fail + min(20, ok/5)` · 285 `< 30 → active:false`; số thật: t7 `ok 74 / fail 43 / nl 0 / cp 0` → 28",
+     "desc": "Nick apk1gm6por không hề checkpoint (cp 0, nl 0) nhưng 43 lần \"không thấy ô Bình luận (đúng nhãn)\"/\"không thấy nút…\" → −86 → Safety 28 → worker tự đặt `active:false` + `safetyPaused` → brand hscl-01 hết nick từ 09/09. Tức là hệ thống tự tắt nick vì selector của mình hỏng, và web chỉ hiện 🛡 28 chứ không nói lý do.",
+     "fix": "`failCount` chỉ tính lỗi FB thật (checkpoint / needLogin / rate-limit / \"Nội dung không hiển thị\" lặp); lỗi selector → bộ đếm riêng `uiFail` → khi ≥ N trong 60′ ở ≥ 2 lead → cảnh báo \"FB đổi giao diện\" (R-13) chứ không trừ Safety. Reset `failCount` của t7 khi bấm ✓ Đã xử lý (web đã reset — cần anh bấm).",
+     "conf": "CHẮC — công thức + số thật khớp từng đơn vị"
+    },
+    {
+     "id": "W-19",
+     "sev": "Cao",
+     "title": "Bình luận vào BÀI thất bại 82% (105 fail / 23 done trong 7 ngày) — đường DOM dự phòng không mở được ô soạn",
+     "where": "log 7 ngày: `không thấy ô Bình luận (đúng nhãn)` = 65 · `không thấy nút Trả lời/Phản hồi của bình luận` = 30 · `không thấy ô trả lời TRONG khung` = 6 · react `không thấy nút Thích` = 15 · kết bạn `không thấy nút Thêm bạn bè` = 5; worker.mjs:607–613 `domComment` chỉ tìm `div[role=textbox][aria-label*=\"Bình luận\"|\"comment\"|\"Viết bình luận\"]`, KHÔNG bấm nút \"Bình luận\" để mở ô",
+     "desc": "React qua API vẫn OK (43 done / 16 fail) nên trang bài có mở được; comment thì gần như luôn rơi xuống DOM (API comment trả FAIL — nghi `config.json.graphql.commentDocId` trên VPS còn doc_id cũ đã bị FB xoay 06/09, hoặc FB xoay tiếp) rồi DOM không thấy ô soạn (FB ẩn ô tới khi bấm \"Bình luận\", hoặc nhãn khác). Mỗi lần fail = `tries+1` + `failCount+1` → 21 phễu dead-letter, 39 thread `tries≥5`, và chính là nguồn kéo Safety xuống 28 (W-18). Trả lời comment-lead cũng 36 fail/0 done → luồng comment-lead thực tế chưa chạy được sau 05c.",
+     "fix": "Cần 2 thứ từ VPS để chốt: (1) giá trị `graphql.commentDocId/replyDocId` trong `config.json` (phải = 28781864408106143); (2) 2 ảnh `errors/<leadId>__comment_*.png` + dòng console `comment API: FAIL <sample>`. Sửa: domComment bấm nút \"Bình luận\"/\"Viết bình luận\" trước, nhận ô theo focus-sau-cú-bấm như 05c; API FAIL do doc_id → dò `doc_id` mới tự động từ 1 lần capture hoặc cảnh báo \"cần capture lại\"; lỗi selector không đốt `tries` quá 2 lần/lead.",
+     "conf": "CHẮC về con số; nguyên nhân gốc cần ảnh errors + config.json (không đọc được VPS từ đây)"
+    },
     {
      "id": "W-1",
      "sev": "Cao",
@@ -68,7 +86,7 @@
      "where": "worker.mjs:1261 `for (const t of tasks) await onNeedLogin(t)` · 883–888 `needLoginCount+1` mỗi task · 1266 checkpoint → `onFail` từng task (`failCount+N`, `tries+1` mỗi thread)",
      "desc": "Hôm nay `maxConcurrent 1` → 1 task/nick/vòng nên chưa lộ. Khi anh nâng lên 3 (panel VPS), `claimBatch` gom 3 task cùng nick → 1 lần đăng xuất = `needLoginCount 3` → `active:false` ngay + Safety −30; checkpoint 1 lần → 3 thread mất 1 lượt oan.",
      "fix": "Counter nick tính 1 lần/phiên; task còn lại chỉ hoãn thread (`taskStatus paused`, nextAt) không đốt tries.",
-     "conf": "Chắc"
+     "conf": "CHẮC — log 7 ngày: 160 dòng \"Tạm hoãn — nick đang cần đăng nhập lại\" (mỗi giờ × mỗi thread, xem E-16)"
     },
     {
      "id": "W-4",
@@ -113,7 +131,7 @@
      "where": "worker.mjs:281–284 (`days = floor((now − safetyAt)/1d)`, `safetyAt=now` ghi MỖI phiên) · 911 `onFail` +1 failCount cho mọi lỗi kể cả lỗi selector",
      "desc": "Nick có phiên mỗi ngày → `days` luôn 0 → không bao giờ trừ. FB đổi 1 nhãn nút → ~2 fail/nick/ngày → ~3 tuần dưới 60 (giãn nhịp), ~5 tuần dưới 30 (tự dừng cả dàn) dù không hề checkpoint.",
      "fix": "Mốc suy giảm riêng `safetyDecayAt` chỉ tiến theo số ngày đã trừ; lỗi selector/nội dung (không thấy nút, ô soạn…) không cộng `failCount` (chỉ checkpoint/needLogin/rate-limit mới tính).",
-     "conf": "Chắc"
+     "conf": "CHẮC — ĐÃ XẢY RA: nick t7 `okCount 74 / failCount 43` → safety = 100 − 86 + 14 = 28 → tự dừng 09/09 (W-18)"
     },
     {
      "id": "W-9",
@@ -149,7 +167,7 @@
      "where": "worker.mjs:859–865 `onInfra` nextAt+10′, không đếm; engine re-enqueue mỗi khi tới hạn",
      "desc": "AdsPower treo cả buổi → mỗi thread lặp mở nick thất bại 6 lần/giờ, log 'retry' đầy 'Hoạt động gần đây', không ai được báo (Cảnh báo hệ thống chỉ thấy VPS offline theo heartbeat, còn worker vẫn online).",
      "fix": "Đếm `infraCount` trên thread → backoff 10′·30′·2h; worker ghi `workers/{id}.infraErrors` → Cảnh báo hệ thống 'AdsPower không mở được nick N lần/giờ'.",
-     "conf": "Chắc"
+     "conf": "CHẮC — số thật 7 ngày: `funnel:retry` = 97 dòng (lỗi hạ tầng hẹn lại 10′), không cảnh báo"
     },
     {
      "id": "W-13",
@@ -215,22 +233,40 @@
    "intro": "Cổng vai (LỆNH #31), gate ma trận/van brand (v119-35, #37), task id tất định + doneSteps + maxInstances 1 là đúng và đã được nghiệm thu. Lỗ hổng nằm ở **chọn lead** (chồng người thật, không ưu tiên nóng, lead cũ đói), **kế toán van khi phễu kẹt qua ngày**, **thread mồ côi khi nick chết**, và **không có giám sát chủ động** — chính 3 điều này làm hệ thống \"chạy mà không ai biết nó đã ngừng\" suốt tuần qua (4/5 nick chết, 11/12 thread kẹt, replyFound 0).",
    "findings": [
     {
+     "id": "E-16",
+     "sev": "Cao",
+     "title": "Engine chọn nick due chỉ theo `active & nextFreeAt`, KHÔNG xem `needLogin/safetyPaused/challenge/uiLang` → nick chết vẫn được xếp việc mỗi giờ (160 dòng \"Tạm hoãn\" trong 7 ngày)",
+     "where": "Tick query `fb_accounts where active==true & nextFreeAt<=now` (v120-scale) · dump `stepNickAdspower:292–298` re-enqueue thread tới hạn không kiểm cờ nick · worker `gateCheck` → `onPaused` 60′ (không đốt tries, không đếm needLogin)",
+     "desc": "Nick t6 needLogin từ 05/09 nhưng vẫn `active:true` (chỉ tắt khi `needLoginCount ≥ 3`, mà onPaused không đếm) → engine re-enqueue 3 thread mỗi giờ → worker mở AdsPower, thấy cần đăng nhập, hoãn 60′, ghi log → lặp 160 lần, chiếm hết \"Hoạt động gần đây\" (F-11), phí mở profile, và thread không bao giờ được chuyển nick khác (E-6).",
+     "fix": "Engine: lọc nick `needLogin/safetyPaused/challenge/uiLang≠vi` ngay sau query due (hoặc set `nextFreeAt = +6h` khi worker cờ nick); thread trên nick cờ → sweeper R-6. Worker: `onPaused` vì needLogin cũng `needLoginCount+1` (1 lần/phiên) để nick tự tắt sau 3 phiên.",
+     "conf": "CHẮC — log + cờ nick khớp"
+    },
+    {
+     "id": "E-17",
+     "sev": "Vừa",
+     "title": "Trần mở lead mới dùng CAP TOÀN CỤC `CAPS.react` (40) — van brand 100 vô hiệu; web vẽ x/100 nhưng engine dừng ở 40",
+     "where": "dump `stepNickAdspower:302–303` `if (u.react >= CAPS.react) return false;` (patch LỆNH R mục (e) `brandCaps(brand).react` KHÔNG có trong code đang chạy) · `apEnqueueFunnel:253` lại dùng `caps.react` của brand",
+     "desc": "hscl-01 đặt van 100/100/30/30: sau 40 react/nick/ngày engine ngừng bốc lead mới dù thẻ brand báo còn 60 suất; ngược lại comment 100 > hardCap worker 30 (F-2). 3 con số (brand · engine toàn cục · worker hardCap) không khớp nhau nên không ai biết van thật là bao nhiêu. 40 react/ngày là mức an toàn hơn — nên coi engine đúng, web sai.",
+     "fix": "1 nguồn sự thật: `effectiveCaps = min(brand, hardCap)`, engine early-out dùng đúng nó, web hiển thị và chặn nhập theo hardCap (F-2). Khuyên anh đưa hscl-01 về Cân bằng 40/12/10/8 trước khi bật lại nick.",
+     "conf": "CHẮC — dump"
+    },
+    {
      "id": "E-1",
      "sev": "Cao",
      "title": "Engine không lọc lead ĐÃ CÓ NGƯỜI THẬT CHĂM / đã hẹn / đã chốt → máy chạm chồng sales",
-     "where": "Lead loop func (patch #37 mốc A2: chỉ `dropped/lost/junk/brandAllow/roleBlockOf/commentIdOf`) · AdsPower path theo harness-selfcmt + CLAUDE.md v119-35 (`bỏ dropped/junk/đã có thread/không post_id`) · script vận hành (`_l34_regen`, `_l32_brand`) phải tự thêm `isOpen` → xác nhận engine không lọc `stage/assignee/first_care_at/closed_at/outreach_replied`",
+     "where": "`outreach.js:307` `if (lead.dropped) continue;` là bộ lọc trạng thái DUY NHẤT của AdsPower path (func path #37 có thêm `lost`) · worker không kiểm (W-4)",
      "desc": "Sales đã gọi/hẹn (stage `booked`), hoặc lead đã `closed` → nick vẫn comment công khai \"nhắn riêng em báo giá\" + inbox mở đầu → khách nhận 2 giọng cùng brand, có ca chào bán lại người vừa mua. Worker cũng không kiểm (W-4) nên không có lớp nào chặn.",
      "fix": "Engine: chỉ bốc lead `stage ∈ {new}` (hoặc `contacted` chưa `first_care_at`), không `assignee` (trừ khi brand cho phép), không `closed_at/lost/dropped/outreach_replied`; trigger `statsOnLead`: lead đổi `stage ≥ responded` / có `first_care_at` / `assignee` → tắt thread + huỷ task queued (`active:false, step:'human'`) + hoàn van. Worker: pre-flight (W-4).",
-     "conf": "Chắc (thấy bộ lọc trong patch #37 + script vận hành)"
+     "conf": "CHẮC — dump 307: AdsPower path chỉ bỏ `dropped` (không cả `lost`, `stage`, `assignee`, `first_care_at`, `closed_at`); số thật: 1/43 lead (2%) người thật chăm trước khi máy chạm — thấp vì sales hscl-01 ít vào, không phải vì có lọc"
     },
     {
      "id": "E-2",
      "sev": "Cao",
      "title": "Chọn lead `detected_at desc` + bỏ lead đã có thread → lead cũ đói, lead NÓNG không được ưu tiên, lead lạnh tiêu hết van",
-     "where": "CLAUDE.md ENGINE (`leads where brand==code orderBy detected_at desc`); harness-lenh37 stub có `orderBy/limit` nhưng `limit` thật chưa thấy",
+     "where": "`outreach.js:304` `leads where brand==code orderBy detected_at desc limit(40)` → chỉ xét 40 lead MỚI NHẤT; 305–313 bỏ `dropped/junk/đã có thread/vai/không post_id`, không xếp theo nhiệt độ",
      "desc": "1 nick ≈ 40 react/ngày (van + pace) trong khi scanner ra 60–140 lead/ngày/brand → lead buổi sáng bị lead buổi chiều đè mãi; lead **nóng** 14:00 gặp 40 suất react đã bị lead **lạnh** (ma trận lạnh = react) tiêu từ sáng → hôm sau không còn \"mới nhất\" → không bao giờ chạm. Nếu query không `limit` thì lead 30 ngày vẫn bị comment lên bài cũ (spam signal). Mỗi lead đã có thread còn tốn 1 `tref.get()`/nick/tick.",
      "fix": "Hàng đợi ưu tiên: điểm = nhiệt (nóng 3 · ấm 2 · lạnh 1) × suy giảm theo tuổi, trần 7 ngày; engine đóng dấu `leads.outreach.queued_at` lúc enqueue để query `where outreach.queued_at == null` thay vì đọc thread từng lead; van react dành riêng ≥50% cho nóng+ấm.",
-     "conf": "Chắc (thứ tự) / Suy luận (`limit`) — LỆNH #43 (b) dump `stepNickAdspower`"
+     "conf": "CHẮC — dump `stepNickAdspower:304` `orderBy detected_at desc limit(40)`; số thật: backlog hscl-01 30 ngày 133 lead hợp lệ chưa có thread (32 nóng, nóng cũ nhất 13 ngày)"
     },
     {
      "id": "E-3",
@@ -239,16 +275,16 @@
      "where": "#37 mốc A2 `const temp37 = lead.temp || 'cold'`",
      "desc": "Tick rơi đúng khe giữa tạo doc và chấm điểm → lead nóng bị coi lạnh → thread `steps:['react']`; sau đó AI chấm `hot`/`seller` nhưng thread đã tồn tại → không nâng phễu, không tắt (`roleBlockOf` chỉ chạy lúc tạo thread).",
      "fix": "Bỏ qua lead thiếu `score/temp` hoặc `detected_at` < 3′; trigger: lead ghi `role seller/poster_self` sau khi có thread → tắt thread + huỷ task.",
-     "conf": "Suy luận — LỆNH #43 (b)"
+     "conf": "Nửa chắc — dump 246/308 `lead.temp || \"cold\"`: lead chưa chấm điểm bị coi là LẠNH; còn tuỳ scanner có ghi `brand` trước `temp` hay không"
     },
     {
      "id": "E-4",
      "sev": "Cao",
      "title": "Re-enqueue thread kẹt \"nguyên fpayload, KHÔNG reserve van lại\" → VƯỢT VAN khi phễu chạy vào ngày khác",
-     "where": "CLAUDE.md FUNNEL 1-LEAD-1-PHIÊN (\"re-enqueue nguyên fpayload (không reserve cap lại)\"); `_l34_move.mjs` (\"Không đụng cap\"); kiểm #34: 11/12 thread hscl-01 kẹt 6 ngày",
+     "where": "`outreach.js:292–299` thread tới hạn → `outreach_tasks.set({payload: th.fpayload, status:\"queued\"})` + `nextAt+30′`; không `tryConsume`, không kiểm ngày reserve",
      "desc": "11 phễu reserve ngày D; ngày D+6 nick sống lại → 11 × (react+comment+kết bạn+inbox) trong ~1,5 h mà `outreach_usage/{pid}__{D+6}` = 0 → lead mới hôm đó vẫn đủ 40/12/10/8 → nick vừa hồi chạy ~2× van; `hardCapCheck` của worker đọc cùng doc usage nên cũng mù. Đây chính là cảnh báo em đã nêu khi chạy LỆNH #28 (nick mới nhận 11 phễu/1,5 h).",
      "fix": "Thread lưu `reservedDay`; khác ngày VN → `tryConsume` lại các bước chưa `doneSteps` (hết van → hẹn mai); hoặc chuyển sang kế toán lúc THỰC HIỆN (worker `increment` khi bước done, engine kiểm `usage + đang queued < cap`).",
-     "conf": "Chắc (thiết kế) — LỆNH #43 (b) đối chiếu code"
+     "conf": "CHẮC — dump 293–299: re-enqueue `th.fpayload` nguyên khối, không gọi `tryConsume`"
     },
     {
      "id": "E-5",
@@ -266,16 +302,16 @@
      "where": "Kiểm #34 (nick tự tắt → engine không re-enqueue 6 ngày; nick needLogin còn active → task `paused` lặp mỗi giờ); `_l34_move.mjs` là thao tác tay",
      "desc": "Nick `active:false` (needLoginCount ≥ 3 / safetyPaused / challenge ≥ 3) rơi khỏi `fb_accounts where active==true` → thread `active:true` nằm mãi; `tries` chỉ đếm fail thật nên không có trần thời gian. Brand có 5 nick mà 4 chết = 80% lead vào phễu bị treo mà không ai biết.",
      "fix": "Sweeper trong `outreachTick`: thread active mà `pid` không sống > 2 h → chia round-robin sang nick sống cùng brand (giãn 10′) hoặc đặt `step:'orphan'` + hoàn van + cảnh báo (E-12); thread active > 72 h → đóng.",
-     "conf": "Chắc (đã thấy qua kiểm #34/#36)"
+     "conf": "CHẮC — số thật 10/09: 12 thread active trên 4 nick TẮT (t3 ×4 quá 10 ngày · t4 ×4 · t6 ×3 · t7 ×1), engine không đụng tới"
     },
     {
      "id": "E-7",
-     "sev": "Cao",
-     "title": "Re-enqueue khi task cùng id đang `running` → có thể ĐÔI hành động công khai",
+     "sev": "Thấp",
+     "title": "Re-enqueue `set()` đè nguyên task (kể cả khi đang `running`) — có đường đôi hành động nhưng watchdog 8′ chặn thực tế",
      "where": "CLAUDE.md FUNNEL (lease `nextAt+30′`; thread tới hạn → re-enqueue), task id tất định `{leadId}__funnel`; worker `reapStale` chỉ requeue `running` > max(15′, nickTimeout+12′)",
-     "desc": "VPS bận (maxConcurrent 1, nhiều nick) → task `queued` > 30′ → engine `set` đè task (status → queued?) đúng lúc worker vừa claim `running` → lượt sau claim lại → comment đã đăng nhưng `doneSteps` chưa ghi → comment 2 lần. Cần chốt bằng code thật.",
+     "desc": "Dump 296: `outreach_tasks.doc(id).set({...status:\"queued\"})` không đọc trạng thái cũ, không transaction → task đang `running` bị đè về `queued` nếu thread tới hạn (lease 30′). Thực tế `hardCancel` 8′ + `onInfra/onFail` đẩy `nextAt` trước khi lease hết → gần như không xảy ra; số thật: `running > 30′` = 0. Hạ Thấp, sửa kèm R-8 (đọc rồi mới ghi / transaction).",
      "fix": "Engine đọc task trước khi ghi: `running` → chỉ gia hạn lease; `queued` → chỉ cập nhật `nextAt`, không đụng payload/status; dùng transaction.",
-     "conf": "Suy luận — LỆNH #43 (b) dump `apEnqueueTask` để chốt"
+     "conf": "CHẮC về mã (có đường), THẤP về xác suất — watchdog 8′ < lease 30′"
     },
     {
      "id": "E-8",
@@ -320,7 +356,7 @@
      "where": "LỆNH #36(f) phát hiện 4/5 nick chết chỉ nhờ chạy tay; bài học LỆNH #21 (`console.error` = severity DEFAULT) mới áp cho scanner; FE `sysAlertCard` chỉ hiện khi super MỞ tab Cảnh báo",
      "desc": "VPS mất điện / AdsPower treo → task queued tích 3 ngày, web vẫn xanh, không ai biết. Với khách trả tiền theo gói thì đây là mất doanh thu âm thầm.",
      "fix": "Cuối `outreachTick` tính health (brand on & alive=0 · queued > 60′ · dead hôm nay · nick needLogin/uiLang/checkpoint · usage âm) → `console.log(JSON.stringify({severity:'ERROR', message:'[OUTREACH-HEALTH] …'}))` (kích policy #9) + `system_status/outreach` (banner FE như BrightData) + việc Hộp việc super + push FCM.",
-     "conf": "Chắc (thiếu cơ chế) / Suy luận (severity log)"
+     "conf": "CHẮC — số thật: brand BẬT + ⚡ngay nhưng 0/6 nick sống, không cảnh báo nào; 4 nick chết từ 05/09, nick cuối tự dừng 09/09"
     },
     {
      "id": "E-13",
@@ -355,7 +391,9 @@
     "LLM chỉ gọi khi phễu có bước comment/inbox; `cmpFinish` bình luận nhẹ dưới bài đối thủ; opt-out/CTA khớp xưng hô; `clean` cắt cuối câu.",
     "Task id tất định + `doneSteps` + reaper transaction + `maxInstances 1` + watchdog 06d → không double do tick chồng.",
     "Rules `outreach_log/outreach_stats/content_stats` lọc theo brand (emulator #38 8/8); collection engine (`outreach_tasks/threads/usage/map`) chỉ Admin SDK, FE không đọc.",
-    "Index đủ cho query đang chạy (threads pid+active+nextAt · tasks workerId+status+createdAt · log brandCode+at · status+at)."
+    "Index đủ cho query đang chạy (threads pid+active+nextAt · tasks workerId+status+createdAt · log brandCode+at · status+at).",
+    "Dump (b): `apEnqueueTask` = 0 dòng — hàm per-step đã bị K3 thay bằng funnel, không còn đường per-step song song trong engine (bớt 1 nguồn đôi).",
+    "`tryConsume` (105–115) transaction đúng: đọc-so-ghi trong 1 tx, cap brand > 0 mới override — không lỗi reserve trùng."
    ]
   },
   {
@@ -380,7 +418,7 @@
      "where": "`45-outreach.js:320` `OA_CAP_MAX = {react:200, comment:100, friend:30, inbox:30}` · worker `hardCaps {80,30,20,15}`",
      "desc": "Super đặt inbox 30/nick → thẻ brand vẽ `0/30`; worker dừng ở 15 → thread `paused… đẩy sang sáng mai` dù thanh van mới nửa.",
      "fix": "Hạ `OA_CAP_MAX` = hardCaps hoặc chú thích \"trần cứng máy chủ: N\" cạnh ô; thanh van dùng `min(cap brand, hardCap)`.",
-     "conf": "Chắc"
+     "conf": "CHẮC — số thật: hscl-01 đang đặt van 100/100/30/30 (comment 100 > hardCap 30, inbox 30 > 15); engine còn chặn mới ở react 40 (E-17)"
     },
     {
      "id": "F-3",
@@ -420,12 +458,12 @@
     },
     {
      "id": "F-7",
-     "sev": "Thấp",
+     "sev": "Vừa",
      "title": "Brand \"BẬT\" nhưng không có nick chạy được → KPI vẫn xanh, engine im lặng",
      "where": "`45:634` `onCount`; `45:48` `oaNickCount` đếm `active!==false` kể cả nick needLogin/challenge/safetyPaused/uiLang≠vi",
      "desc": "Thẻ brand hiện \"1 nick · xoay vòng\" trong khi nick đó cần đăng nhập lại — đúng ca hscl-01 tuần qua.",
      "fix": "Tách `usable`; chip đỏ \"BẬT nhưng 0/N nick chạy được\"; dòng Cảnh báo hệ thống (LỆNH #43 mục 2 đã in cờ này).",
-     "conf": "Chắc"
+     "conf": "CHẮC — đúng ca hscl-01 hôm nay (BẬT · 0/6 nick sống · thẻ vẫn xanh)"
     },
     {
      "id": "F-8",
@@ -556,6 +594,14 @@
    "value": "Tỉ lệ chốt (phản hồi tới tay sales đúng lúc)"
   },
   {
+   "id": "R-15",
+   "title": "Sửa đường bình luận vào bài: bấm \"Bình luận\" mở ô soạn, nhận ô theo focus, tự phát hiện doc_id lỗi thời",
+   "why": "Đóng W-19: 82% bình luận thất bại 7 ngày qua, kéo theo 21 phễu chết + Safety nick sập. Không sửa thì bật nick lại cũng chết lại trong 2 ngày.",
+   "how": "`domComment` (bài): bấm nút \"Bình luận\"/\"Viết bình luận\" → poll ô MỚI có focus (cách 05c đã chạy cho reply) → gõ; comment API `FAIL` kèm mã lỗi doc_id → cờ `workers/{id}.docIdStale` + cảnh báo \"cần capture lại doc_id\" + tạm dùng DOM; lỗi selector cùng loại ≥ 3 lead/60′ → `pauseAll` (R-13) thay vì đốt 5 lượt/lead. Nghiệm thu bằng `dryRun` trước khi bật nick thật.",
+   "effort": "Nhỏ",
+   "value": "Hiệu quả + an toàn nick"
+  },
+  {
    "id": "R-3",
    "title": "Bắt phản hồi qua BÌNH LUẬN/react bằng trang Thông báo + scanner",
    "why": "Đóng E-11: 2/3 lead không có uid nên inbox không kiểm được; comment-lead trả lời ngay dưới comment là kênh phản hồi phổ biến nhất ở nhóm bán hàng.",
@@ -582,8 +628,8 @@
   {
    "id": "R-6",
    "title": "Sweeper thread mồ côi + tự chuyển nick + đóng thread quá 72 h",
-   "why": "Đóng E-6: 11/12 thread hscl-01 kẹt 6 ngày chỉ vì nick chết; hiện phải chạy `_l34_move.mjs` tay.",
-   "how": "`outreachTick` quét thread active mà nick không sống > 2 h → round-robin nick sống cùng brand (giãn 10′), không có → `step:'orphan'` + hoàn van + cảnh báo; > 72 h → đóng.",
+   "why": "Đóng E-6/E-16: 12 thread hscl-01 kẹt 5–10 ngày trên 4 nick chết; nick needLogin vẫn bị xếp việc mỗi giờ (160 dòng log).",
+   "how": "`outreachTick`: lọc nick cờ (needLogin/safetyPaused/challenge/uiLang) khỏi due; thread active mà nick không sống > 2 h → round-robin nick sống cùng brand (giãn 10′), không có → `step:\"orphan\"` + hoàn van + cảnh báo; > 72 h → đóng.",
    "effort": "Nhỏ",
    "value": "Vận hành"
   },
@@ -605,9 +651,9 @@
   },
   {
    "id": "R-9",
-   "title": "Đếm lỗi nick theo PHIÊN, Safety suy giảm đúng, dò checkpoint bỏ dialog bài, không tính lỗi selector",
-   "why": "Đóng W-3/W-8/W-9: khi nâng số nick cùng lúc, 1 lần đăng xuất = tắt nick; nick khoẻ tự dừng sau vài tuần vì lỗi giao diện.",
-   "how": "Counter nick 1 lần/phiên; `safetyDecayAt` riêng; `failCount` chỉ tính checkpoint/needLogin/rate-limit; strict bỏ `dialog` chứa `article`; kiểm challenge trước `loggedOut`; sửa `nextMorningVN` 0–8h; merge config sâu.",
+   "title": "Đếm lỗi nick theo PHIÊN, tách \"lỗi FB\" khỏi \"lỗi giao diện\", Safety suy giảm đúng",
+   "why": "Đóng W-3/W-8/W-9/W-18: nick khoẻ duy nhất của hscl-01 đã bị tự dừng 09/09 vì 43 lỗi selector; khi nâng số nick cùng lúc, 1 lần đăng xuất = tắt nick.",
+   "how": "Counter nick 1 lần/phiên; `failCount` chỉ tính checkpoint/needLogin/rate-limit; lỗi selector → `uiFail` riêng + cảnh báo \"FB đổi giao diện\" (R-13); `safetyDecayAt` riêng; strict bỏ `dialog` chứa `article`; sửa `nextMorningVN`; merge config sâu; web hiện LÝ DO Safety thấp (cp/nl/fail/uiFail).",
    "effort": "Nhỏ",
    "value": "An toàn nick"
   },
@@ -655,13 +701,13 @@
  "roadmap": [
   {
    "name": "Bước 0 — số thật",
-   "when": "hôm nay, 2 phút",
-   "items": "anh chạy **LỆNH #43** (chỉ đọc) → em điền số vào báo cáo, chốt 3 mục còn \"Suy luận\" (E-2 limit · E-7 re-enqueue running · E-4 reserve lại) và danh sách sửa đợt 1."
+   "when": "ĐÃ CHẠY 10/09 15:45 VN",
+   "items": "LỆNH #43 xong; số + 3 mục Suy luận đã chốt (mục \"Kết quả LỆNH #43\"). Còn thiếu 3 thứ từ VPS để chốt nguyên nhân gốc W-19 (config.json doc_id · ảnh errors comment · dòng console comment API)."
   },
   {
-   "name": "Đợt 1 — đóng lỗ an toàn + phản hồi (worker 2026-09-10 + LỆNH #44 engine nhỏ + zip FE nhỏ)",
-   "when": "1–2 ngày",
-   "items": "R-1 (máy dừng khi người thật vào), R-2 phần phiên đọc inbox độc lập + backoff + regex trạng thái, R-8, R-9, R-6 sweeper, F-1 nick realtime, F-2 trần van, F-6 tên nick. Kiểm: harness worker (t_flow/t_reply/t_zombie) + harness engine + smoke."
+   "name": "Đợt 1 — sống lại + đóng lỗ an toàn (worker 2026-09-10 + LỆNH #44 engine + zip FE nhỏ)",
+   "when": "1–2 ngày sau khi anh chốt",
+   "items": "**Worker**: R-15 sửa đường bình luận bài (bấm \"Bình luận\" mở ô, nhận ô theo focus, dò doc_id lỗi thời) · R-9 tách lỗi FB ↔ lỗi giao diện (`uiFail` riêng, Safety không trừ vì selector, đếm theo phiên, decay đúng) · R-8 ghi tiến độ nguyên tử + SIGINT êm + API mơ hồ kiểm trước DOM · R-2 phần phiên đọc inbox độc lập + backoff + regex trạng thái · `dryRun` (R-13) để nghiệm thu không tốn hành động thật. **Engine (LỆNH #44)**: E-16 lọc nick cờ khỏi due · R-6 sweeper thread mồ côi (chuyển nick sống / đóng > 72 h / hoàn van) · E-17 `effectiveCaps = min(brand, hardCap)` · R-1 lọc lead có người thật (`lost/stage/assignee/first_care_at/closed_at`) + trigger tắt thread · E-4 reserve lại khi re-enqueue khác ngày. **FE (zip)**: F-1 nick realtime · F-2 trần van theo hardCap + hiện lý do Safety · F-6/F-7 tên nick + chip \"BẬT nhưng 0/N nick chạy được\". Kiểm: harness worker (t_flow/t_reply/t_zombie + harness mới cho domComment/uiFail) + harness engine + smoke 2 cây; nghiệm thu thật bằng dryRun rồi 1 nick 1 ngày."
   },
   {
    "name": "Đợt 2 — engine thông minh hơn (LỆNH #45)",
@@ -675,5 +721,97 @@
   }
  ],
  "lenh": "`docs/lenh-2026-09-10-43.md` — 1 khối dán vào Cloud Shell (`~/firebase-s13/functions`), **không ghi gì**, ~2 phút: (1) VPS online/phiên bản · (2) brand bật ↔ nick sống ↔ VPS (cờ ⚠ BẬT nhưng 0 nick sống) · (3) task theo trạng thái, queued mồ côi, running > 30′ · (4) thread theo bước, thread kẹt trên nick chết, quá hạn nextAt · (5) van hôm nay reserve vs đã làm, phát hiện usage ÂM · (6) log 7 ngày theo trạng thái/bước, top lý do fail/skip/paused · (7) lead máy đã chạm, đã inbox, khách phản hồi, **người thật đã chăm trước khi máy chạm**, trễ phát hiện→chạm, backlog lead chưa chạm theo nhiệt độ · (8) content_stats theo mode/cta/variant · (b) dump 4 hàm engine (`stepNickAdspower · apEnqueueFunnel · apEnqueueTask · tryConsume`, che chuỗi dài) để em chốt các mục \"Suy luận\". Đã dry-run với fake Firestore có ca lỗi mẫu (exit 0).",
- "method": "3 agent đối kháng chỉ-đọc chạy song song: **A** đọc hết `worker.mjs` 2026-09-06d (1.496 dòng) + config + 3 tài liệu + 5 harness; **B** đọc hết `45-outreach.js` + các đoạn live.js/50/87/20/70/25 liên quan; **C** dựng lại engine từ 14 script patch/harness đã áp thật + ghi chép CLAUDE.md (không có `outreach.js`/`content.js` đầy đủ ở đây). Em kiểm chứng từng mục Cao/Vừa trên code (đọc lại `runNick`, `checkReplies`, `claimBatch`, `reapStale`, `gateCheck`, `onFail/onInfra/onNeedLogin`, `safetyRecalc`, `detectChallengeStrict`, `gqlComment`, merge config; `live.js:534/545`, `45:320`, `20-feed:737`) — mục nào chỉ suy từ tài liệu ghi rõ \"Suy luận\" và có mục kiểm trong LỆNH #43. Không sửa dòng code nào. Báo cáo gốc 3 agent: `docs/rasoat-automation-2026-09-10/agent-{A,B,C}-*.md`."
+ "method": "3 agent đối kháng chỉ-đọc chạy song song: **A** đọc hết `worker.mjs` 2026-09-06d (1.496 dòng) + config + 3 tài liệu + 5 harness; **B** đọc hết `45-outreach.js` + các đoạn live.js/50/87/20/70/25 liên quan; **C** dựng lại engine từ 14 script patch/harness đã áp thật + ghi chép CLAUDE.md (không có `outreach.js`/`content.js` đầy đủ ở đây). Em kiểm chứng từng mục Cao/Vừa trên code (đọc lại `runNick`, `checkReplies`, `claimBatch`, `reapStale`, `gateCheck`, `onFail/onInfra/onNeedLogin`, `safetyRecalc`, `detectChallengeStrict`, `gqlComment`, merge config; `live.js:534/545`, `45:320`, `20-feed:737`) — mục nào chỉ suy từ tài liệu ghi rõ \"Suy luận\" và có mục kiểm trong LỆNH #43. Không sửa dòng code nào. Báo cáo gốc 3 agent: `docs/rasoat-automation-2026-09-10/agent-{A,B,C}-*.md`.",
+ "lenh43": {
+  "when": "anh chạy 10/09/2026 15:45 VN — output + dump 4 hàm engine (`docs/lenh-2026-09-10-43-engine-dump.txt`)",
+  "kpis": [
+   {
+    "v": "0/6",
+    "l": "nick hscl-01 còn sống (brand đang BẬT + ⚡ngay)",
+    "c": "hi"
+   },
+   {
+    "v": "12",
+    "l": "thread active kẹt trên 4 nick chết (5–10 ngày)",
+    "c": "hi"
+   },
+   {
+    "v": "82%",
+    "l": "bình luận vào bài thất bại 7 ngày (105 fail / 23 done)",
+    "c": "hi"
+   },
+   {
+    "v": "28",
+    "l": "Safety nick cuối (fail 43 × −2, không checkpoint) → tự dừng 09/09",
+    "c": "hi"
+   },
+   {
+    "v": "133",
+    "l": "lead hợp lệ 30 ngày chưa có thread (32 nóng, cũ nhất 13 ngày)",
+    "c": "md"
+   },
+   {
+    "v": "1/4",
+    "l": "khách phản hồi trên lead đã inbox · máy tự phát hiện 0",
+    "c": "md"
+   },
+   {
+    "v": "2%",
+    "l": "máy chạm chồng người thật (1/43) — thấp vì sales ít vào",
+    "c": "lo"
+   },
+   {
+    "v": "160",
+    "l": "dòng log \"Tạm hoãn — nick cần đăng nhập lại\" (lặp mỗi giờ)",
+    "c": "md"
+   }
+  ],
+  "rows": [
+   [
+    "VPS",
+    "vps-1 online, worker 2026-09-06d, 0/10 nick đang chạy, RAM 37 %, inboxCheck bật — máy sẵn sàng nhưng không có nick nào để chạy."
+   ],
+   [
+    "Brand",
+    "hscl-01 BẬT · ma trận tuỳ chỉnh · van 100/100/30/30 · nội dung AI · ⚡ngay · 0/6 nick sống. 6 brand còn lại tắt, 0 nick."
+   ],
+   [
+    "Nick",
+    "t2/t3/t4 TẮT (0 ok/0 fail, needLogin từ 05/09, anh tắt tay); t6 TẮT needLogin (ok 3 / fail 2, safety 86); **t7 TẮT do Safety 28** (ok 74 / fail 43 / nl 0 / cp 0, lang vi, replyCheck 1 ngày trước = 0); t1 func TẮT. 3 doc `acc_Nick_A_*`/`acc_Profile_*` là nick quét (không phải automation) nhưng nằm chung `fb_accounts` → hiện lẫn ở bảng Tài khoản Facebook."
+   ],
+   [
+    "Task",
+    "156: done 100 · failed 49 · paused 7 · queued 0 · running > 30′ = 0 (không treo)."
+   ],
+   [
+    "Thread",
+    "150: active 12 · replied 0 · comment-lead 21 · tries ≥ 5 (chết) 39 · skipped_role 4. Bước đã làm: react 45 · comment 23 · kết bạn 8 · inbox 4. 12 thread quá hạn nextAt 5–10 ngày trên nick t3/t4/t6/t7."
+   ],
+   [
+    "Van hôm nay",
+    "trống (không nick nào chạy) — chưa kiểm được ca usage ÂM (E-5); xem lại khi nick sống."
+   ],
+   [
+    "Log 7 ngày",
+    "586 dòng: paused 164 · fail 147 · retry 106 · sched 92 · done 77. Theo bước: react done 43 / fail 16 · comment done 23 / fail 105 · kết bạn done 7 / fail 5 · inbox done 4 · phễu retry (lỗi hạ tầng) 97 · phễu dead-letter 21. Lý do fail: không thấy ô Bình luận 65 · không thấy nút Trả lời 30 · không thấy nút Thích 15 · không thấy ô trả lời trong khung 6 · không thấy nút Thêm bạn bè 5. Skip 0 (bộ dò \"nội dung không hiển thị\" chưa từng kích)."
+   ],
+   [
+    "Lead",
+    "máy chạm 43 (ấm 21 · lạnh 14 · nóng 8), đã inbox 4, khách phản hồi 1 (25 %, do sales đổi giai đoạn — máy phát hiện 0), có meta nội dung 20, đã loại/không thành 7, **vai người bán/chủ bài bị chạm 7 = đúng 7 ca #31a đã biết (trước cổng vai 06/09)**, người thật chăm trước máy 1, trễ phát hiện → máy chạm trung vị 11,4 h. Backlog hscl-01: 7 ngày 39/76 lead hợp lệ chưa có thread (nóng 9, cũ nhất 6 ngày); 30 ngày 133/261 (nóng 32, cũ nhất 13 ngày)."
+   ],
+   [
+    "Nội dung",
+    "content_stats hscl-01: sent 3 · rep 1 · tagged 20 — mẫu quá nhỏ, chưa kết luận A/B."
+   ]
+  ],
+  "verdicts": [
+   "**E-2 (limit) → CHẮC**: `orderBy detected_at desc limit(40)` — engine chỉ nhìn 40 lead mới nhất, không ưu tiên nóng; backlog 32 lead nóng 30 ngày chưa chạm.",
+   "**E-4 (reserve lại) → CHẮC**: re-enqueue `fpayload` nguyên khối, không `tryConsume`, không kiểm ngày → phễu kẹt qua ngày chạy lại là vượt van.",
+   "**E-7 (đè task đang running) → có đường trong mã nhưng hạ THẤP**: `set()` đè không đọc trạng thái, nhưng watchdog 8′ < lease 30′ và `running > 30′ = 0` → sửa kèm R-8, không ưu tiên.",
+   "**E-1 → CHẮC hơn**: AdsPower path chỉ lọc `dropped` (dump 307) — cả `lost` cũng không; số chồng người thật thấp (2 %) chỉ vì sales hscl-01 ít vào web.",
+   "**E-3 → nửa chắc**: `lead.temp || 'cold'` — lead chưa chấm điểm bị coi là lạnh (react)."
+  ],
+  "new": "Số thật lộ 4 mục mới: **W-18** Safety Score tự tắt nick khoẻ vì lỗi selector của chính mình (đã xảy ra 09/09) · **W-19** bình luận vào bài thất bại 82 % — đường DOM dự phòng không mở được ô soạn, nghi thêm doc_id comment lỗi thời trên VPS · **E-16** engine xếp việc cho nick needLogin mỗi giờ (160 dòng log, thread không được chuyển) · **E-17** trần mở lead mới dùng cap toàn cục 40 trong khi web vẽ x/100.",
+  "ask": "Để chốt nguyên nhân gốc W-19 em cần từ VPS (anh chụp/dán): (1) `config.json` → giá trị `graphql.commentDocId` và `replyDocId` (phải là `28781864408106143`); (2) 2 ảnh trong `errors/` tên `<leadId>__comment_*.png`; (3) 1 dòng console worker `comment API: FAIL …`. Không cần gửi token."
+ }
 }

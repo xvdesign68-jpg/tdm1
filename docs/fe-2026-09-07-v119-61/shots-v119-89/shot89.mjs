@@ -1,0 +1,16 @@
+import { chromium } from 'playwright-core'; import http from 'http'; import fs from 'fs'; import path from 'path';
+const SP = '/tmp/claude-0/-home-user-tdm1/a3bfa096-63d8-54a0-bde2-ab4d4bbc2672/scratchpad'; const ROOT = SP + '/shots89/site'; const OUT = SP + '/shots89';
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
+const server = http.createServer((req, res) => { const u = decodeURIComponent(req.url.split('?')[0]); const fp = path.join(ROOT, u === '/' ? 'app.html' : u); if (!fp.startsWith(ROOT) || !fs.existsSync(fp) || fs.statSync(fp).isDirectory()) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'content-type': MIME[path.extname(fp)] || 'application/octet-stream' }); res.end(fs.readFileSync(fp)); });
+const port = await new Promise(r => server.listen(0, () => r(server.address().port)));
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto(`http://127.0.0.1:${port}/app.html#feed`); await page.waitForTimeout(2500);
+await page.evaluate(() => { const D = window.SL_DATA; const l = D.leads.find(x => !x.dropped && !x.lost && x.temp === 'hot'); l.ai_scored = false; l.__t = 1; D.sysLlm = { ok: false, since: Date.now() - 75 * 60e3, at: Date.now(), runs: 4, kind: 'server', sample: 'LLM 500 [server_error]: The server had an error while processing your request', model: 'gpt-5.6-sol' }; location.hash = 'feed'; window.SLApp.reload(D); }); await page.waitForTimeout(900);
+const card = await page.$('#feedList .lead-card:has(.chip-aitmp)'); if (card) { await card.scrollIntoViewIfNeeded(); await page.waitForTimeout(300); const bb = await card.boundingBox(); await page.screenshot({ path: OUT + '/feed-card-diem-tam-1440.png', clip: { x: 0, y: Math.max(0, bb.y - 60), width: 1440, height: Math.min(900, bb.height + 120) } }); await page.evaluate(() => { const c = document.querySelector('#feedList .lead-card:has(.chip-aitmp) [data-chatbox]'); if (c) c.click(); }); await page.waitForTimeout(700); await page.screenshot({ path: OUT + '/modal-diem-tam-1440.png' }); await page.evaluate(() => { const cl = document.querySelector('#modal #mClose'); if (cl) cl.click(); }); await page.waitForTimeout(300); }
+await page.evaluate(() => { window.scrollTo(0, 0); document.getElementById('view').scrollTop = 0; }); await page.screenshot({ path: OUT + '/feed-scanbar-ai-loi-1440.png', clip: { x: 0, y: 0, width: 1440, height: 420 } });
+await page.evaluate(() => { location.hash = 'overview'; window.SLApp.reload(window.SL_DATA); }); await page.waitForTimeout(900);
+await page.screenshot({ path: OUT + '/overview-ai-loi-1440.png', clip: { x: 0, y: 0, width: 1440, height: 620 } });
+await page.evaluate(() => { location.hash = 'alerts'; window.SLApp.reload(window.SL_DATA); }); await page.waitForTimeout(700);
+await page.screenshot({ path: OUT + '/alerts-ai-loi-1440.png', clip: { x: 0, y: 0, width: 1440, height: 620 } });
+await browser.close(); server.close(); console.log('shots ok');

@@ -20,7 +20,7 @@ def proposals(items):
     for p in items:
         tier=p.get('tier','')
         out.append(f"""<article class="prop"><div class="prop-h"><span class="pid">{E(p['id'])}</span><h4>{E(p['title'])}</h4><span class="tag eff-{E(p['effort']).lower()}">{E(p['effort'])}</span><span class="tag val">giá trị {E(p['value'])}/5</span>{('<span class="tag tier">'+E(tier)+'</span>') if tier else ''}{('<span class="tag touch">'+E(p.get('touches',''))+'</span>') if p.get('touches') else ''}</div>
-<p>{md(p['why'])}</p><p class="how"><span>Cách làm:</span> {md(p['how'])}</p>{('<p class="risk"><span>Rủi ro:</span> '+md(p['risk'])+'</p>') if p.get('risk') else ''}</article>""")
+<p>{md(p['why'])}</p><p class="how"><span>Cách làm:</span> {md(p['how'])}</p>{('<p class="risk"><span>Rủi ro:</span> '+md(p['risk'])+'</p>') if p.get('risk') else ''}{('<p class="meta"><span>Gộp:</span> '+E(', '.join(p['merged']))+'</p>') if p.get('merged') else ''}{('<p class="meta"><span>Giám khảo:</span> '+E(p['judge'])+'</p>') if p.get('judge') else ''}</article>""")
     return ''.join(out)
 sections=[]
 for g in J['groups']:
@@ -60,7 +60,7 @@ code{{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--cod
 details{{margin:10px 0 0;color:var(--ink-2)}} summary{{cursor:pointer;font-weight:600;color:var(--ink)}} details ul{{margin:8px 0 0 18px;padding:0}} details li{{margin:3px 0}}
 .prop{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:10px 0}} .prop-h{{display:flex;gap:10px;align-items:center;flex-wrap:wrap}} .pid{{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-3)}}
 .tag{{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-family:'Plus Jakarta Sans',sans-serif}} .tag.eff-s{{background:var(--lo-bg);color:var(--lo)}} .tag.eff-l{{background:var(--md-bg);color:var(--md)}} .tag.tier{{background:var(--ink);color:var(--card)}} .tag.touch{{background:var(--code);color:var(--ink-2)}}
-.prop p{{margin:8px 0 0;color:var(--ink-2)}} .prop .how span,.prop .risk span{{font-weight:700;color:var(--ink)}}
+.prop p{{margin:8px 0 0;color:var(--ink-2)}} .prop .meta{{font-size:12.5px;color:var(--ink-3)}} .prop .meta span{{font-weight:700}} .prop .how span,.prop .risk span{{font-weight:700;color:var(--ink)}}
 .tw{{overflow-x:auto;max-width:100%}} .tbl td,.tbl th{{overflow-wrap:anywhere}} code{{overflow-wrap:anywhere}}
 .muted{{color:var(--ink-3)}} .ask{{background:var(--md-bg);border-radius:12px;padding:10px 14px}} ul.road{{padding-left:20px}} ul.road li{{margin:6px 0}}
 ul.qs{{padding-left:20px}} ul.qs li{{margin:10px 0}} .opt{{color:var(--ink-2);font-size:13.5px;margin-top:2px}}
@@ -72,7 +72,7 @@ pre{{background:var(--code);padding:12px 14px;border-radius:12px;overflow-x:auto
 <h1>Rà soát nhận diện lead</h1>
 <p class="sub">{E(J['meta']['subtitle'])}</p>
 <nav class="toc"><a href="#pipe">Bản đồ luồng</a><a href="#verify">Kiểm chứng</a>{''.join(f'<a href="#{E(g["key"])}">{E(g["short"])}</a>' for g in J['groups'])}<a href="#props">Đề xuất</a><a href="#road">Lộ trình</a><a href="#qs">Câu hỏi chốt</a><a href="#lenh">LỆNH chỉ đọc</a></nav>
-<div class="kpis"><div class="kpi hi"><b>{cnt['Cao']}</b><span>phát hiện mức Cao</span></div><div class="kpi md"><b>{cnt['Vừa']}</b><span>mức Vừa</span></div><div class="kpi lo"><b>{cnt['Thấp']}</b><span>mức Thấp</span></div><div class="kpi"><b>{len(J['proposals'])}</b><span>đề xuất đã qua giám khảo</span></div><div class="kpi"><b>{E(J['meta']['coverage'])}</b><span>độ phủ đọc code</span></div></div>
+<div class="kpis"><div class="kpi hi"><b>{cnt['Cao']}</b><span>phát hiện mức Cao</span></div><div class="kpi md"><b>{cnt['Vừa']}</b><span>mức Vừa</span></div><div class="kpi lo"><b>{cnt['Thấp']}</b><span>mức Thấp</span></div><div class="kpi"><b>{len(J['proposals'])}</b><span>đề xuất đã qua giám khảo</span></div><div class="kpi"><b>{E(J['meta']['coverage'])}</b><span>file đọc trọn (5 backend · 10 web)</span></div></div>
 <section><h2>Tóm tắt</h2>{md(J['summary'])}</section>
 <section id="pipe"><h2>Bản đồ luồng quét → lead (như đang chạy)</h2><p class="lead">{md(J['pipeline_intro'])}</p><div class="tw"><table class="tbl"><thead><tr><th>Bước</th><th>Làm gì</th><th>Ở đâu</th><th>Điểm yếu</th></tr></thead><tbody>{pipe}</tbody></table></div></section>
 <section id="verify"><h2>Kiểm chứng đối kháng</h2><p class="lead">{md(V['intro'])}</p><div class="kpis">{vk}</div><details><summary>Phát hiện đã BÁC BỎ ({len(V['refuted'])}) — không đưa vào bảng</summary><ul>{vref}</ul></details></section>

@@ -1,0 +1,391 @@
+{
+ "meta": {
+  "subtitle": "Quét → lọc → chấm điểm → nhận diện lead · 11/09/2026 · chỉ đánh giá, chưa sửa code · 100 phát hiện thô qua kiểm chứng đối kháng còn 95 · 35 đề xuất gộp còn 23 · chờ anh chốt 8 câu",
+  "coverage": "15 file"
+ },
+ "summary": "**Kết luận ngắn:** đường quét → lọc → chấm điểm → tạo lead chạy ổn sau các LỆNH #21/#23/#31/#46 (gieo/gặt, cổng vai, retry AI), nhưng còn **4 lỗi mức Cao** đang hoặc sắp gây hại hằng ngày, **33 mức Vừa** và một lớp **nợ thiết kế AI** khiến hệ thống chưa \"thông minh hơn theo thời gian\".\n\n**4 mức Cao:** (1) **N4-3** sweeper LỆNH #46 chấm lại lead sales ĐANG CHĂM và ghi `temp:'junk'` khi điểm < 40 → web tự giấu lead khỏi Lead mới / Hôm nay / Hộp việc / Nên gọi dù backend cố ý \"giữ vì sales đang chăm\" — đang xảy ra với backlog 252 lead điểm tạm. (2) **F-A2 + N3-12** trang Từ khoá và wizard đang hiển thị bản GỘP từ khoá/exclude của mọi nguồn như thể toàn cục (vì `config/app` chưa có `keywords/exclude`); một cú bấm × / \"Thêm bộ này\" / tick toàn cục sẽ ghi bản gộp thành bộ lọc toàn cục — mà `exclude` là cổng thật duy nhất trước AI → chặn bài xuyên 4 brand, im lặng, không hoàn tác. (3) **Q-3** bình luận của mỗi bài thực tế chỉ được lấy ĐÚNG 1 LẦN ngay lúc phát hiện bài (vài phút sau khi đăng, thường chưa có bình luận) vì cả probe lẫn sweep đều gửi `posts_to_not_include` — nhịp làm mới 3 h/12 h gần như là code chết ở quét theo lịch → comment-lead \"còn không / giá bao nhiêu\" đến sau bị mất hằng ngày.\n\n**Nhóm Vừa đáng chú ý:** lượt bị cắt/ném lỗi làm mất bài im lặng vì `seen` ghi trước khi chấm (N1-1/N2-1); lead ghi 2 bước (set không brand → update brand) nên push \"Lead nóng mới\" gần như không tới admin brand (N1-2/N4-5); bộ đếm `daily_stats` không đảo khi AI chấm lại hạ nhiệt độ/loại (N3-5/N4-4) → KPI/Bảng brand/CPL 30 ngày lệch tới ~25/09; khoá nối nguồn ↔ brand theo TÊN nguồn (N1-6/N3-8); bình luận không khớp bài cha bị dán vào bài đầu lô nhiều brand (N1-4/N3-7); tầng 1 fail-open không được giám sát (N2-3); 3 ô cấu hình \"giả\" (từ khoá include L-1, trọng số F-B1, công tắc phương thức quét N3-1); \"Quét ngay\"/\"Quét quá khứ\" báo sai (N3-2/N3-9/N3-10); prompt viết cho agency marketing rồi ghi đè brand (L-2), điểm AI 1 con số không tiêu chí (C-1), không học từ sales (C-2), thiếu vai đại lý/mua sỉ (N2-6).\n\n**Kiểm chứng:** 52 phát hiện seed + 48 phát hiện mới từ 4 finder → 12 lô phản biện trên code thật: **39 xác nhận · 56 đúng một phần (mô tả được sửa lại) · 5 bác bỏ**; 40 phát hiện đổi mức (đa số hạ vì tác động chưa có số đo; 2 nâng lên Cao). **Đề xuất:** 35 từ 3 góc (giá trị khách · chi phí/tin cậy · AI học từ dữ liệu) → giám khảo gộp còn 23, **Đợt 1 = 3 LỆNH + 1 zip trong ≈2 tuần**, ưu tiên khẩn: sweeper không giấu lead đang chăm (PB-5).",
+ "pipeline_intro": "Bản đồ 10 bước như đang chạy trên production (số dòng theo `docs/lenh-2026-09-11-46-fixture/index.js` dựng lại từ dump #20/#31b + patch #46). Cột \"Điểm yếu\" trỏ tới mã phát hiện ở các bảng dưới.",
+ "verify": {
+  "intro": "Mỗi lô 8 phát hiện giao cho 1 agent phản biện với lệnh CỐ GẮNG BÁC BỎ (mở đúng file:dòng, mặc định bác khi không có bằng chứng, chấm lại mức theo tác động thật với số liệu trong `data-so-lieu.md`, ghi rõ 'Suy luận' khi code chưa dump). Cột 'Kiểm chứng' trong bảng = kết luận của lô đó; phần in nghiêng 'Kiểm chứng:' trong mô tả là phần mô tả đã được sửa lại.",
+  "kpis": [
+   {
+    "v": "100",
+    "l": "phát hiện thô (52 seed + 48 mới)",
+    "c": ""
+   },
+   {
+    "v": "39",
+    "l": "xác nhận đúng như mô tả",
+    "c": "lo"
+   },
+   {
+    "v": "56",
+    "l": "đúng một phần, đã sửa mô tả",
+    "c": "md"
+   },
+   {
+    "v": "5",
+    "l": "bác bỏ (không đưa vào bảng)",
+    "c": "hi"
+   },
+   {
+    "v": "40",
+    "l": "đổi mức sau kiểm chứng (2 nâng lên Cao)",
+    "c": ""
+   }
+  ]
+ },
+ "scorecard": [
+  {
+   "name": "Gieo/gặt bài BrightData (Pha 1)",
+   "score": "7,5",
+   "note": "Sow/harvest ổn sau #21; còn sweep 2 h \"đóng dấu hụt\" (N1-3), `recentIds` kẹp 200 (N1-9), nhịp cố định 10′ cho mọi nguồn (G-3), không đo độ trễ phát hiện (Q-4)."
+  },
+  {
+   "name": "Bình luận (Pha 1b)",
+   "score": "5,0",
+   "note": "Chỉ lấy 1 lần lúc phát hiện bài (Q-3 Cao); bookkeeping ghi TRƯỚC gieo (N1-5); comment không khớp bài cha dán vào bài đầu lô (N1-4/N3-7); khoá dự phòng khi thiếu comment_id gộp/random (N1-12)."
+  },
+  {
+   "name": "Lọc rẻ (seen · exclude · từ khoá)",
+   "score": "5,5",
+   "note": "Include không tham gia (L-1); bộ lọc toàn cục \"ma\" trên web (F-A2/N3-12 Cao); `seen` ghi trước chấm + không TTL (N1-1/Q-2); khớp thô chưa dump filter.js (L-5)."
+  },
+  {
+   "name": "Tầng 1 AI (gpt-5-nano)",
+   "score": "6,0",
+   "note": "Rẻ, loại ≈52 % bài; nhưng fail-open không giám sát (N2-3), không đo bỏ sót (L-3), prompt agency (L-2), không nhận từ khoá/weights."
+  },
+  {
+   "name": "Tầng 2 AI + LỆNH #46",
+   "score": "7,0",
+   "note": "Retry/score_retry/sweeper/LLM watch tốt; sweeper giấu lead đang chăm (N4-3 Cao), hợp thức hoá heuristic khi thiếu key (N2-5), badreq hệ thống (N4-6), điểm 1 số (C-1), thiếu vai đại lý (N2-6), miss-reply 3× (C-4)."
+  },
+  {
+   "name": "Làm giàu (SĐT · Zalo · profile)",
+   "score": "6,0",
+   "note": "SĐT chỉ từ chính text (D-1), author_url thiếu ~69 % (D-2), eKYC mọi lead (D-3), profile-scan trước gộp (N4-10)."
+  },
+  {
+   "name": "Tạo lead (multitouch · brand · id)",
+   "score": "6,0",
+   "note": "Lead ghi 2 bước không brand (N1-2/N4-5); id ngẫu nhiên (Q-2); gộp trùng chỉ khi có link/SĐT/email (Q-1); khoá theo TÊN nguồn (N1-6/N3-8)."
+  },
+  {
+   "name": "Bộ đếm & KPI (daily_stats · bd_month)",
+   "score": "7,0",
+   "note": "#41/#42 đúng cho tạo/vai; thiếu nhánh đổi nhiệt độ/AI loại (N3-5/N4-4/N2-11); 'Rác AI lọc' luôn 0 (N4-12)."
+  },
+  {
+   "name": "Giám sát & số liệu vận hành",
+   "score": "6,5",
+   "note": "bdwatch/LLM watch/outreach status có; thiếu yield/nguồn im (G-1), tầng 1 (N1-10), Lịch sử quét chỉ 2 ngày mà nhãn 14 ngày (N3-4/N1-8), đơn giá AI (G-2 bác một phần)."
+  },
+  {
+   "name": "Web: cấu hình quét/lọc/chấm",
+   "score": "5,5",
+   "note": "3 ô cấu hình giả (L-1/F-B1/N3-1), form nguồn mất authAccountId (F-A1), Quét ngay/Quét quá khứ nói sai (N3-2/N3-9/N3-10), calibCard khuyên sai key (F-B3)."
+  },
+  {
+   "name": "Web: thẻ lead · Bài đã quét · wizard",
+   "score": "7,0",
+   "note": "Thẻ comment-lead thiếu ngữ cảnh bài gốc (N4-1), kết quả AI chấm lại không hiện (N4-8/N2-9), nối bài↔lead theo tên (F-D4), Loại không lý do (F-C2)."
+  }
+ ],
+ "groups_meta": {
+  "quet": {
+   "title": "1. Quét nguồn · BrightData · bình luận · quét tay",
+   "short": "Quét",
+   "intro": "Pha 1/1b của `scanAll` + `lib/scraper.js` (gieo/gặt, sweep, comment, backfill/quét tay) và cách nối nguồn ↔ brand."
+  },
+  "loc": {
+   "title": "2. Lọc rẻ · từ khoá · bộ lọc toàn cục · thư viện ngành",
+   "short": "Lọc",
+   "intro": "Cổng `seen` + `isExcluded` trước AI, trang Từ khoá & bộ lọc, form Nguồn quét, INDUSTRY_LIB và wizard — nơi cấu hình trên web khác với cái backend thực sự làm."
+  },
+  "cham": {
+   "title": "3. AI chấm điểm 2 tầng · sweeper #46 · trọng số",
+   "short": "Chấm điểm",
+   "intro": "`lib/scorer.js` (prompt, prefilter, scoreLead), Pha 3a/3b của `scanAll`, patch LỆNH #46 (retry, score_retry, sweeper) và trang Chấm điểm AI."
+  },
+  "lam-giau": {
+   "title": "4. Làm giàu dữ liệu · tạo lead",
+   "short": "Làm giàu",
+   "intro": "SĐT/Zalo/profile, multitouch, đóng dấu brand, ghi doc lead."
+  },
+  "giam-sat": {
+   "title": "5. Bộ đếm · giám sát · số liệu · chi phí",
+   "short": "Giám sát",
+   "intro": "`daily_stats`/`bd_month`/`scans`/`system_status`, cảnh báo chủ động và các con số super/khách nhìn thấy."
+  },
+  "fe": {
+   "title": "6. Web: thẻ lead · Bài đã quét · Hộp việc · wizard",
+   "short": "Web lead",
+   "intro": "Cách web hiển thị và dùng kết quả AI (feed, modal, pipeline, Bài đã quét, tìm kiếm, wizard brand)."
+  }
+ },
+ "group_of": {
+  "quet": [
+   "Q-1",
+   "Q-2",
+   "Q-3",
+   "Q-4",
+   "Q-5",
+   "N1-3",
+   "N1-4",
+   "N1-5",
+   "N1-6",
+   "N1-7",
+   "N1-9",
+   "N1-11",
+   "N1-12",
+   "N3-2",
+   "N3-7",
+   "N3-8",
+   "N3-9",
+   "N3-10"
+  ],
+  "loc": [
+   "L-1",
+   "L-2",
+   "L-3",
+   "L-4",
+   "L-5",
+   "F-A1",
+   "F-A2",
+   "F-A3",
+   "F-A4",
+   "F-A5",
+   "F-A6",
+   "N3-12",
+   "N3-3"
+  ],
+  "cham": [
+   "C-1",
+   "C-2",
+   "C-3",
+   "C-4",
+   "C-5",
+   "C-6",
+   "N2-1",
+   "N2-2",
+   "N2-3",
+   "N2-4",
+   "N2-5",
+   "N2-6",
+   "N2-7",
+   "N2-12",
+   "N1-1",
+   "N1-10",
+   "N3-6",
+   "N3-11",
+   "N4-3",
+   "N4-6",
+   "N4-11",
+   "F-B1",
+   "F-B2",
+   "F-B3",
+   "F-B4",
+   "F-B5",
+   "F-B6",
+   "F-B7"
+  ],
+  "lam-giau": [
+   "D-1",
+   "D-2",
+   "D-3",
+   "N1-2",
+   "N4-10"
+  ],
+  "giam-sat": [
+   "G-1",
+   "G-2",
+   "G-3",
+   "N1-8",
+   "N2-8",
+   "N2-10",
+   "N2-11",
+   "N3-4",
+   "N3-5",
+   "N4-4",
+   "N4-5",
+   "N4-9",
+   "N4-12"
+  ],
+  "fe": [
+   "F-C1",
+   "F-C2",
+   "F-C3",
+   "F-C4",
+   "F-C5",
+   "F-D1",
+   "F-D2",
+   "F-D3",
+   "F-D4",
+   "F-D5",
+   "F-D6",
+   "F-D7",
+   "F-E1",
+   "F-E2",
+   "F-E3",
+   "F-F1",
+   "F-F2",
+   "N4-1",
+   "N4-2",
+   "N4-7",
+   "N4-8",
+   "N2-9",
+   "N3-1"
+  ]
+ },
+ "props_intro": "35 đề xuất từ 3 góc (PA giá trị khách · PB chi phí/tin cậy · PC AI học từ dữ liệu) → 2 giám khảo (giá trị ÷ công + rủi ro; khớp hệ thống thật/đã có/anh đã bỏ) gộp trùng còn **23 đề xuất canonical** (mã của đề xuất bị gộp ghi ở dòng \"Gộp\"). Mọi đề xuất giữ gu anh đã chốt: bộ đếm máy chủ > tính trên client, Super Admin set hộ, fail-closed, có công tắc, có harness; không chạm mảng anh đã bỏ (pháp lý, self-service/billing, Zalo cá nhân, bản tin ZBS, bulk nick).",
+ "tiers": {
+  "Đợt 1": [
+   "PB-5",
+   "PB-3",
+   "PB-2",
+   "PB-1",
+   "PA-4",
+   "PC-6",
+   "PB-4",
+   "PB-10",
+   "PB-6"
+  ],
+  "Đợt 2": [
+   "PA-1",
+   "PC-1",
+   "PA-5",
+   "PB-9",
+   "PC-2",
+   "PB-12",
+   "PC-3",
+   "PC-4",
+   "PC-7",
+   "PB-8",
+   "PA-9",
+   "PB-7",
+   "PC-5"
+  ],
+  "Đợt 3": [
+   "PC-11"
+  ]
+ },
+ "merged": {
+  "PB-1": [
+   "PA-8",
+   "PC-5 (trần mềm)"
+  ],
+  "PB-2": [
+   "PA-8 (sow46/id tất định)",
+   "PA-12 (Quét ngay nói thật)"
+  ],
+  "PC-2": [
+   "PA-2"
+  ],
+  "PC-1": [
+   "PA-3"
+  ],
+  "PC-6": [
+   "PA-3 (FE)",
+   "PA-6 (FE)"
+  ],
+  "PB-5": [
+   "PA-6"
+  ],
+  "PB-6": [
+   "PA-7",
+   "PC-8 (bộ đếm)"
+  ],
+  "PB-10": [
+   "PA-7 (brand ở write đầu + cổng push)"
+  ],
+  "PC-3": [
+   "PA-10",
+   "PB-11"
+  ],
+  "PC-4": [
+   "PA-10 (bài đã sửa)"
+  ],
+  "PB-9": [
+   "PA-11 (TTL/limit/bd_month)"
+  ],
+  "PB-3": [
+   "PA-11 (đơn giá)",
+   "PC-10",
+   "PA-5 (eKYC)"
+  ],
+  "PB-8": [
+   "PA-11 (chart daily_stats)",
+   "PA-12",
+   "PC-8 (source_health/drift)"
+  ],
+  "PB-12": [
+   "PB-11 (khoá comment)"
+  ],
+  "PA-1": [
+   "PC-9"
+  ],
+  "PB-7": [
+   "PA-9 (bookkeeping)"
+  ],
+  "PA-5": [
+   "PC-3 (gom SĐT)"
+  ],
+  "PB-4": [
+   "PC-5 (gate tầng 1)"
+  ]
+ },
+ "roadmap": [
+  {
+   "name": "Đợt 1 — 3 LỆNH + 1 zip",
+   "when": "≤ 2 tuần, làm ngay sau khi anh chốt",
+   "items": "**LỆNH A \"AI hardening\"** = PB-5 (sweeper không giấu lead đang chăm, không hợp thức hoá heuristic, giữ `base_score`, lease) + PB-3 (`reasoning_effort`/`max_completion_tokens`, timeout 30–45 s, circuit-breaker trong lượt, reply gọi riêng, eKYC chỉ nóng/ấm) + PB-4 (giám sát tầng 1 + badreq hệ thống + cửa sổ trượt 15′) + PB-2 a–d (sow46 theo trigger, lease score_retry bằng transaction, khoá lượt, `seen` create) — cùng vùng scorer.js/index.js sau #46 → 1 patch content-anchored fail-closed, 1 deploy; kèm A/B 30 bài chỉ đọc cho reasoning_effort. **LỆNH B \"không mất bài\"** = PB-1 (lease ứng viên bằng score_retry, trần mềm 1.200 s, bọc lỗi từng bài, `scans` bản 'aborted') — cần dump 60 dòng Pha 2/3b bản đang chạy trước. **LỆNH C** = PB-10 (brand ghi ngay ở write đầu + cổng push nóng kiểu #41; BƯỚC 1 dump Gateway ZBS `justTagged`) + PB-6 (stats.js nhánh đổi nhiệt độ/AI loại + recount 60 ngày lần 4 — chỉ chạy SAU khi `_l46_after.mjs` xác nhận backlog 252 ≈ 0; số KPI/Bảng brand/CPL sẽ GIẢM ở 4 brand) + Rules whitelist thêm `dropped_reason`, `ai_feedback`. **Zip FE** (m32.py, 2 cây) = PA-4 (thẻ comment-lead kể đủ chuyện + Nhu cầu lên đầu + tìm theo bài gốc) + PC-6 (giải thích AI trên thẻ/modal, không ẩn lead đang chăm, Loại có lý do, chip Rác·Loại tách AI/người) + dòng cảnh báo/cột lỗi PB-4 + chip PB-5."
+  },
+  {
+   "name": "Đợt 2 — theo thứ tự",
+   "when": "1–2 tháng",
+   "items": "PB-9 (TTL scans/seen, scanned_posts id tất định, chi phí AI đọc bd_month, ghi phạm vi thật) → PB-12 (đo comment orphan (0) rồi fail-closed + brand theo ctx bài cha + chặn trùng TÊN nguồn) → PA-1 (prompt theo BRAND từ đầu + vai đại lý/đăng hộ + hợp đồng JSON; `_promptcmp` chỉ đọc + công tắc `.env`; làm SAU recount PB-6) → PC-2 (chấm theo 6 tiêu chí con = 6 key weights, hotness tính bằng code, chạy bóng 2 tuần) → PA-5 (gom SĐT từ bình luận cùng tác giả + FE bôi mọi số) → PC-3 (bộ nhớ người viết: người bán quen bỏ trước AI, khách cũ quay lại) → PC-4 (vân tay văn bản gộp bài chéo group + phát hiện bài đã sửa; đo cặp trùng trước) → PC-7 (đối soát tầng 1 tự động + nút Chấm lại bằng AI) → PC-1 (Sổ tay brand tự học, khi PC-6 đã gom ≥10 nhãn/brand) → PB-7/PA-9 (sweep không mua lại bài cũ + bookkeeping comment ghi sau gieo + hàng đợi 'bài đáng theo dõi' — chờ anh chốt trần record comment) → PB-8/PC-5 (nhịp gieo thích ứng có sàn/trần + sức khoẻ nguồn + yield alert; hàng đợi chấm ưu tiên)."
+  },
+  {
+   "name": "Đợt 3",
+   "when": "sau",
+   "items": "PC-11 (lead lạnh 40–59 = 'Theo dõi' theo brand, tự lên hạng khi có tín hiệu thứ 2 — quyết định sản phẩm), ngưỡng nóng/ấm theo brand, `source_id` thay tên nguồn ở backend, 1 group nhiều brand (nếu anh cần)."
+  }
+ ],
+ "questions": [
+  {
+   "q": "1. AI tự loại / hạ điểm có được TRỪ khỏi bộ đếm KPI không?",
+   "options": "Quy tắc hiện tại (C.12) chỉ miễn trừ khi SALES bấm Loại. Sweeper #46 loại 44/48 lead đầu tiên mà `new/hot` ngày phát hiện giữ nguyên. Em đề nghị: máy loại (`dropped_by` bắt đầu bằng `rescore`) và đổi nhiệt độ → trừ/dời cột; sales loại → giữ như cũ. Chọn xong em mới patch stats.js + recount (PB-6)."
+  },
+  {
+   "q": "2. Lead lạnh 40–59 (≈40–50 % lead hợp lệ): giữ vào feed như hiện nay hay chế độ 'Theo dõi' theo brand?",
+   "options": "PC-11: công tắc theo brand, mặc định TẮT (hành vi cũ 100 %); bật → lead lạnh không đếm KPI/Hộp việc/push, tự lên hạng khi có tín hiệu thứ 2 (đăng thêm nơi khác, để SĐT, khách cũ). Em sẽ chạy script chỉ đọc in tỉ lệ phản hồi/chốt của lạnh vs ấm từng brand để anh quyết."
+  },
+  {
+   "q": "3. Vai 'đại lý / mua sỉ' (reseller) có là lead hợp lệ không? Bài 'đăng hộ' có cho máy kết bạn/inbox người đăng hộ không?",
+   "options": "Hiện 'nhà cung cấp cùng ngành' = seller → quán/đại lý cần nguồn sỉ của hscl-01 có thể bị chặn ở cả scanner lẫn engine. PA-1(b): thêm vai `reseller` chỉ khi super bật cờ 'brand có bán sỉ' từng brand; `proxy` (đăng hộ) = lead hợp lệ, em khuyên VẪN cho kết bạn/inbox người đăng hộ (kênh liên hệ duy nhất)."
+  },
+  {
+   "q": "4. Có cần 1 group Facebook phục vụ NHIỀU brand không?",
+   "options": "Hiện không thể: `seen` toàn cục + nối nguồn theo tên → bài chỉ vào 1 lead cho 1 brand; wizard tự bỏ group đã có. Nếu cần (agency nhiều khách cùng ngành) → `seen` theo brand + lead nhân theo brand → chi phí AI ×N. Nếu KHÔNG cần, em chỉ chặn trùng TÊN nguồn (rẻ) + chuyển khoá sang `source_id` ở Đợt 2."
+  },
+  {
+   "q": "5. Bật lịch quét THÍCH ỨNG theo độ sôi động nguồn (P23) — có sàn/trần super đặt, công tắc mặc định tắt?",
+   "options": "PB-8: nguồn sôi động gieo 5′, nguồn im 120′ (trần super đặt), + sức khoẻ nguồn + cảnh báo 'có bài mà 0 lead 6 h ban ngày'. Anh chưa chốt riêng P23 nên em chưa làm."
+  },
+  {
+   "q": "6. Bình luận dưới 'bài đáng theo dõi' (Q-3 Cao): chấp nhận thêm record BrightData không?",
+   "options": "PA-9: theo dõi ≤10 bài/nguồn (bài đã ra lead hoặc ≥2 comment-lead), làm mới mỗi 6 h trong ≤3 ngày → tối đa 10 bài × 30 record/6 h/nguồn; công tắc `watchPostsDays` (0 = tắt). Cần anh chốt trần record để em đặt mặc định."
+  },
+  {
+   "q": "7. Đổi prompt theo BRAND (PA-1) + điểm theo tiêu chí con (PC-2): chấp nhận KPI 14 ngày 'đổi kỳ' sau ngày bật?",
+   "options": "Cả 2 đều đổi phân bố điểm → nóng/ấm/lạnh đổi, ma trận automation theo temp và KPI so kỳ đổi theo. Em làm có chạy bóng (ghi `score_v2` cạnh `score` 2 tuần, script so sánh chỉ đọc) + công tắc `.env` có đường lùi; chỉ bật khi anh xem bảng so xong."
+  },
+  {
+   "q": "8. Ba việc nhỏ cần anh gật: lead id tất định (đổi format id lead MỚI), giữ `prefiltered_out` 14 ngày thay 3, và đối soát tầng 1 tự động ≈ $0,4/ngày?",
+   "options": "Id tất định `L_<post_url>` + `create()` = chống lead trùng tuyệt đối (PB-2 e); 14 ngày + audit 30 bài/brand/ngày bằng gpt-5.6-sol = vừa đo tỉ lệ tầng 1 bỏ sót vừa TẠO lead thật từ bài bị bỏ sót (PC-7)."
+  }
+ ],
+ "lenh": "Trước khi patch, 6 LỆNH CHỈ ĐỌC (không ghi gì) để chốt số và lấy mốc code đang chạy — em soạn thành 1 khối `bash` dán Cloud Shell khi anh gật:\n1. **Tham số & cấu hình**: `gcloud functions describe manualScan` (timeoutSeconds — N3-10); `.env` có `LLM_PRICE_IN/OUT`, `LLM_REASONING`, `SCANNED_TTL_DAYS` không (chỉ in TÊN + độ dài, không in giá trị key); `config/app` hiện có `keywords/exclude` chưa (F-A2 — nếu đã lỡ có → xoá).\n2. **Dump code đang chạy** (che chuỗi dài): `stats.js` (statsEvents đầy đủ), `push.js` (brandAdmins sau #12), `lib/filter.js` (isExcluded khớp thô hay ranh giới từ — L-5/F-A5), `lib/multitouch.js` (mtIdentityKey/tryMergeTouch — Q-1), `lib/zaloCheck.js` (`enrichPhoneFromText` có ném lỗi không — N1-1), Gateway ZBS `onDocumentUpdated` (điều kiện `justTagged` — PB-10), 60 dòng Pha 2/3b `index.js` bản sau #46 (PB-1).\n3. **3 record thô BrightData** bài + 3 record bình luận (tìm field profile/commenter url ẩn dưới tên khác — D-2; tỉ lệ comment thiếu `comment_id` — N1-12).\n4. **`_bd_waste.mjs`**: 7 ngày `scans` lượt `sweepRuns>0` → `bdRecords/skippedSeen/bdCommentRecords` theo nguồn (tiền BrightData lãng phí thật — N1-9/PB-7).\n5. **Đo trùng & SĐT**: cặp lead 14 ngày cùng brand có text giống ≥ 0,8 (Q-1/PC-4); số lead có `phone`/`email`/`author_url` (mẫu số thật của Q-1/D-2); số lead `rescore_note && temp==='junk'` (lead đang chăm bị giấu — N4-3); `node _l46_after.mjs` backlog còn lại.\n6. **Comment orphan** 7 ngày: `scanned_posts kind=='comment'` có gid trong `parent_url` ≠ gid nguồn (N1-4/PB-12) + đếm decision `seller/self_comment` theo tác giả 30 ngày (PC-3).",
+ "method": "**Nền**: cây FE w89 (= zip v119-89), backend dựng lại từ dump #20/#31b (`docs/lenh-2026-09-11-46-fixture/`), `lib/scraper.js` bản #21/#23, patch LỆNH #46 đã deploy, số liệu thật từ 6 LỆNH gần nhất (#31a/#41/#42/#43/#45/#46) gom trong `data-so-lieu.md`. **0 dòng code sửa.**\n\n**Vòng 1 (em + 2 agent chỉ đọc)**: em đọc trọn scanAll/scorer/scraper/patch #46 → 22 phát hiện backend; agent FE rà 50/60/87/20/65/live.js → 30 phát hiện; agent docs gom số liệu + quy tắc anh đã chốt + đề xuất đã có/đã bỏ → `seed-all.json` 52 mục.\n\n**Vòng 2 (Workflow đối kháng, 25 agent, ~1 h 55′, 8 M token)**: 4 finder theo góc (đường dữ liệu quét · AI chấm điểm · web cấu hình · web hiển thị lead) → 48 phát hiện mới không trùng seed; 12 lô kiểm chứng (mỗi lô 8 mục, agent phải BÁC BỎ, mặc định bác khi không thấy code, chấm lại mức theo số liệu thật, ghi 'Suy luận' khi thiếu dump) → 39 xác nhận / 56 một phần / 5 bác; 3 agent đề xuất theo 3 góc → 35 đề xuất; 2 giám khảo (giá trị ÷ công + rủi ro · khớp hệ thống/đã có/anh đã bỏ) → gộp còn 23 + xếp Đợt; 1 critic hoàn chỉnh (còn thiếu gì, mâu thuẫn, LỆNH chỉ đọc). Giám khảo 2 + critic bị ngắt vì hết hạn mức phiên, chạy lại ở chế độ resume.\n\n**Hạn chế**: `lib/filter.js`, `lib/multitouch.js`, `lib/zaloCheck.js`, `lib/alerts.js`, `stats.js`/`push.js` bản đang chạy, Gateway ZBS chưa dump → các mục đánh 'Suy luận' cần LỆNH chỉ đọc mục 2 để chốt; số liệu chỉ từ file data (không đo mới). Dữ liệu gốc: `workflow-result.json` (toàn bộ verdict/đề xuất/giám khảo/critic), `seed-all.json`, `findings-backend.json`, `agent-fe.md`, `data-so-lieu.md`."
+}

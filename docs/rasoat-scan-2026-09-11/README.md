@@ -19,5 +19,5 @@ Workflow script: `scratchpad/wf/rasoat-scan-lead.mjs` (ephemeral; 4 finder → v
 ## Kết quả ngắn
 - 100 phát hiện thô → **95 giữ (4 Cao · 33 Vừa · 58 Thấp)**, 5 bác (G-2, F-C4, F-D1, F-D6, F-F1), 40 đổi mức.
 - 4 Cao: N4-3 (sweeper #46 giấu lead sales đang chăm), F-A2 + N3-12 (bộ lọc toàn cục "ma"), Q-3 (bình luận chỉ lấy 1 lần lúc phát hiện bài).
-- 35 đề xuất → 23 canonical; Đợt 1 = LỆNH A (PB-5+PB-3+PB-4+PB-2) · LỆNH B (PB-1) · LỆNH C (PB-10+PB-6+Rules 2 field) · zip FE (PA-4+PC-6).
-- 8 câu hỏi chờ anh chốt + 6 LỆNH chỉ đọc (mục cuối báo cáo).
+- 35 đề xuất → 24 canonical (2 giám khảo + critic điều chỉnh 12 chỗ); Đợt 1 = LỆNH A0 (PB-5+PB-2a) · A (PB-3+PB-4+PB-2bd) · C (PB-10+PB-6+Rules) · D (PB-9 rút gọn+PB-12) · zip FE (PA-4+PC-6+PA-11+PB-12 FE).
+- 8 câu hỏi chờ anh chốt + 6 LỆNH chỉ đọc R1–R6 của critic (7 file backend chưa từng dump: filter/multitouch/zaloCheck/alerts/stats/push/wrapper).

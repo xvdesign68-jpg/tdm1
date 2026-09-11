@@ -2654,7 +2654,404 @@
     "PA-4"
    ],
    "notes": "CÁCH CHẤM: score = (giá trị thật cho khách/sales/vận hành) ÷ (công S=1/M=2) trừ rủi ro; em đã kiểm lại các mốc quyết định thứ hạng trên fixture/patch/FE trước khi chấm: index.js:319–320 (`seen` ghi trước chấm), :388–395 (lead ghi 2 bước, comment Gateway ZBS justTagged), :408–409 (mapPool chỉ bọc scoreLead), :415 (`!!ai.is_real_lead`), :423–425 (miss-reply chấm lại ×2), :433 (eKYC mọi lead); scorer.js:23–33 (SYS agency marketing, seller gộm nhà cung cấp cùng ngành); patch-46.cjs:46 (timeout 60 s × 4), :60 (badreq), :128 (prefilter fail-open), :180 (sow46 thiếu trigger), :229 (gate sweeper), :250–254 (up ghi temp junk cả nhánh human), :272 (downNow46 theo lượt), :299 (push nóng vẫn `!before`); 20-feed.js:717 + 10-core:117 (FE ẩn junk), 30-pipeline.js:298 (Loại không lý do), live.js:1109 (limit 1000). Mọi mục khớp mô tả; các chỗ 'Suy luận' (brandAdmins(''), tần suất mất bài, stats.js đang chạy, vị trí BUYER_RE) giữ nguyên nhãn Suy luận.\n\nGÓI ĐỢT 1 (≤2 tuần, 3 LỆNH + 1 zip): (1) LỆNH A 'sweeper + AI hardening' = PB-5 + PB-3 + PB-4 + PB-2(a–d) — cùng file scorer.js/index.js sau #46 → 1 patch content-anchored fail-closed, 1 deploy scheduledScan/manualScan; kèm A/B 30 bài chỉ đọc cho reasoning_effort. (2) LỆNH B 'không mất bài' = PB-1 (cần dump 60 dòng Pha 2/3b bản đang chạy trước vì mốc nằm trong vùng #46). (3) LỆNH C = PB-10 (BƯỚC 1 dump Gateway ZBS — kênh OA Z15 anh giữ theo Q5; script dừng nếu gateway so before.brand !== after.brand) + PB-6 (patch stats.js + recount 60 ngày lần 4, CHỈ chạy sau khi `node _l46_after.mjs` xác nhận backlog 252 ≈ 0; số KPI/Bảng brand/CPL sẽ GIẢM ở 4 brand — báo anh trước, ghi chú 'đối soát ngày …'). (4) Zip FE (m32.py, 2 cây) = PA-4 + PC-6 + dòng cảnh báo/cột lỗi của PB-4 + chip nhỏ PB-5; PC-6 cần Rules thêm 2 field `dropped_reason`, `ai_feedback` vào whitelist 31 field (#8) → gộp vào LỆNH C.\n\nTHỨ TỰ ĐỢT 2: PB-9 → PB-12 (đo (0) trước) → PA-1 (đổi prompt, có _promptcmp + công tắc; làm SAU PB-6 recount để KPI kỳ trước không lẫn 2 lần đổi) → PC-2 (shadow 2 tuần) → PA-5 → PC-3 (sau PA-1 để reseller +buyer) → PC-4 → PC-7 → PC-1 (khi PC-6 đã gom ≥10 nhãn/brand) → PB-7/PA-9 (sau `_bd_waste` + anh chốt trần record comment) → PB-8/PC-5.\n\nCẦN ANH CHỐT TRƯỚC KHI LÀM: PB-8 (phần 'lịch quét thích ứng' P23 chưa chốt riêng — data B), PA-9 (trần record comment/nguồn), PA-1(b) reseller (cờ `brands.ai.banSi` do super bật từng brand — giữ quy tắc C.1), PC-11 (quyết định sản phẩm C-3), PB-2(e) lead id tất định (đổi format id). Không đề xuất nào chạm mảng anh đã bỏ (pháp lý, self-service/billing, Zalo cá nhân, ZBS bản tin, bulk nick); không trùng tính năng đã có (Quét thử riêng nguồn, Hôm nay, tìm SĐT, calibCard hiển thị).\n\nGHI CHÚ RỦI RO CHUNG: 3 đề xuất đổi phân bố điểm (PA-1, PC-2, PC-11) đều ảnh hưởng ma trận automation theo temp + KPI so kỳ → bắt buộc chạy bóng/công tắc `.env` có đường lùi và không gộp chung LỆNH với Đợt 1. Mọi patch backend theo quy tắc C.7 (script trong functions/, fail-closed idempotent, backup, deploy xích &&, không `!` ngoài heredoc)."
+  },
+  {
+   "ranked": [
+    {
+     "id": "PB-5",
+     "tier": "Đợt 1",
+     "score": 95,
+     "reason": "KHẨN + an toàn nhất. Xác nhận code: patch #46:250 `const up = { score: h, temp: t, … }` ghi cho CẢ nhánh `human` (:249) → lead sales đang chăm bị `temp:'junk'` → FE ẩn ở 20-feed.js:717 `feedHidden` + 10-core:117 (Hôm nay/Hộp việc/Nên gọi); nokey → `return heuristic()` không kẹp (patch:134) + sweeper vẫn chạy → hợp thức hoá 90 nóng + mở gate automation (VAN NICK). Không mâu thuẫn quy tắc (C.9 fail-closed, C.11); không Rules/index (Admin SDK); index `leads(ai_scored,detected_at)` chỉ khi backlog >80 (LỆNH #47 đã ghi). Script đặt lại lead đã junk chạy SAU khi backlog 252 xong (~19:00 11/09). Lease (4) ghép với PB-2(b). FE chip đi cùng PC-6."
+    },
+    {
+     "id": "PB-4",
+     "tier": "Đợt 1",
+     "score": 90,
+     "reason": "Đóng điểm mù tầng 1: prefilter fail-open (scorer.js:98 / patch:128), `downNow46` (patch:272) chỉ nhìn tầng 2; ngưỡng theo LƯỢT không kích khi lượt 1–3 bài (A2 sau #46). badreq (patch:60) → fallback ngay + `stop46` không có badreq → 1 lỗi 400 hệ thống (tiền lệ LỆNH #5) đẻ lead heuristic mỗi lượt. FE ĐÃ CÓ `llmStatusCard`/`sysLlm` v119-89 (live.js:1009) → chỉ thêm `llm.pre`; Lịch sử quét cột lỗi 60-scan-views.js:25 chưa cộng `llmFail`. Rules `system_status` read super đã có (#23). WARNING cho tầng 1 (không ERROR) để không spam alert #9. Công tắc `PREFILTER_FAILOPEN=true` giữ đường lùi. S, không đụng van/nick."
+    },
+    {
+     "id": "PB-3",
+     "tier": "Đợt 1",
+     "score": 88,
+     "reason": "Xác nhận: body gọi patch:137/:119 không có `reasoning_effort`/`max_completion_tokens` dù content.js đã vá #29 (16→11 s); `LLM46.timeoutMs` 60 s × 4 (patch:46) → tới ~259 s/bài; miss-reply chấm lại nguyên bài 2 lần (index.js:423-425); eKYC mọi lead có SĐT (:433) + quét vét 20/lượt (:469-480). Đơn giá mặc định config.sanitized.js:35-36 là giá gpt-4o-mini — `.env` có ghi đè không = Suy luận → LỆNH chỉ đọc in `LLM_PRICE_*` (không in key). BẮT BUỘC A/B chỉ đọc 30 bài trước deploy (reasoning low có thể đổi chất chấm). eKYC lạnh bỏ = cố ý, có nút bật lại; không đụng van/nick/stats. Gộp phần reasoning của PC-10 vào đây."
+    },
+    {
+     "id": "PB-10",
+     "tier": "Đợt 1",
+     "score": 86,
+     "reason": "Xác nhận 2 bước: fixture index.js:389 `ref.set(lead)` với object :442-453 KHÔNG có `brand`, :395 `ref.update({brand…})` ~50 ms sau; push.js:59 `if (!before && after.temp === 'hot')` (#46 giữ nhánh `!before`) → `brandAdmins('')` chỉ ra super (LỆNH #12) → admin brand không nhận 'Lead nóng mới' (250 nóng/14 ngày). RÀNG BUỘC: comment index.js:390-392 xác nhận Gateway ZBS `onDocumentUpdated` bắt `justTagged` → PHẢI giữ write 2 chỉ còn `brand_tagged_at/brand_tagged_by` (không đổi brand) hoặc sửa gateway — bước (1) dump gateway trước, script fail-closed. Kênh OA Z15 là kênh anh GIỮ (Q5) nên không được lỡ. Không Rules/index. Nghiệm thu bằng `_pushtest.mjs` (LỆNH #14) đã có."
+    },
+    {
+     "id": "PB-6",
+     "tier": "Đợt 1",
+     "score": 84,
+     "reason": "Xác nhận: 42-stats-patch.cjs:12-14 `countable` chỉ ±1 khi đổi countable → sweeper hạ 47/48, loại 44 (A5) không trừ `new/hot`; vi phạm C.11 ('hợp lệ' = không junk/dropped) trong khi vẫn giữ C.12 (sales bấm Loại không trừ — chỉ `/^rescore/`). `daily_stats.junk` luôn 0 (A3) mà 25-agency.js:130 vẫn in 'Rác AI lọc'. Cần dump `stats.js` 50 dòng (bản chạy chỉ biết qua 3 patch) → patch fail-closed; recount 60 ngày tiền lệ #41/#42 (an toàn), chạy SAU backlog #46. Số KPI/Bảng brand/CPL sẽ GIẢM → phải nói trước với anh. Không Rules (daily_stats write=false), không index. PC-8(1) và PA-7(1) trùng — lấy PB-6 làm chuẩn."
+    },
+    {
+     "id": "PB-2",
+     "tier": "Đợt 1",
+     "score": 82,
+     "reason": "(a) 1 dòng: patch:180 `sow46 = !isBackfill && !opts.sourceUrl && !force` không kiểm `trigger` trong khi #21 định nghĩa `sowMode = trigger==='scheduled'` (doc scheduledscan-4:72) → Quét ngay (65:403 gửi `{scanMethod}`) chồng lượt lịch: cùng nạp score_retry + sweeper 12 lead → chấm đôi gpt-5.6-sol. (b) lease transaction, (c) khoá lượt `system_status/scan_lock` + FE toast thay 'Quét xong: 0 lead' (đóng N3-2 — đường 'Quét thử riêng nguồn' ĐÃ CÓ v119-57 vẫn dùng backfill nên không ảnh hưởng), (d) `seen` create(). Tần suất lead trùng = Suy luận (score_retry lúc nghiệm thu = 0). (e) lead id tất định `L_<post_id>` → tách sang Đợt 2 cùng PB-1 (đổi format id, cần harness riêng). Không Rules/index."
+    },
+    {
+     "id": "PC-6",
+     "tier": "Đợt 1",
+     "score": 80,
+     "reason": "FE 0 tham chiếu `ai_prev/rescored_at/dropped_reason/rescore_note` (grep w89 = 0) dù patch #46:250-254 đã ghi; timeline 65:312 in `dropped_by` kỹ thuật; nút Loại 30:298/:335 không ghi lý do. `restoreLead` ĐÃ CÓ (20-feed:719) → nút 'Không đồng ý – khôi phục' rẻ. RÀNG BUỘC Rules: whitelist 31 field (lenh-2026-09-04-backend-v119-42.md:36) KHÔNG có `dropped_reason`/`ai_feedback` → sales/admin ghi sẽ permission-denied → cần 1 LỆNH Rules 2 field chuỗi ngắn (fail-closed như #8). Phần backend 'giữ temp ≥ cold' = PB-5(2), không làm 2 lần. Là NỀN DỮ LIỆU cho PC-1 → phải đi trước. Không đụng engine/van."
+    },
+    {
+     "id": "PA-4",
+     "tier": "Đợt 1",
+     "score": 78,
+     "reason": "FE-only, S. Xác nhận: modal ĐÃ CÓ chip 'Từ bình luận · dưới bài của…' + `<details class=ld-parent>` (65:74, :82 từ v119-52) nhưng thẻ feed 20-feed.js:905 không có nhánh `kind==='comment'` (chỉ `roleChip` :744 cho poster_self và dòng độ tin cậy :776); hộp AI :908 in `intent` thay `need`; chỉ mục tìm :490 `__q` thiếu `parent_text/parent_author`. 359 comment-lead/30 ngày (A4) → giá trị triage cao. Morph v119-58 giữ node, không chớp. Rủi ro chỉ là thẻ cao thêm 1 dòng mobile (smoke đo). Không backend/Rules."
+    },
+    {
+     "id": "PB-12",
+     "tier": "Đợt 1",
+     "score": 74,
+     "reason": "Xác nhận cả 2 đường: scraper.js:286-287 fallback `batch[0]` và đường gặt #23 doc:127-128 `|| first` → comment dán vào bài đầu lô, AI đọc bài gốc SAI (scorer.js:64), `self_comment`/`parent_kind` #34 sai; `recordPost` index.js:123 lấy brand theo tên nguồn gắn trên comment → rò chéo brand ở Bài đã quét (Rules scanned_posts lọc brand). Làm ngay: (0) LỆNH chỉ đọc đếm lệch gid + (2) `recordPost` brand theo ctx bài cha + (3) FE chặn trùng TÊN nguồn (form 50:133 chỉ chặn id). (1) fail-closed bỏ `batch[0]/first` CHỈ sau khi (0) đo <10 % (comment-lead là lead giá trị nhất, không được mất mù). LƯU Ý: scraper.js trong scratchpad là bản TRƯỚC #23 → patch cần dump bản sau #23. Chuyển backend sang `source_id` (N1-6) = M riêng, chờ anh chốt '1 group nhiều brand?'. Gộp phần khoá comment thiếu id (PB-11(2)) vào patch scraper này."
+    },
+    {
+     "id": "PA-11",
+     "tier": "Đợt 1",
+     "score": 72,
+     "reason": "Phần FE khả thi NGAY không cần backend: `daily_stats.scanned/scanRuns` ĐÃ CÓ (#39, lenh-2026-09-08-39-scanstats.js:25), super đã subscribe 35 ngày (live.js:1099, làm ấm 4,5 s :1103), brand user đã đọc daily_stats brand mình (:1130); `bd_month` đã subscribe (:1117 tháng hiện tại, :874 mọi tháng) → chart 14 ngày (60-scan-views.js:60 đang nhãn '14 ngày' trên `limit(1000)` ≈2 ngày :1109) và 'Chi phí AI'/CPL (50:499 `A.cost/A.leads` từ D.scans) đổi nguồn = zip. Backend: LỆNH chỉ đọc `LLM_PRICE_*` (không in key; .env có đặt hay không = Suy luận) + `scans` ghi `model/priceIn/priceOut`. BỎ phần `daily_stats.aiUsd` phân bổ theo `bySource[].llmCalls` (field chưa có trong row — Suy luận, Đợt 3). TTL `scans` → giao PB-9. Nhận phần FE của PB-9 (limit 300 + nhãn phạm vi)."
+    },
+    {
+     "id": "PB-9",
+     "tier": "Đợt 1",
+     "score": 70,
+     "reason": "Làm ngay phần rẻ, không đổi hành vi: `scans.expireAt` 90 ngày + TTL policy (tiền lệ S3 outreach_log; backup #9 chỉ giữ 7 ngày nên chấp nhận) — hiện `db.collection('scans').add(summary)` index.js:502 không expireAt, ~480 doc/ngày × bySource 23 dòng; `scanned_posts` id tất định `SP_<post_id>` (index.js:96 `.doc()` ngẫu nhiên + patch #46:216 `ai_wait` mỗi lần hoãn → 1 bài 7 dòng, chip đếm phồng — đã kiểm N4-9). Phần `seen` TTL 180 ngày + lưới `too_old` → ĐỢT 2 (đổi cơ chế chống trùng lõi; kho `seen` ~40 k/tháng chưa đau). Phần FE (limit 300, nhãn phạm vi, cost bd_month) chuyển sang PA-11. Không Rules/index."
+    },
+    {
+     "id": "PB-1",
+     "tier": "Đợt 2",
+     "score": 76,
+     "reason": "Gốc N1-1/N2-1/N3-11 xác nhận: `seen` commit Pha 2 (index.js:320) trước mọi quyết định, callback mapPool chỉ bọc `scoreLead` (:408-409), score_retry bị xoá khi nguồn tạm tắt (patch:201). Value 5 nhưng đổi luồng lõi (lease thay seen) + mốc nằm trong vùng #46 → cần LỆNH chỉ đọc dump 60 dòng Pha 2/3b trước; tần suất mất bài thật = Suy luận (#19: lượt 504 vẫn chạy nền, chỉ mất khi instance bị thu hồi). Đợt 1 đã có PB-3(4) circuit-breaker + timeout 30 s làm lượt ngắn lại → giảm áp lực. Xếp ĐẦU Đợt 2, đi cùng PB-2(e) lead id tất định (nếu xoá lease thất bại sau khi tạo lead → tránh lead trùng). Không Rules/index (query `where nextAt<=now` đã có). Nhận phần trần mềm của PC-5(2) và lease của PA-8."
+    },
+    {
+     "id": "PC-1",
+     "tier": "Đợt 2",
+     "score": 74,
+     "reason": "C-2 Cao, không có vòng học (scorer.js:12-14 chỉ 3 ô text). Không mâu thuẫn: super duyệt 1 nút (Q6/Q7 super set hộ), P37 backend chưa có (data B). PHỤ THUỘC PC-6 (nhãn `dropped_reason/ai_feedback` + Rules 2 field) → không thể Đợt 1; dữ liệu dương mỏng (SLA A3: 4–6 lead chăm/60 ngày/brand, chốt 1/14 ngày) → digest gate ≥10 nhãn, vòng đầu chủ yếu giảm dương tính giả. AN TOÀN hơn theo PA-3: áp `ai.rules` vào TẦNG 2 trước (tầng 1 fail-open, L-3 không kiểm được bỏ sót) — chỉ đưa vào PRE_SYS sau khi PC-7 audit chạy. CF onSchedule mới khởi tạo lười (bài học #10), Rules brands write=super sẵn. Cap 8 quy tắc + nút gỡ + `LEARN_RULES=false`."
+    },
+    {
+     "id": "PC-2",
+     "tier": "Đợt 2",
+     "score": 72,
+     "reason": "C-1 Cao xác nhận: JSON 1 số (scorer.js:25), weights thành 1 câu (:125-130), slider FE gần vô hiệu (F-B1 partial). Chọn PC-2 thay PA-2 vì: giữ ĐÚNG 6 key DEF_WEIGHTS (live.js:76-78) không phải map lại; KHÔNG động ngưỡng 80/60/40 (C.14 + F-B6: 4 chỗ FE + `tempOf` index.js:6 + ma trận automation theo temp + stats `tempOf` #42 — đổi thành `config/app.thresholds` như PA-2 là rủi ro lan 3 hệ). Bắt buộc SHADOW 2 tuần (`ai_v2` cạnh score, bật bằng env) vì đổi phân bố nhiệt độ → KPI so kỳ + van automation + push nóng đều đổi. normBool + role rỗng (N2-12) có thể tách ra đi sớm cùng LỆNH PB-4. Token tầng 2 +~10 %."
+    },
+    {
+     "id": "PA-1",
+     "tier": "Đợt 2",
+     "score": 70,
+     "reason": "L-2 Cao xác nhận (scorer.js:23 SYS agency + :16 khối brand 'áp dụng THAY CHO'), N2-6 (scorer.js:31 + normRole :51 `nha.?cung|tuyen` chặn đại lý/mua sỉ). Giữ PA-1 làm khung (buildSys theo brand + reseller/proxy + JSON chặt + `_promptcmp.mjs` A/B 40 bài + env `PROMPT_BRAND_V2`), GỘP PC-9 (`ai.products[]`/`ai.b2b`, engine `contact_via_poster` chỉ react/comment, `_pc9_taxo.mjs`). VAN NICK: reseller chỉ khi super tick `b2b` (Q6 super set hộ), giữ cổng #31 seller/poster_self + harness selfcmt 34/34 chạy lại; brand tuyển dụng giữ 'tuyển = seller' (đã kiểm KHỐI 4 #31 đúng). Đổi prompt = đổi phân bố điểm → ghi chú ngày đổi trên KPI; token +10–20 % (Suy luận). Đợt 2 vì phải A/B + phối hợp PC-2 (cùng sửa SYS/JSON, làm 1 lần)."
+    },
+    {
+     "id": "PC-3",
+     "tier": "Đợt 2",
+     "score": 68,
+     "reason": "L-4 xác nhận scanner không nhớ người viết (index.js:315-321 chỉ seen theo bài); A4: 158 chủ bài + 47 mùi người bán + 5 seller/3 h ban ngày. Giữ PC-3 (đầy đủ nhất: `seller_known` ≥2 phán quyết + khách cũ `returning` + push + FE), GỘP PA-10 (phần hash bài sửa → PC-4) và PB-11. Cần LỆNH chỉ đọc đếm decision seller/self_comment theo tác giả 30 ngày để biết tiết kiệm thật (PB-11 đã nêu — chưa có số). AN TOÀN cho nick (bớt máy chạm đối thủ). Phụ thuộc PA-1 reseller (đại lý +buyer) để không khoá nhầm khách sỉ. Rules `author_memory` read super/write=false (block 1 dòng như system_status); CF `clearAuthorMemory` verify super. Phần D-1 gom SĐT (3) trùng PA-5 → giao PA-5."
+    },
+    {
+     "id": "PA-5",
+     "tier": "Đợt 2",
+     "score": 66,
+     "reason": "D-1 xác nhận (index.js:433 chỉ `x.post.text`; comment đi riêng :301); FE bôi số chỉ khớp `l.phone` (20-feed:829), `normPhoneVN` :759 chỉ di động. RÀNG BUỘC Rules: 'Dùng số này' ghi `phone` — whitelist 31 field (#8) KHÔNG có `phone` → non-super permission-denied → cần LỆNH Rules (hoặc chỉ super/admin qua CF). Rủi ro gán nhầm SĐT người khác (ẩn danh/trùng tên) → fail-closed theo profile key `__slProfileKey31` (index.js:104). Phần eKYC chỉ nóng/ấm TRÙNG PB-3(7) → giao PB-3. Phần FE (bôi mọi số + cố định 02x + hộp 'bình luận thêm') có thể đi sớm cùng zip PA-4. Backend Pha 1b gom `text_extra` → M, Đợt 2 cùng PC-3 (cùng khoá tác giả)."
+    },
+    {
+     "id": "PC-8",
+     "tier": "Đợt 2",
+     "score": 66,
+     "reason": "G-1 xác nhận (`sysAlertRows` 8 loại, không có 'có bài mà 0 lead'/nguồn chết); 2 sự cố 26/08 + 04/09 chỉ lộ khi chạy script tay. `source_health/{gid}` theo group id (tránh N1-6) + drift rules chạy cuối `scanStatsOnRun` (#39 trigger đã có, không thêm cron) + `[QUALITY-DRIFT]` ERROR 1 lần/ngày (alert #9 đã có). Phần (1) đổi nhiệt độ = PB-6 (Đợt 1) → PC-8 chỉ thêm `aiDown/aiDropped` + `source_health`; (4) chart 14 ngày = PA-11. Rules: `source_health` read super/brand theo brand (block mới, mẫu outreach_stats). Cảnh báo ồn tuần đầu → sàn n≥30 + chỉ 8–22 h. Là DỮ LIỆU NỀN 2 tuần cho PB-8 (adaptive) → làm trước PB-8."
+    },
+    {
+     "id": "PC-7",
+     "tier": "Đợt 2",
+     "score": 64,
+     "reason": "L-3 xác nhận (`prefiltered_out` ≈52 % A4, TTL 3 ngày index.js:84/:136, không đường chấm lại); cách rẻ nhất đo bỏ sót tầng 1 và vừa đo vừa cứu FN thành lead (`found_by:'audit'`). Cần composite index `scanned_posts(brand, decision, createdAt)` = 1 LỆNH gcloud (tiền lệ S1) + CF onSchedule mới + CF `rescorePost` onRequest (verify super/admin như genContent). Chi phí ~$0,4/ngày, công tắc. Rủi ro lead audit trùng bài đã thành lead qua đường khác → kiểm `seen` + `leadId` trước (đi sau PB-2(e) id tất định thì tuyệt đối). Không đụng van/nick. `prefiltered_out` giữ 14 ngày → doc ×4 (nhỏ)."
+    },
+    {
+     "id": "PC-5",
+     "tier": "Đợt 2",
+     "score": 60,
+     "reason": "Ưu tiên chấm bằng tín hiệu rẻ: chỉ đổi THỨ TỰ, không quyết định lead → an toàn; `BUYER_RE/ASK_RE` nằm ở content.js (#34) = Suy luận vị trí, cần export sang `lib/signals.js`; đọc `bd_month.src[k]` 1 read/lượt (rollup index.js:519-526 có sẵn). Phần (2) trần mềm TRÙNG PB-1(3) → giao PB-1; phần (3) preDown chỉ cho prio≥30 lên tầng 2 → phối với PB-4(2) (`LLM_PRE_DOWN_PASS`). Lợi ích chỉ lộ khi có sự cố (A2: lượt 3–8 bài) → Đợt 2 sau PB-1. Không Rules/index."
+    },
+    {
+     "id": "PB-7",
+     "tier": "Đợt 2",
+     "score": 58,
+     "reason": "Xác nhận: `lastSweepAt` ghi theo đồng hồ (index.js:222) dù sow `skip` (scraper.js:171) → sweep thật ~1/3 (đang VÔ TÌNH tiết kiệm); `recentIds` kẹp 200 (scraper.js:98, index.js:187) còn `seen` vô hạn; `cmt_scrape.lastAt` commit trước gieo (index.js:274/278). BẮT BUỘC (0) `_bd_waste.mjs` chỉ đọc 7 ngày trước — chưa có số lãng phí thật; sửa N1-3 mà thiếu `start_date` (scraper.js:96 đã hỗ trợ) → snapshot sweep ×3 → script fail-closed 2 mốc. Bookkeeping comment (4) là phần đáng làm nhất (mất comment 3–12 h) và phải chạy lại harness #23 10/10 + 8/8. Q-3 cố ý để PA-9. Patch scraper cần dump bản sau #23."
+    },
+    {
+     "id": "PC-10",
+     "tier": "Đợt 2",
+     "score": 56,
+     "reason": "Phần riêng có giá trị: bọc dữ liệu chống prompt injection (N2-7: scorer.js:66 nhét `\"\"\"${body}\"\"\"` không escape → `reply` bị dẫn rồi nick đăng công khai / vào prompt Content Studio #30b) — là BẢO MẬT, không phải pháp lý (không vướng Q1). Phần reasoning_effort TRÙNG PB-3 → giao PB-3 (Đợt 1). Phần tách `reply` sau `commitLeadNow` bằng model rẻ: đổi luồng (cửa sổ ~10 s reply rỗng; engine chế độ `reply` đã fallback genForLead nên vô hại; hscl-01 đang mode AI) nhưng chất lượng model rẻ = Suy luận → env chuyển về sol; `reply_used` cần thêm field Rules (whitelist #8). PB-3(5) `replyOnly` đã giải C-4 rẻ hơn → PC-10 chỉ còn injection + few-shot brand → Đợt 2."
+    },
+    {
+     "id": "PC-4",
+     "tier": "Đợt 2",
+     "score": 52,
+     "reason": "Q-1 partial: multitouch ĐÃ CÓ (index.js:371 `tryMergeTouch` 48 h, :376 `mtIdentityKey`) nhưng rỗng với ~69 % lead thiếu author_url. Ý hay nhưng: `lib/multitouch.js` CHƯA dump (thêm identityKey `t:<fp>` = Suy luận nội bộ hàm), ngưỡng Jaccard cần bộ 20 cặp test, gộp nhầm 2 người dùng cùng mẫu bài (group tìm việc/CV) là rủi ro dữ liệu → làm 2 pha: pha 1 CHỈ ghi `similar_to` (không gộp) 2 tuần, pha 2 mới gộp ≥0,9 cùng brand + tên fold trùng. `seen` đổi shape phải tương thích ngược. Không Rules/index; daily_stats không đổi (gộp = không tạo doc). Nhận phần bài-đã-sửa (N1-11) của PA-10."
+    },
+    {
+     "id": "PA-9",
+     "tier": "Đợt 2",
+     "score": 50,
+     "reason": "Q-3 Cao xác nhận (index.js:237-245 chỉ gieo comment cho bài trong lượt) — comment-lead là lead hỏi mua trực tiếp nhất. NHƯNG tăng record comment BrightData (≤10 bài × ≤30 record/6 h/nguồn) và ngân sách BD thật không có trong tài liệu (A5) → CHỜ ANH CHỐT trần N bài/nguồn + ngày theo dõi trước khi làm; công tắc `watchPostsDays` mặc định 3 + `brands.scan.watchPosts`. Phần bookkeeping N1-5/N1-3 TRÙNG PB-7 → giao PB-7, PA-9 chỉ còn `watch_posts`. Rules block 1 dòng (mẫu system_status). Đi sau PB-7 (đo lãng phí) để có số thuyết phục anh."
+    },
+    {
+     "id": "PB-8",
+     "tier": "Đợt 3",
+     "score": 45,
+     "reason": "Data B ghi rõ: P23 phần 'lịch quét thích ứng' CHƯA được anh chốt riêng (phần self-service đã bỏ Q6) → phải hỏi anh trước; mặc định OFF nên không đổi hành vi nhưng vẫn là M công. Cần `source_health`/rate 2 tuần từ PC-8 mới đặt bậc 5′/10′/30′/120′ có căn cứ; nguồn sôi động 5′ tăng record BD (ngân sách chưa rõ). Phần `system_status/scan` + cảnh báo yield TRÙNG PC-8 → giao PC-8; Q-4 `detect_lag_ms` 1 dòng có thể đi cùng LỆNH PB-10 (index.js:452) nếu anh muốn sớm. Nhận phần adaptive của PA-12."
+    },
+    {
+     "id": "PC-11",
+     "tier": "Đợt 3",
+     "score": 40,
+     "reason": "C-3 đang 'chờ anh chốt' (quyết định sản phẩm: lead lạnh 40–59 vào feed hay 'Theo dõi'); đổi `countable` statsEvents (thêm `!l.watch`) + push + FE tab → đụng bộ đếm C.11/C.12; phụ thuộc PC-3/PC-4/PC-2 (tín hiệu thứ 2 để nâng hạng) chưa có → không có căn cứ bật brand nào. Không mâu thuẫn Q6 (super set `brands.scoring`). Script `_pc11_preview.mjs` chỉ đọc (tỉ lệ phản hồi/chốt lạnh vs ấm theo cohort ≥14 ngày) có thể chạy sớm để anh quyết — còn triển khai để Đợt 3."
+    },
+    {
+     "id": "PA-2",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Gộp vào PC-2 (cùng C-1/F-B1/F-B2/F-B3). PA-2 kém an toàn hơn: map lại 6 key (intent→need, industry+area gộp fit) phải chốt lại với anh, và đưa ngưỡng 80/60/40 ra `config/app.thresholds` — ngưỡng đang dùng chung ở `tempOf` index.js:6, 4 chỗ FE (F-B6), ma trận automation theo temp và `tempOf` trong stats #42 → đổi 1 chỗ lệch 3 hệ. Giữ 3 ý nhỏ trong PC-2 FE: validate tổng=100, nút Đặt lại, tips calibCard đổi sang tên key thật."
+    },
+    {
+     "id": "PA-3",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Gộp vào PC-1 (digest quy tắc brand, super duyệt) + PC-6 (nhãn `dropped_reason`/`ai_feedback`, chip AI chấm lại, map dropped_by). Giữ 1 điểm AN TOÀN của PA-3 vào PC-1: áp `ai.rules` vào TẦNG 2 trước (không PRE_SYS) tới khi PC-7 audit đo được bỏ sót tầng 1."
+    },
+    {
+     "id": "PA-6",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Trùng PB-5 (nhánh human giữ temp ≥ cold + `ai_flag`, script đặt lại lead đã junk sau backlog) + PC-6 (feedHidden/todayBoard/nextBestLeads không ẩn lead đang chăm, chip 'AI chấm lại 90→10', map dropped_by, tách chip 'AI loại N · Người loại M'). Không có ý riêng."
+    },
+    {
+     "id": "PA-7",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Gộp = PB-6 (statsEvents đổi nhiệt độ + `droppedByAi` + recount 60 ngày + Bảng brand 'Rác AI lọc') + PB-10 (brand ở write đầu + cổng push nóng mới). Tách 2 LỆNH nhỏ fail-closed an toàn hơn 1 LỆNH gộp 3 file; PB-10 còn có bước kiểm gateway ZBS `justTagged` mà PA-7 chỉ ghi 'Suy luận'."
+    },
+    {
+     "id": "PA-8",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Gộp = PB-1 (lease score_retry + trần mềm + bọc lỗi mapPool + giữ lease khi nguồn tắt) + PB-2 (sow46 theo trigger + lead id tất định). PB-2 (a–d) là S làm được Đợt 1, PB-1 là M đầu Đợt 2 — tách ra để không kẹt cả gói theo mục M."
+    },
+    {
+     "id": "PA-10",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Gộp: bộ nhớ người bán/khách cũ → PC-3 (đầy đủ hơn, có push + FE + CF gỡ chặn); hash text bài đã sửa 'đã bán/đã tìm được' (N1-11) → PC-4 (cùng chỗ tính vân tay ở Pha 2; `dedupeTxt` BrightData ổn định = Suy luận, chỉ kích khi hash cũ tồn tại và khác)."
+    },
+    {
+     "id": "PA-12",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Gộp 3 nơi: nhịp gieo thích ứng + độ trễ phát hiện → PB-8 (Đợt 3, chờ anh chốt P23-lịch quét); cảnh báo nguồn im / 0 lead → PC-8; 'Quét ngay nói thật' (manualScan đi sow + toast 'Đã gieo N nguồn – bài về trong ~3′') → PB-2(c) khoá lượt + FE toast (đóng N3-2 rẻ hơn, không đổi ngữ nghĩa nút manualScan cho 'Quét thử riêng nguồn' ĐÃ CÓ v119-57)."
+    },
+    {
+     "id": "PB-11",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Trùng PC-3 (author_memory `seller_known` ≥2 + buyer=0 + TTL 60 ngày + công tắc + nút gỡ). Ý riêng duy nhất — khoá comment dự phòng `parentUrl#user_url#hash(text)` thay `Math.random()` (scraper.js:27-28, N1-12) + đếm `cmtNoId` — chuyển vào patch scraper của PB-12 (cùng file, cùng LỆNH, fail-closed)."
+    },
+    {
+     "id": "PC-9",
+     "tier": "Bỏ",
+     "score": 0,
+     "reason": "Gộp vào PA-1 (cùng N2-6/C-5): PA-1 rộng hơn (sửa gốc L-2 prompt agency + JSON chặt + A/B `_promptcmp.mjs` + env lùi) và nhận từ PC-9 các phần cụ thể: `ai.products[]` + cờ `ai.b2b` ở Hồ sơ AI/wizard bước 2, `service` enum theo products, `industry` theo 14 key INDUSTRY_LIB (ĐÃ CÓ FE 10-core:132-146), engine `contact_via_poster` chỉ react/comment, `_pc9_taxo.mjs` map lại 60 ngày không gọi AI."
+    }
+   ],
+   "merges": [
+    {
+     "keep": "PC-2",
+     "drop": "PA-2",
+     "reason": "Cùng C-1/F-B1: tiêu chí con + hotness tính bằng code + shadow. PC-2 giữ đúng 6 key DEF_WEIGHTS và KHÔNG đưa ngưỡng 80/60/40 ra config (tránh lệch tempOf backend/4 chỗ FE/ma trận automation/stats)."
+    },
+    {
+     "keep": "PC-1",
+     "drop": "PA-3",
+     "reason": "Cùng C-2: nhãn Loại chuẩn hoá → digest quy tắc brand → super duyệt. Lấy thêm của PA-3: áp rules vào tầng 2 trước, tầng 1 chỉ sau khi PC-7 đo bỏ sót."
+    },
+    {
+     "keep": "PB-5",
+     "drop": "PA-6",
+     "reason": "Cùng N4-3: sweeper không hạ junk lead đang chăm; phần FE của PA-6 (chip AI chấm lại, map dropped_by, không ẩn lead đang chăm) đã nằm trong PC-6."
+    },
+    {
+     "keep": "PB-6",
+     "drop": "PA-7",
+     "reason": "Cùng N3-5/N4-4/N2-11: bộ đếm đổi nhiệt độ + droppedByAi + recount. Phần brand ở write đầu + push nóng của PA-7 = PB-10 (tách LỆNH nhỏ, có bước kiểm gateway ZBS)."
+    },
+    {
+     "keep": "PB-1",
+     "drop": "PA-8",
+     "reason": "Cùng N1-1/N2-1/N3-11: lease score_retry + trần mềm + bọc lỗi. Phần sow46 theo trigger + lead id tất định của PA-8 = PB-2."
+    },
+    {
+     "keep": "PC-3",
+     "drop": "PA-10",
+     "reason": "Cùng L-4: bộ nhớ người viết (seller_known/khách cũ). Phần hash bài đã sửa (N1-11) của PA-10 chuyển sang PC-4."
+    },
+    {
+     "keep": "PB-8",
+     "drop": "PA-12",
+     "reason": "Cùng G-3/Q-4: nhịp gieo thích ứng + độ trễ phát hiện (chờ anh chốt P23-lịch quét). Phần 'Quét ngay nói thật' (N3-2) rẻ hơn = PB-2(c) khoá lượt + toast; cảnh báo nguồn im = PC-8."
+    },
+    {
+     "keep": "PC-3",
+     "drop": "PB-11",
+     "reason": "Cùng L-4: author_memory ≥2 seller & 0 buyer, TTL 60 ngày, công tắc, nút gỡ. Ý riêng khoá comment thiếu id (N1-12) chuyển vào patch scraper của PB-12."
+    },
+    {
+     "keep": "PA-1",
+     "drop": "PC-9",
+     "reason": "Cùng N2-6/C-5: vai reseller/proxy + service enum + industry taxonomy. PA-1 giữ khung (prompt theo brand từ đầu + JSON chặt + A/B + env lùi), nhận của PC-9: ai.products[]/ai.b2b, engine contact_via_poster, script map taxonomy."
+    }
+   ],
+   "top5": [
+    "PB-5",
+    "PB-4",
+    "PB-3",
+    "PB-10",
+    "PB-6"
+   ],
+   "notes": "Đã kiểm trên code thật (không sửa gì): (1) Rules whitelist `leads` update cho non-super = 31 field (docs/lenh-2026-09-04-backend-v119-42.md:36) KHÔNG có `phone`, `dropped_reason`, `ai_feedback`, `reply_used` → mọi đề xuất cho sales/admin ghi field mới (PC-6, PC-1, PA-5, PC-10) đều cần 1 LỆNH Rules; super không bị chặn. (2) fixture index.js:389-395 xác nhận lead ghi 2 bước KHÔNG brand, và comment :390-392 nói Gateway ZBS `onDocumentUpdated` bắt `justTagged` (brand_tagged_at) → PB-10 bắt buộc giữ write 2 dạng chỉ `brand_tagged_at/by` (kênh OA Z15 anh giữ theo Q5). (3) patch #46:249-254: nhánh `human` vẫn ghi `temp:t` (junk) → PB-5 khẩn; FE w89 0 tham chiếu `ai_prev/dropped_reason/rescore_note/rescored_at` → PC-6 đúng. (4) Sweeper #46 chỉ chạy khi `sow46` (patch:227) mà `sow46` không kiểm trigger (patch:180) → PB-2(a) 1 dòng. (5) `daily_stats.scanned/scanRuns` (#39) + super subscribe 35 ngày (live.js:1099) + `bd_month` subscribe (live.js:1117/874) → PA-11 phần FE làm được không cần backend. (6) scraper.js trong scratchpad là bản TRƯỚC #23 (`harvestComments` chỉ có ở doc scheduledscan-7 patch:106-128 với fallback `first` :128) → mọi patch scraper (PB-12, PB-7) cần dump bản sau #23 trước; `stats.js` cũng chỉ biết qua 3 patch → PB-6 cần dump 50 dòng. (7) Không đề xuất nào mâu thuẫn Q1/Q5/Q6/Q7/bulk nick; N2-7 prompt injection là bảo mật (không phải pháp lý). Điểm chưa được anh chốt phải hỏi trước khi làm: PB-8 (P23 lịch quét thích ứng), PC-11 (C-3 lead lạnh), PA-9 (trần record comment theo dõi), PB-12(1) fail-closed comment (sau khi đo lệch), PA-1 (định nghĩa 'reseller' + brand nào bật b2b). (8) Van/nick: PA-1/PC-3 làm an toàn hơn (bớt chạm đối thủ, reseller chỉ khi super tick b2b); PB-5 đóng lỗ nokey mở gate automation; không đề xuất nào nới van. (9) Bộ đếm: PB-6 recount làm KPI/Bảng brand/CPL GIẢM rõ (đúng C.11, giữ C.12) → nói trước với anh; PA-1/PC-2 đổi phân bố điểm → shadow/A-B + ghi chú ngày đổi. (10) Gợi ý đóng gói Đợt 1 (≤2 tuần): LỆNH #48 scorer/index = PB-3 + PB-4 + PB-5 + PB-2(a)(b)(d) (+normBool của PC-2); LỆNH #49 stats/index/push = PB-6 + PB-10 (+1 dòng `detect_lag_ms` nếu anh muốn); LỆNH #50 Rules 2 field + PB-2(c) khoá lượt; LỆNH #51 TTL scans + SP_ id (PB-9); LỆNH chỉ đọc: LLM_PRICE (PA-11), A/B reasoning (PB-3), đo lệch comment (PB-12(0)); zip v119-90 = PA-4 + PC-6 + PA-11 FE + PB-4 FE + PB-12(3) + PB-9 FE (limit 300, nhãn phạm vi). Backlog 252 lead điểm tạm đã xong ~19:00 11/09 → script đặt lại junk (PB-5) và recount (PB-6) chạy sau mốc đó."
   }
  ],
- "critic": null
+ "critic": {
+  "gaps": [
+   {
+    "area": "lib/filter.js — isExcluded (cổng lọc DUY NHẤT trước AI)",
+    "what": "Chưa từng được dump (grep repo + scratchpad = 0 file; LỆNH #20 (a) chỉ gom index/scraper/config/logger). Mọi kết luận 'khớp thô / không ranh giới từ / có fold dấu hay không' của L-1, L-5, F-A5, F-A2, N3-3, N3-12 là Suy luận; mức Cao của N3-12/F-A2 phụ thuộc trực tiếp (nếu fold dấu thì 'bán chó'→'ban cho' khớp 'bạn cho mình hỏi').",
+    "howToCheck": "LỆNH chỉ đọc: `sed -n '1,140p' lib/filter.js` (che chuỗi ≥28) + `node --input-type=module -e` gọi `isExcluded(text, {exclude:[...]})` với 6 ca (tuyển↔'tuyển chọn hải sản', 'bán chó'↔'bạn cho mình hỏi', có/không dấu, hoa/thường, dấu cách trong từ loại) + đếm `scanned_posts` decision `excluded` 3 ngày theo nguồn."
+   },
+   {
+    "area": "lib/multitouch.js — tryMergeTouch / mtIdentityKey / mtTouch / leo thang điểm",
+    "what": "Không có trong bất kỳ dump nào. Q-1, D-2, Q-2, N4-10, N4-11, F-B4/F-B6 (score đổi mà temp không đổi?) đều Suy luận. Chưa ai rà rủi ro GỘP CHÉO BRAND: identityKey = author_url/phone/email KHÔNG có brand → lead brand A có thể gộp thành touch của lead brand B (lọt tenancy) — luồng 'lead của brand thứ 2' chưa được xét ở tầng này.",
+    "howToCheck": "Dump toàn bộ file (~100 dòng) + script chỉ đọc: lead 30 ngày `group_count>=2` → so `touches[].source`/gid với `lead.brand` (đếm ca lệch brand); đếm lead `identityKey` rỗng %; đếm lead có `score !== base_score` mà temp ≠ tempOf(score)."
+   },
+   {
+    "area": "lib/zaloCheck.js — enrichPhoneFromText + eKYC",
+    "what": "Không dump: regex trích SĐT (có bắt cố định 02x?), hàm có ném lỗi không (N1-1 vế 'Promise.all reject'), ngữ nghĩa `phone_has_zalo == null` (D-3 quét vét), chi phí eKYC/lead, `system_alerts/ekyc_credit`. F-E1/F-E2 FE-only sẽ vô ích nếu backend không trích số cố định.",
+    "howToCheck": "Dump hàm `enrichPhoneFromText` + regex; script chỉ đọc 30 ngày: phân bố `phone` theo prefix (+842x vs +843/5/7/8/9), `phone_has_zalo` true/false/null/thiếu field, Σ `scans.bySource[].ekyc` 7 ngày theo temp của lead."
+   },
+   {
+    "area": "lib/alerts.js + Zalo ZBS gateway (~/smartlead-zalo-fn) + tagLeadBrand + config.channels",
+    "what": "Luồng THÔNG BÁO lead nóng ra ngoài web (Telegram/ZBS OA Z15 tới brand_sales — kênh anh giữ theo Q5) hoàn toàn chưa rà; PB-10 (brand ở write đầu) có thể phá điều kiện `onDocumentUpdated justTagged` (comment fixture index.js:390-392) — chính giám khảo đặt làm bước 1 bắt buộc nhưng chưa ai đọc. FE Cảnh báo ghi `config/app.channels{id:on}` (50-config-views.js:458-462) — backend có đọc không: Suy luận.",
+    "howToCheck": "Dump `lib/alerts.js` + grep `channels|zalo_notified|notify` trong index.js + điều kiện trigger của `notifyBrandZalo` (smartlead-zalo-fn); script chỉ đọc: lead hot 7 ngày có `zalo_notified`/`brand_tagged_by`/`brand_pending` phân bố."
+   },
+   {
+    "area": "stats.js ĐANG CHẠY (sau #17+#40+#41+#42+#44+#46)",
+    "what": "Bản duy nhất trong scratchpad (`backend/stats.js`) là v119-49 GỐC (dòng 26 vẫn `if (!before)` — trước #41). N2-11/N3-5/N4-4/N4-12 và PB-6 (patch stats.js + recount lần 4) dựa trên 3 patch doc, không phải file deploy. `_l42_recount.mjs` chạy lại trước khi patch có đủ 'đóng' vấn đề không cũng chưa chốt.",
+    "howToCheck": "`grep -n 'LENH #4[0-6]\\|countable\\|roleBad\\|tempOf' stats.js` + `sed -n` 60 dòng statsEvents; kèm `node _l46_after.mjs` để biết backlog 252 đã ≈0 chưa trước recount."
+   },
+   {
+    "area": "push.js ĐANG CHẠY (sau LỆNH #12/#16/#46)",
+    "what": "`scratchpad/l46/try/push.js` là bản v119-43 dựng từ doc #11 (brandAdmins `if(!brand) return []`, KHÔNG có superAdmins) → không phải bản sau #12. N1-2/N4-5/PB-10 chưa biết super có nhận 'Lead nóng mới' với brand rỗng không; nghiệm thu #14 chỉ thấy log `push reply`.",
+    "howToCheck": "Dump `brandAdmins/superAdmins` + nhánh PU1 (40 dòng) và `gcloud logging read 'resource.labels.function_name=\"pushOnLead\" AND textPayload:\"push hot\"' --freshness=7d` đếm `sent N`."
+   },
+   {
+    "area": "Wrapper scheduledScan / manualScan (index.js ngoài fixture) + options Cloud Run",
+    "what": "Fixture chỉ có stub (:544). Chưa biết: giá trị `trigger` của Quét ngay ('manual'?), try/catch quanh scanAll (N1-1 (c)), `scan_jobs` có được đóng khi lỗi/timeout không (N3-10), hình dạng `summary` trả FE (N3-2), map `range→startDate/endDate` (N3-9), backend có đọc `config/app.autoScanEnabled/profileScanEnabled/profileScanMax` không (FE ghi ở Chấm điểm AI), timeout/maxInstances của manualScan (N3-10 giả định 540 s từ setGlobalOptions).",
+    "howToCheck": "`grep -n 'onSchedule\\|onRequest\\|autoScanEnabled\\|profileScan' index.js` → sed 40 dòng sau mỗi mốc; `gcloud functions describe manualScan --region asia-southeast1 --format='value(serviceConfig.timeoutSeconds,serviceConfig.maxInstanceCount,serviceConfig.availableMemory)'` (và scheduledScan)."
+   },
+   {
+    "area": "Firestore Rules cho sources / scanned_posts / scan_jobs / backfill_done / config write — và whitelist leads",
+    "what": "Dump #38 không được lưu vào repo (docs/lenh-2026-09-07-38.md không có dòng `match /`); chỉ có tóm tắt trong CLAUDE.md cho users/leads/outreach*/workers/scans/config. Ai được GHI `sources` (super hay cả admin brand?) quyết định PB-12(3) 'chặn trùng tên ở FE' có đủ hay không. Em đã đối chiếu whitelist #8 (`docs/lenh-2026-09-04-backend-v119-42.md:37`): 31 field KHÔNG có `phone`, `phone_has_zalo`, `dropped_reason`, `ai_feedback` → PA-5/PC-6/F-C2/N4-8 BẮT BUỘC kèm LỆNH Rules, không còn là Suy luận (chỉ còn rủi ro Rules live đã bị sửa tay sau #8).",
+    "howToCheck": "`grep -n 'match /' firestore.rules` + in nguyên block `sources`, `scanned_posts`, `scan_jobs`, `backfill_done`, `config`, và dòng `hasOnly([` của `leads` (so với 31 field #8)."
+   },
+   {
+    "area": "Index composite + TTL policy + job dọn",
+    "what": "Chưa xác nhận: `scanned_posts(brand ASC, createdAt DESC)` cho query brand user (live.js:1128) — CLAUDE.md chỉ nhắc 'index lạ CICAgJiH2JAK của scanned_posts'; `leads(ai_scored, detected_at)` #47 còn chờ; `cmt_scrape(qualified,lastAt)` nếu làm Q-3; `scanned_posts(brand,decision,createdAt)` nếu PC-7; TTL policy `scanned_posts.expireAt` là Firestore TTL hay function `cleanupScannedPosts` (L-3 verdict giả định tồn tại từ doc #22).",
+    "howToCheck": "`gcloud firestore indexes composite list --format=json | node -e '…in collectionGroup+fields'` (bài học #8d) + `gcloud firestore fields ttls list` + `gcloud functions list --regions asia-southeast1 | grep -i clean`."
+   },
+   {
+    "area": ".env — giá trị các khoá KHÔNG secret của mảng quét/chấm",
+    "what": "Chưa từng in: `LLM_PRICE_IN/OUT` (G-2 bị bác chỉ bằng phép tính ngược từ $0,0149, chưa thấy giá trị), `LLM_REASONING`, `LLM_TIMEOUT_MS`, `LLM_TRIES`, `ZALO_CHECK_ENABLED`, `RESCORE_FALLBACK/RESCORE_PER_RUN`, `SCAN_COMMENTS`, `COMMENTS_PER_POST`, `PROBE_POSTS`, `POSTS_PER_GROUP`, `FULLSWEEP_HOURS`, `MIN_KEEP_SCORE`, `HOT_THRESHOLD`, `BD_SOW_MODE`, `MOCK_MODE`. Nhiều verdict (N2-4, D-3, C-3(b), F-B6 HOT_THRESHOLD≠80) treo ở đây.",
+    "howToCheck": "`grep -E '^(LLM_PRICE_IN|LLM_PRICE_OUT|LLM_MODEL|LLM_PREFILTER_MODEL|LLM_REASONING|LLM_TIMEOUT_MS|LLM_TRIES|ZALO_CHECK_ENABLED|RESCORE_|SCAN_COMMENTS|COMMENTS_PER_POST|PROBE_POSTS|POSTS_PER_GROUP|FULLSWEEP_HOURS|MIN_KEEP_SCORE|HOT_THRESHOLD|BD_SOW_MODE|MOCK_MODE)' .env` (không in *_KEY/*_TOKEN/*_SECRET/URL)."
+   },
+   {
+    "area": "index.js / lib/scraper.js SẢN XUẤT sau #21 (v-sow) + #23 (v-sowc) + #32 + #46",
+    "what": "Fixture = dump #20 + #31b (số dòng 'index.js:NNN' trong 95 verdict là dòng FIXTURE, không phải file deploy); scraper.js scratchpad là bản trước #23 (không có `harvestComments`). Đường gặt comment theo lịch (gần như toàn bộ lượt) chỉ được rà qua doc #23 (N3-7 verdict dựa doc:112/128); dòng 242-243 fixture bị bỏ qua theo đề bài. Mọi LỆNH patch Đợt 1 (PB-1/2/3/4/5) đều cần mốc từ bản này.",
+    "howToCheck": "LỆNH dump: `grep -n 'v-sow\\|v-sowc\\|v-selfcmt\\|LENH #46\\|LENH #32' index.js lib/scraper.js` rồi `sed -n` Pha 1b→3b + `fetchPosts/fetchComments/harvestComments/normalizeComment` (che chuỗi ≥28) → `cloudshell download` 1 file."
+   },
+   {
+    "area": "Profile-scan BrightData (__bdProfTrigger/__bdProfCollect) + số tiền BrightData thật",
+    "what": "2 hàm không có trong dump nào (N4-10 Suy luận); `config/app.profileScanMax 5` chưa biết áp theo lượt hay ngày; data A5 xác nhận KHÔNG có con số BrightData thật nào → N1-9/N1-3/PB-7/PA-9 không định lượng được.",
+    "howToCheck": "Dump 2 hàm; script chỉ đọc: lead 30 ngày `profile_status` pending/done/error + tuổi pending; `bd_month/{ym}` in đủ field (bdRecords, bdCommentRecords, profile?, aiUsd, src[k])."
+   },
+   {
+    "area": "Automation dùng KẾT QUẢ chấm điểm sau khi AI đổi ý (sweeper #46 / rescore_role)",
+    "what": "Chưa rà: thread `outreach_threads` đang active/task queued cho lead mà sweeper vừa hạ junk / `dropped_by rescore*` / role seller — engine #44 R-1 chỉ dừng khi NGƯỜI THẬT vào (`humanTookOver`), không có nhánh 'AI rút lại'; content.js `parentKindOf` (#34) đọc `parent_text` — nếu N1-4 gán sai bài cha thì giọng bình luận sai; `roleBlockOf` lead cũ so tên với `parent_author`.",
+    "howToCheck": "Script chỉ đọc functions/: join `outreach_threads` (active hoặc task queued/running) ↔ `leads` → đếm lead `ai_scored===false` / `temp==='junk'` / `dropped_by=~/^rescore/` / role seller|poster_self; log `outreach_log` 7 ngày cho các lead đó."
+   },
+   {
+    "area": "Comment-lead END-TO-END (hợp đồng ID giữa scraper → lead → engine → worker)",
+    "what": "scraper `post_id='cmt_'+cid` (cid có thể numeric / base64 `comment:<post>_<cid>` giải mã / comment_url / khoá dự phòng); engine `commentIdOf` lấy số cuối; worker dựng `base64('feedback:<postId>_<commentId>')` cần postId SỐ nhưng `leads.post_id` RỖNG 100 % (data D) → suy từ post_url dạng posts|permalink|story.php? Chế độ force: `leadKey(lead.post_url)` với post_url bình luận = `comment_url||parentUrl` → thiếu comment_url thì các bình luận cùng bài đụng khoá (Q-2 verdict, Suy luận). Chưa ai đo.",
+    "howToCheck": "Script chỉ đọc 30 ngày: comment-lead có `comment_id` numeric / base64 / rỗng, `comment_url` rỗng %, `post_url` theo dạng URL; `outreach_log` comment-lead skip/fail theo lý do; 3 record comment thô từ 1 `pending_snapshots/C_*` (đếm record thiếu `comment_id` — N1-12)."
+   },
+   {
+    "area": "Lead của brand thứ 2 / brand rỗng",
+    "what": "N1-6 chỉ xét 2 nguồn trùng tên cùng group. Chưa xét: lead `brand` rỗng/`brand_pending:true` (nguồn chưa gán brand) nằm ở đâu trên web (Rules brand user không thấy, super thấy?), `tagLeadBrand` lưới dự phòng có chạy không; 2 brand cùng ngành khác group (buyer đăng chéo → 2 lead 2 brand là đúng hay trùng?).",
+    "howToCheck": "Script chỉ đọc: lead 30 ngày `brand` rỗng hoặc `brand_pending` true theo nguồn; `sources` có brand rỗng; cặp lead khác brand cùng `identityKey`/`phone`."
+   },
+   {
+    "area": "Số đo còn thiếu để chốt mức độ (nhiều verdict hạ/nâng sev theo Suy luận)",
+    "what": "(a) Q-3 (Cao duy nhất mảng quét) dựa lập luận 'bình luận chỉ được lấy đúng 1 lần' — đo được bằng `cmt_scrape` (lastAt−firstAt>0) & `commentsRefreshSkipped`; (b) N4-3 (Cao) — số lead trong backlog 252 có `first_care_at||assignee||stage≠new` chưa đếm (A3 gợi ý chỉ 4–6 lead chăm đầu/60 ngày/brand → có thể rất nhỏ); (c) độ trễ phát hiện & tỉ lệ `time` = giờ gặt (Q-4); (d) tỉ lệ record dư / sweep thật (N1-9/N1-3); (e) backlog 252 hiện còn bao nhiêu (PB-6 recount phụ thuộc).",
+    "howToCheck": "Gộp vào LỆNH 3 + 4 bên dưới (scans 7 ngày + kho lead 30 ngày + cmt_scrape + `node _l46_after.mjs`)."
+   }
+  ],
+  "unverified": [
+   "L-5 · F-A5 · N3-12 · F-A2 · L-1 · N3-3 · F-A3: ngữ nghĩa isExcluded (khớp thô/ranh giới từ/fold dấu) — lib/filter.js chưa dump; L-1 'chỉ exclude có tác dụng' độ chắc cao nhưng vẫn suy từ tên hàm + comment index.js:308.",
+   "Q-1 · D-2 · Q-2(force comment) · N4-10 · N4-11 · F-B4 · F-B6: nội bộ multitouch (mtIdentityKey rỗng?, leo thang điểm, merge có copy profile_*?, có đổi score mà giữ temp?) — lib/multitouch.js chưa dump; '~70 % lead không gộp' chưa trừ lead có phone/email.",
+   "N1-1 · D-3 · F-E1 · F-E2 · D-1: enrichPhoneFromText có ném lỗi không, regex SĐT backend, ngữ nghĩa `phone_has_zalo == null` — lib/zaloCheck.js chưa dump; wrapper scheduledScan có try/catch không (N1-1 vế 'mù hoàn toàn').",
+   "N2-11 · N3-5 · N4-4 · N4-12 · PB-6: stats.js đang chạy chỉ đọc qua patch doc #17/#41/#42 (bản scratchpad là v119-49 gốc, trước #41); 'rescore_role ĐÃ được trừ đúng' (N2-11/N4-4 verdict) đúng theo patch #42 nhưng chưa thấy file deploy.",
+   "N1-2 · N4-5 · PB-10: `brandAdmins('')` sau LỆNH #12 có cộng super không (bản push.js trong scratchpad là v119-43 trước #12, không có superAdmins); điều kiện Gateway ZBS `justTagged`/`tagLeadBrand` chưa đọc → rủi ro mất ZNS khi bỏ write 2.",
+   "N3-10: timeout manualScan = 540 s chỉ suy từ setGlobalOptions (#20 b) — chưa describe; 'scans không ghi khi bị cắt' Suy luận 2 chiều. N3-1: wrapper không truyền scanMethod — Suy luận theo chữ ký scanAll. N2-2/N1-7/N3-2/N3-9: giá trị `trigger` của Quét ngay, hình dạng `summary`, map range→ngày nằm trong wrapper chưa dump.",
+   "N3-11: `loadSources()` chỉ trả nguồn đang bật — suy từ sourcesCount 28→23, không phải code. N3-7: đường gặt #23 (harvestComments, uk normalized) chỉ đọc qua doc; scraper.js scratchpad là bản trước #23.",
+   "N1-4 · N3-7 · PB-12(0): tần suất comment lệch bài cha — bằng chứng duy nhất là comment code v-fixgrp; N1-12: BrightData có bao giờ bỏ trống comment_id không (code có nhánh giải mã base64 → dữ liệu thật CÓ id); N1-6/N3-8: tần suất trùng TÊN nguồn = 0 số liệu.",
+   "N1-9: 'sweep trả 20 bài cũ hơn mốc 200 đã seen, vẫn tính tiền' — Suy luận về hành vi BrightData và bị #22b (dead_page, 0 record) đi ngược; chỉ vế leo thang 5 record dư là chắc. N1-3: tỉ lệ sweep thật ~1/3 suy từ nhịp gieo 12′/lượt 3–4′.",
+   "Q-3 (nâng Vừa→Cao): lập luận code chắc (posts_to_not_include = recentIds ngay lúc gặt) nhưng 'bình luận của mỗi bài chỉ được lấy đúng 1 lần' chưa có số đo (cmt_scrape lastAt>firstAt, commentsRefreshSkipped). N4-3 (nâng Vừa→Cao): cơ chế chắc, ĐỘ LỚN chưa đo (bao nhiêu lead điểm tạm đã có người thật chạm).",
+   "N2-4: token suy nghĩ của gpt-5.6-sol (scans không ghi) — chỉ có nano 2.304 token từ #45; N2-12: model trả `is_real_lead` chuỗi/thang 0–1 — 0 bằng chứng; N2-6: 'đại lý bị chặn' — '47 mùi người bán' là heuristic SELLER_RE, chưa đọc lại tay; N2-5/N2-3/N1-10/N3-6/N4-6: kịch bản thiếu key / nano sập / 400 hệ thống chưa từng xảy ra.",
+   "C-3 ('40–50 % lead lạnh'), C-4 (tần suất miss-reply, không có bộ đếm), C-5 (Content Studio không map — content.js không trong bộ file), C-6 (tỉ lệ bài >1.500 ký tự), G-3, Q-4 (tỉ lệ `time` = giờ gặt): không có số trong data.",
+   "G-2 (BÁC): bác bằng phép tính ngược từ log $0,0149 (đơn giá pha trộn ≈$1,41/1M > trần mặc định $0,60) — hợp lý nhưng chưa in `.env LLM_PRICE_*`; giá đúng của gpt-5.6-sol vẫn chưa biết.",
+   "F-C2 · N2-9 · N4-8 · PA-5 · PC-6: verdict ghi 'Suy luận whitelist #8' — em ĐÃ kiểm `docs/lenh-2026-09-04-backend-v119-42.md:37`: 31 field KHÔNG có `phone`, `phone_has_zalo`, `dropped_reason`, `ai_feedback` → sales/admin ghi từ FE sẽ permission-denied; cần LỆNH Rules trước khi ship FE (còn lại chỉ rủi ro Rules live khác doc).",
+   "PB-1 (tần suất instance bị thu hồi; mốc patch trong vùng #46 phải dump lại), PB-7 (`_bd_waste` chưa có số), PA-9 (trần record comment chờ anh), PC-3 (số seller theo tác giả chưa đếm), PC-11 (cohort lạnh ≥14 ngày chưa có), PB-8 (P23 lịch quét thích ứng chưa chốt riêng)."
+  ],
+  "contradictions": [
+   "PB-4(2) 'khi preDown prefilter KHÔNG fail-open mà xếp bài vào score_retry' + ngưỡng 'cửa sổ trượt 15′' MÂU THUẪN với 3 verdict N1-10, N2-3, N3-6 (đều chốt GIỮ fail-open — lead kịp thời > vài cent; score_retry quá hạn biến sự cố tầng 1 rẻ thành lead dự phòng ≤59; N1-10 khuyên dùng `prev46` 2 lượt liên tiếp thay vì thêm state cửa sổ trượt). Giám khảo xếp PB-4 Đợt 1 (78) mà không hoà giải; nên giữ (1)(3)(4) cảnh báo + badreq, bỏ/hoặc mặc định TẮT phần defer tầng 1.",
+   "PB-3(1) `max_completion_tokens = LLM_MAX_TOKENS || 1200` MÂU THUẪN với N2-4 verdict ('KHÔNG đặt trần, hoặc ≥2000 kèm gấp đôi') và với chính data #45 (gpt-5-nano dùng 2.304 token suy nghĩ/bài → trần 1200 làm nano cụt `finish=length` ngay, tái tạo lỗi #28 mà LỆNH #29 đã phải nâng lên 2000). PB-3(3) timeout 30 s cũng trái N2-1 verdict (đề nghị 45 s) và #45 (nano 24 s/bài ở pool 10).",
+   "PB-3(6) và lý do gộp PA-11 'đơn giá mặc định gpt-4o-mini 0,15/0,60 nếu .env chưa đặt' MÂU THUẪN với G-2 ĐÃ BỊ BÁC (.env phải đang đặt ~10× mặc định); PB-3 và PA-11 dependsOn G-2 (refuted). Giữ 'ghi model + reasoning tokens vào scans', bỏ 'đặt lại giá'.",
+   "PB-2 gộp (b) lease transaction + (c) khoá lượt TTL `system_status/scan_lock` + (d) `seen` create() lên trên (a) gate theo trigger, trong khi N2-2 verdict nói sau (a) thì lease là 'dư' và N1-7 verdict nói khoá lượt TTL TỆ HƠN transaction (Quét ngay báo busy oan — PB-2 risk tự nhận). Đồng thời PB-1 risk 'phải đi kèm PB-2 lead id tất định' nhưng PB-2 đẩy (e) sang 'M làm sau' → vòng phụ thuộc chưa đóng (lease xoá lỗi → lead trùng id ngẫu nhiên).",
+   "PC-4(3) 'seen quay lại với hash khác → phát hiện bài đã sửa' MÂU THUẪN với N1-11 verdict ('Hash trong seen KHÔNG hiệu quả — bài trong recentIds không bao giờ được BrightData trả lại → bỏ hướng này'); giám khảo vẫn gộp phần 'bài đã sửa' của PA-10 vào PC-4.",
+   "PC-3 giữ khoá dự phòng `n:<fold(tên)>@<gid>` (chỉ thêm guard 'tên ≥2 từ') MÂU THUẪN với L-4 verdict ('KHÔNG theo tên bỏ dấu + group — tên trùng rất phổ biến → chặn nhầm người mua thật, ngược fail-closed') và quy tắc C.9; đúng theo verdict thì chỉ khoá theo `__slProfileKey31` (≈31 % bài).",
+   "PA-1(b) 'proxy → roleBlockOf chặn kết bạn/inbox người đăng hộ' MÂU THUẪN với N2-6 verdict ('em khuyên vẫn cho kết bạn/inbox — kênh liên hệ duy nhất, sai người là phóng đại'). PA-1(c) và PC-2(2) cùng đặt gate 'role rỗng/other → chỉ nhận khi hotness ≥60' MÂU THUẪN với N2-12 verdict ('KHÔNG nên — đổi yield theo giả định chưa đo; đếm scans.roleUnknown trước').",
+   "PB-6(1) 'dropped_by rescore → new −1' (AI tự loại trừ khỏi bộ đếm) và PB-5(2) 'human giữ temp tối thiểu cold' (AI nói không phải lead vẫn tính hợp lệ) MÂU THUẪN với nhau và với quy tắc anh chốt: C.11 (hợp lệ = AI ≥40, không junk) vs C.12 (sales bấm Loại vẫn hợp lệ) chưa nói gì về 'AI rút lại'. N3-5 verdict yêu cầu 'cần anh chốt trước, không tự làm' nhưng giám khảo đặt PB-6 vào Đợt 1 chỉ với 'báo anh trước'. PB-6 why còn nói KPI 14 ngày (939/250) đang phồng, trong khi N3-5 verdict chỉ ra backlog 26/08 nằm NGOÀI cửa sổ 14 ngày (chỉ Bảng brand/ROI 30 ngày tới ~25/09).",
+   "PB-9(3) scanned_posts id tất định `SP_<post_id>` + merge cho toàn bộ recordPost MÂU THUẪN với N2-10 và N4-9 verdict (KHÔNG nên: `watchScanned(jobId)` đếm theo doc mới từng lượt, bình luận cần khoá comment_id, force ghi đè lịch sử; chỉ cần guard `!x.deferredDoc`). PB-9(2) seen TTL 180 ngày khác Q-2 verdict 60 ngày (nhỏ).",
+   "Gói Đợt 1 của giám khảo 'LỆNH A = PB-5 + PB-3 + PB-4 + PB-2(a–d) trong 1 patch/1 deploy' MÂU THUẪN với ghi chú rủi ro của chính giám khảo (thay đổi ảnh hưởng chất lượng chấm phải có A/B/đường lùi, không gộp) — PB-3 `reasoning_effort` cần A/B 30 bài trước deploy, gộp chung nghĩa là PB-5 (khẩn, an toàn lead đang chăm) bị chặn theo A/B. Nên tách PB-5 + PB-2(a) (2 dòng) deploy trước.",
+   "Q-3 là finding Cao DUY NHẤT của nhóm quét nhưng không có đề xuất Đợt 1 nào giải nó (PA-9 watch_posts 52 điểm Đợt 2, PB-7 50 Đợt 2); ngược lại 4/8 mục Đợt 1 giải các finding Thấp/Vừa. Thứ hạng chưa nhất quán với mức độ (dù PA-9 hợp lý cần anh chốt trần record).",
+   "data-so-lieu B 'config.js chưa map BROWSER_SVC_URL/SECRET' (N3-1 desc + N1 notes dùng lại) MÂU THUẪN với Q-5 verdict + CLAUDE.md LỆNH #32 (06/09 đã map, `CFG.BROWSER_SVC_URL` 24 ký tự); kết luận N3-1 không đổi (0 nguồn nick) nhưng dữ kiện trong báo cáo phải sửa.",
+   "N3-9 seed 'force … có thể tạo lead trùng (Q-2)' MÂU THUẪN với N3-9 verdict + Q-2 verdict (force là chế độ DUY NHẤT chống trùng bằng `leadKey(post_url)` tất định; chỉ tốn AI chấm lại) — báo cáo cuối phải dùng verdict, không dùng câu seed.",
+   "F-F1 (bác) coi '1 group không thuộc 2 brand' là by-design, trong khi N1-6 verdict coi đó là 'by-design của FE, chưa phải quy tắc anh chốt → câu hỏi sản phẩm chờ anh'. Cần 1 câu hỏi chốt duy nhất trong mục 'cần anh chốt'.",
+   "Đề xuất chạm mảng anh chốt không đụng: Q-5 fix 'quét group riêng tư qua worker AdsPower', D-2 fix (b) 'worker mở post_url đọc author_url', N1-11 (c) 'worker onSkip stampLead' — đều sửa worker/VPS (C.8: không đụng nếu chưa bàn); PA-5 đã bỏ (b) nhưng N1-11 (c) và Q-5 vẫn nằm trong verdict fixNote. L-2 fix 'chặn bật quét khi thiếu Hồ sơ AI' chạm Q6 (verdict đã đổi thành cảnh báo). C-3(a)/PC-11 'lạnh = Theo dõi không đếm KPI' đụng C.11; C-1 fix 'ngưỡng nóng/ấm theo brand' đụng C.14 + F-B6 verdict 'TUYỆT ĐỐI không đổi ngưỡng'.",
+   "N2-9 verdict ('lý do AI chấm lại ĐÃ hiện qua ghi chú hệ thống trong Dòng thời gian 360° + 3 ghi chú mới nhất trên thẻ') vs N4-8 verdict/PC-6 why ('sales không thấy lý do, không thể phản bác') — tác động PC-6 bị nói quá; cả 2 đều Thấp nên chỉ cần sửa lời.",
+   "Hai khái niệm 'sow' khác nhau trong cùng file: `sowMode` (#21, gieo/gặt BrightData) và `sow46` (#46, nạp score_retry + sweeper). PB-2(a) sửa `sow46` theo trigger, còn N3-2 'Gieo ngay' muốn lượt tay ĐI `sowMode` — hai hướng ngược chiều cho cùng chữ 'sow', patch content-anchored dễ nhầm mốc; cần đặt tên rõ trong LỆNH."
+  ],
+  "lenhChiDoc": [
+   "LỆNH R1 — DUMP MÃ ĐANG CHẠY (che chuỗi ≥28 ký tự, 1 file `~/scan-dump-0912.txt` → cloudshell download): `lib/filter.js` (toàn bộ) · `lib/multitouch.js` (toàn bộ) · `lib/zaloCheck.js` (enrichPhoneFromText + regex + doCheck/cacheDays) · `lib/alerts.js` + grep `channels|zalo_notified|notify` trong index.js · `stats.js` (statsEvents + grep marker LENH #40–#46) · `push.js` (brandAdmins/superAdmins + nhánh hot PU1) · wrapper `scheduledScan/manualScan` (grep -n onSchedule|onRequest|autoScanEnabled|profileScan → 40 dòng sau mỗi mốc) · `__bdProfTrigger/__bdProfCollect` · index.js Pha 1b→3b + scraper.js fetchPosts/fetchComments/harvestComments/normalizeComment theo marker v-sow/v-sowc/v-selfcmt/LENH #46/#32 · `firestore.rules` các block `sources`, `scanned_posts`, `scan_jobs`, `backfill_done`, `config` + dòng `hasOnly([` của `leads`. Mục tiêu: đóng ~20 mục Suy luận (L-5/F-A5/N3-12, Q-1/D-2/N4-10/N4-11, N1-1/D-3/F-E1, N2-11/N3-5/N4-4, N1-2/N4-5/PB-10, N3-10/N3-1/N3-2/N3-9/N3-11, N3-7).",
+   "LỆNH R2 — HẠ TẦNG & CẤU HÌNH: `gcloud functions describe manualScan` và `scheduledScan` (--region asia-southeast1: timeoutSeconds, maxInstanceCount, availableMemory) · `gcloud firestore indexes composite list --format=json` lọc collection leads/scanned_posts/cmt_scrape/score_retry (có `scanned_posts(brand, createdAt)`? `leads(ai_scored, detected_at)` #47?) · `gcloud firestore fields ttls list` (scanned_posts.expireAt, outreach_log, seen?) · `gcloud functions list | grep -i clean` (cleanupScannedPosts) · `.env` in `KEY=value` CHỈ cho LLM_PRICE_IN/OUT, LLM_MODEL, LLM_PREFILTER_MODEL, LLM_REASONING, LLM_TIMEOUT_MS, LLM_TRIES, ZALO_CHECK_ENABLED, RESCORE_*, SCAN_COMMENTS, COMMENTS_PER_POST, PROBE_POSTS, POSTS_PER_GROUP, FULLSWEEP_HOURS, MIN_KEEP_SCORE, HOT_THRESHOLD, BD_SOW_MODE, MOCK_MODE (không *_KEY/*_TOKEN/*_SECRET/URL) · `config/app` in danh sách field + giá trị keywords/exclude/scanIntervalMin/aiMode/scanComments/scanMethod/profileScan* (F-A2: bẫy gộp đã bị kích chưa). Mục tiêu: chốt G-2, N3-10, N2-4, D-3, F-B6, #47, N3-1.",
+   "LỆNH R3 — NHẬT KÝ QUÉT 7 NGÀY (script functions/ chỉ đọc `scans` + `pending_snapshots` + `cmt_scrape` + `group_state` + `scan_jobs`): theo lượt in trigger, durationMs, bdRecords, postsFetched, skippedSeen, sweepRuns, probeEscalated, commentsFetched, bdCommentRecords, commentsRefreshSkipped, backfillSkipped, scoreErrors, llmOk/llmFail/llmDeferred/llmFallback/llmRescored/llmPreFail; tổng: Σ(bdRecords−postsFetched) ÷ ΣbdRecords (N1-9 record dư), số lượt sweepRuns>0 có bdRecords>0 (N1-3 sweep thật), số doc `cmt_scrape` có lastAt−firstAt > 1 h (Q-3: bình luận có bao giờ được gieo lần 2?), `pending_snapshots` C_/P_ tồn và tuổi, `group_state` lastSweepAt/lastTriggerAt tuổi, `scan_jobs` status running > 30′ (N3-10), lượt trigger manual có bdRecords>0 (N3-2). Mục tiêu: chốt Q-3 Cao, N1-3/N1-9/PB-7, N3-2/N3-10.",
+   "LỆNH R4 — KHO LEAD 30 NGÀY (script functions/ chỉ đọc, ≤2.000 lead, chạy sau `node _l46_after.mjs`): (a) `ai_scored:false` còn lại; `rescored_at` 24 h; phân bố `dropped_by` (rescore/rescore_role/lenh31b/email/rỗng); TRONG lead sweeper đã chấm lại: bao nhiêu có `first_care_at||assignee||stage≠'new'` và `temp==='junk'` (N4-3 độ lớn); `group_count>=2` (N4-11); (b) `phone` theo prefix +842x vs di động, `phone_has_zalo` true/false/null/thiếu, `author_url` %, `identityKey` rỗng %, `brand` rỗng/`brand_pending`, `post_id` rỗng %, `kind=comment` với `comment_id` numeric/base64/rỗng và `comment_url` rỗng %, |detected_at − time| < 60 s (Q-4 lag giả) và trung vị lag theo nguồn; (c) cặp lead cùng brand ≤14 ngày có fold(text) 300 ký tự đầu trùng ≥0,8 (Q-1 số trùng thật, loại text <80 ký tự). Mục tiêu: chốt N4-3, Q-1, D-1/D-2/D-3, Q-4, PB-6 timing.",
+   "LỆNH R5 — BÀI ĐÃ QUÉT & NGUỒN (script chỉ đọc `scanned_posts` 3 ngày + `sources` + `config/app`): decision phân bố theo nguồn/brand (prefiltered_out %, excluded %, seller/self_comment, ai_wait, no_keyword); kind=comment: `brand` doc ≠ brand của nguồn theo gid(parent_url) và parent_url không có trong URL nguồn nào (N3-7/N1-4 tần suất lệch — bước (0) của PB-12); số bài `ai_wait` trùng post_url (N2-10); `sources`: tên trùng sau fold (N1-6/N3-8), brand rỗng, `authAccountId` còn, keywords/exclude riêng từng nguồn (nội dung exclude thật — F-A5 'tuyển'/'pass'); 3 record comment thô từ 1 snapshot C_ (tên field id/user_url thật — N1-12/D-2(a)). Mục tiêu: chốt PB-12, N1-6, F-A5, N1-12, D-2.",
+   "LỆNH R6 — VÒNG NHẬN DIỆN ↔ AUTOMATION & THÔNG BÁO (chỉ đọc): (a) join `outreach_threads` active / `outreach_tasks` queued|running ↔ `leads` → đếm lead `ai_scored===false`, `temp==='junk'`, `dropped_by=~/^rescore/`, role seller|poster_self (máy đang chạm lead AI đã bác); (b) `gcloud logging read` 7 ngày function pushOnLead textPayload:\"push hot\" (đếm `sent N`, N>0 cho admin brand?) — chốt N4-5/N1-2; (c) lead hot 7 ngày có `zalo_notified` / `brand_tagged_by` / `brand_pending` (ZBS gateway có bắt không — điều kiện tiên quyết PB-10); (d) `outreach_log` 7 ngày comment-lead theo lý do skip/fail (hợp đồng ID comment_id). Mục tiêu: đóng gap 13/14/15 và điều kiện an toàn của PB-10."
+  ],
+  "notes": "Tổng quan: 100/100 phát hiện đều có verdict (52 seed + 48 mới; 39 confirmed / 56 partial / 5 bác), sev sau verdict: 4 Cao (Q-3, F-A2, N3-12, N4-3 — F-A2 và N3-12 cùng gốc fallback gộp keyword), 33 Vừa, 58 Thấp; 34/95 verdict hạ sev, 2 nâng. Lớp verdict nhìn chung tốt (bác đúng 5 mục, hạ sev có lý do code), nhưng 46/95 verdict vẫn chứa 'Suy luận' vì 7 file backend chưa từng được dump (filter/multitouch/zaloCheck/alerts/stats/push deploy/wrapper) và fixture là bản #20+#31b (số dòng không phải file sản xuất). Điểm đáng lưu ý nhất cho anh: (1) Đợt 1 của giám khảo có 4 chỗ đề xuất đi ngược verdict của chính vòng rà (PB-4 defer tầng 1, PB-3 trần 1200 token/timeout 30 s, PB-2 khoá lượt, PB-9 id SP_) → cần sửa đề xuất trước khi soạn LỆNH; (2) PB-6/PB-5 đụng khoảng trống giữa quy tắc C.11 và C.12 ('AI rút lại lead' có còn hợp lệ không) → phải hỏi anh, không tự chốt; (3) Q-3 là Cao duy nhất nhóm quét nhưng không có mục Đợt 1; (4) whitelist Rules #8 em đã đối chiếu: KHÔNG có phone/phone_has_zalo/dropped_reason/ai_feedback → mọi zip FE ghi các field này cho sales/admin phải đi kèm LỆNH Rules. 6 LỆNH chỉ đọc ở trên là tiền đề để chuyển ~25 mục từ Suy luận sang chắc và định lượng 4 mục Cao trước khi patch."
+ }
 }

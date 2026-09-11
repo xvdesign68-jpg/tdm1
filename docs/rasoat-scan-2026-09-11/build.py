@@ -62,6 +62,7 @@ details{{margin:10px 0 0;color:var(--ink-2)}} summary{{cursor:pointer;font-weigh
 .tag{{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--brand-soft);color:var(--brand);font-family:'Plus Jakarta Sans',sans-serif}} .tag.eff-s{{background:var(--lo-bg);color:var(--lo)}} .tag.eff-l{{background:var(--md-bg);color:var(--md)}} .tag.tier{{background:var(--ink);color:var(--card)}} .tag.touch{{background:var(--code);color:var(--ink-2)}}
 .prop p{{margin:8px 0 0;color:var(--ink-2)}} .prop .meta{{font-size:12.5px;color:var(--ink-3)}} .prop .meta span{{font-weight:700}} .prop .how span,.prop .risk span{{font-weight:700;color:var(--ink)}}
 .tw{{overflow-x:auto;max-width:100%}} .tbl td,.tbl th{{overflow-wrap:anywhere}} code{{overflow-wrap:anywhere}}
+.adj{{background:var(--md-bg);border-radius:14px;padding:12px 16px;margin:0 0 14px}} .adj h3{{margin:0 0 6px}} .adj ul{{margin:0;padding-left:20px}} .adj li{{margin:5px 0;color:var(--ink-2)}}
 .muted{{color:var(--ink-3)}} .ask{{background:var(--md-bg);border-radius:12px;padding:10px 14px}} ul.road{{padding-left:20px}} ul.road li{{margin:6px 0}}
 ul.qs{{padding-left:20px}} ul.qs li{{margin:10px 0}} .opt{{color:var(--ink-2);font-size:13.5px;margin-top:2px}}
 pre{{background:var(--code);padding:12px 14px;border-radius:12px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.5}}
@@ -78,7 +79,7 @@ pre{{background:var(--code);padding:12px 14px;border-radius:12px;overflow-x:auto
 <section id="verify"><h2>Kiểm chứng đối kháng</h2><p class="lead">{md(V['intro'])}</p><div class="kpis">{vk}</div><details><summary>Phát hiện đã BÁC BỎ ({len(V['refuted'])}) — không đưa vào bảng</summary><ul>{vref}</ul></details></section>
 <section><h2>Bảng điểm theo phân hệ</h2><div class="tw"><table class="tbl"><thead><tr><th>Phân hệ</th><th>Điểm</th><th>Nhận xét</th></tr></thead><tbody>{score_rows}</tbody></table></div></section>
 {''.join(sections)}
-<section id="props"><h2>Đề xuất thông minh</h2><p class="lead">{md(J['props_intro'])}</p>{proposals(J['proposals'])}</section>
+<section id="props"><h2>Đề xuất thông minh</h2><p class="lead">{md(J['props_intro'])}</p>{('<div class="adj"><h3>Điều chỉnh sau critic (đã áp vào tier và nội dung)</h3><ul>'+''.join('<li>'+md(x)+'</li>' for x in J.get('critic_adjust',[]))+'</ul></div>') if J.get('critic_adjust') else ''}{proposals(J['proposals'])}</section>
 <section id="road"><h2>Lộ trình đề xuất</h2><ul class="road">{road}</ul></section>
 <section id="qs"><h2>Câu hỏi chờ anh chốt</h2><ul class="qs">{qs}</ul></section>
 <section id="lenh"><h2>LỆNH chỉ đọc nên chạy để chốt số</h2>{md(J['lenh'])}</section>

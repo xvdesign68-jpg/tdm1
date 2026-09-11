@@ -61,15 +61,15 @@ crit=R.get('critic')
 lenh=N['lenh']
 method=N['method']
 if crit:
-    gaps=crit.get('gaps') or []
-    if gaps: lenh+='\n\n**Critic bổ sung (còn thiếu):** '+' · '.join(f"{g.get('area','')}: {g.get('what','')} ({g.get('howToCheck','')})" for g in gaps[:8])
     lc=crit.get('lenhChiDoc') or []
-    if lc: lenh+='\n\n**Critic đề nghị LỆNH chỉ đọc:** '+' · '.join(lc[:8])
+    if lc: lenh=N.get('lenh_intro',N['lenh'])+'\n'+'\n'.join(f"{i+1}. {x}" for i,x in enumerate(lc))
+    gaps=crit.get('gaps') or []
+    if gaps: lenh+='\n\n**Mảng chưa rà (critic):** '+' · '.join(f"**{g.get('area','')}** — {cut(g.get('what',''),260)}" for g in gaps)
     unv=crit.get('unverified') or []
-    if unv: method+='\n\n**Critic: còn dựa Suy luận / verdict yếu:** '+', '.join(unv[:40])
+    if unv: method+='\n\n**Critic — còn dựa Suy luận / verdict yếu ('+str(len(unv))+' nhóm):** '+' · '.join(cut(x,220) for x in unv)
     con=crit.get('contradictions') or []
-    if con: method+='\n\n**Critic: mâu thuẫn cần lưu ý:** '+' · '.join(con[:8])
-J={'meta':N['meta'],'summary':N['summary'],'pipeline_intro':N['pipeline_intro'],'pipeline':P['pipeline'],'verify':{'intro':N['verify']['intro'],'kpis':N['verify']['kpis'],'refuted':refuted},'scorecard':N['scorecard'],'groups':groups,'props_intro':N['props_intro'],'proposals':out_props,'roadmap':N['roadmap'],'questions':N['questions'],'lenh':lenh,'method':method}
+    if con: method+='\n\n**Critic — '+str(len(con))+' mâu thuẫn đề xuất ↔ verdict, đã xử lý ở mục "Điều chỉnh sau critic":** '+' · '.join(cut(x,200) for x in con)
+J={'critic_adjust':N.get('critic_adjust',[]),'meta':N['meta'],'summary':N['summary'],'pipeline_intro':N['pipeline_intro'],'pipeline':P['pipeline'],'verify':{'intro':N['verify']['intro'],'kpis':N['verify']['kpis'],'refuted':refuted},'scorecard':N['scorecard'],'groups':groups,'props_intro':N['props_intro'],'proposals':out_props,'roadmap':N['roadmap'],'questions':N['questions'],'lenh':lenh,'method':method}
 json.dump(J,open(os.path.join(here,'findings.json'),'w',encoding='utf-8'),ensure_ascii=False,indent=1)
 from collections import Counter
 print('findings',sum(len(g['findings']) for g in groups),Counter(f['sev'] for g in groups for f in g['findings']),'props',len(out_props),'judges',len(judges),'critic',bool(crit))

@@ -14,7 +14,7 @@ Anh yêu cầu: "check kĩ và toàn diện hệ thống lọc, quét, nhận di
 ```
 python3 assemble.py && python3 build.py      # → findings.json + report.html
 ```
-Workflow script: `scratchpad/wf/rasoat-scan-lead.mjs` (ephemeral; 4 finder → verify lô 8 → 3 góc đề xuất → 2 giám khảo → critic; ~25 agent, ~2 h, ~8 M token). Bài học: resume theo cache cần args GIỐNG HỆT (1 dấu chấm khác trong seedIndex → 25 agent chạy lại).
+Workflow script: `scratchpad/wf/rasoat-scan-lead.mjs` (ephemeral; 4 finder → verify lô 8 → 3 góc đề xuất → 2 giám khảo → critic; ~25 agent, ~2 h, ~8 M token). Bài học: resume theo cache cần args GIỐNG HỆT (1 dấu chấm khác trong seedIndex → cache miss) và cache là PREFIX theo thứ tự gọi agent — script có concurrency thì thứ tự gọi đổi khi replay → agent phía sau chạy lại; vì vậy 2 agent rớt (giám khảo 2 + critic) được chạy lại bằng workflow riêng `judge2-critic.mjs` đọc đầu vào cache từ file (`judge-input.json`/`critic-input.json`).
 
 ## Kết quả ngắn
 - 100 phát hiện thô → **95 giữ (4 Cao · 33 Vừa · 58 Thấp)**, 5 bác (G-2, F-C4, F-D1, F-D6, F-F1), 40 đổi mức.

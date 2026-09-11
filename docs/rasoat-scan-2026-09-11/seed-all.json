@@ -1,0 +1,470 @@
+[
+ {
+  "id": "Q-1",
+  "group": "quet",
+  "sev": "Vừa",
+  "title": "Lead trùng người / trùng bài chéo group không gộp được với ~70 % lead",
+  "where": "index.js:369–381 (`tryMergeTouch` + `mtIdentityKey(author_url, phone, email)`, cửa sổ 48 h) · scraper.js:13–15 (`author` mặc định 'Ẩn danh', `post_id` riêng từng group)",
+  "desc": "Gộp đa-chạm (multitouch) chỉ nhận ra cùng 1 người khi có `author_url` (≈31 % lead), SĐT hoặc email. Người đăng cùng 1 bài \"cần tìm…\" lên 4–5 group (rất phổ biến ở group mua bán VN) mà không có link profile → 4–5 lead riêng, sales gọi 4–5 lần cùng 1 khách, KPI \"lead hợp lệ\" thổi phồng.",
+  "fix": "Thêm dấu vân tay VĂN BẢN (chuẩn hoá bỏ dấu/khoảng trắng, hash 200 ký tự đầu hoặc shingle 8-gram, Jaccard ≥ 0,8) trong 7–14 ngày: trùng → gộp thành `touches` + `group_count`++ (tín hiệu nhu cầu mạnh hơn) thay vì lead mới."
+ },
+ {
+  "id": "Q-2",
+  "group": "quet",
+  "sev": "Vừa",
+  "title": "`seen/{post_id}` không có TTL, tăng vô hạn; lead không có khoá duy nhất theo bài",
+  "where": "index.js:18 (`seenDoc`), 315–326 (ghi seen theo lô, lỗi commit bị nuốt) · 384–389 (`db.collection('leads').doc()` id ngẫu nhiên, chỉ `force` mới dùng `leadKey(post_url)`)",
+  "desc": "Mọi bài/bình luận từng lấy (kể cả rác) đều để lại 1 doc `seen` vĩnh viễn (ước ~1.300 record/ngày → ~40 k doc/tháng). Chống trùng lead dựa HOÀN TOÀN vào `seen`; nếu lô ghi seen lỗi (catch im lặng dòng 326) hoặc nguồn bị quét lại (backfill/force) thì cùng 1 bài có thể thành 2 lead vì id lead ngẫu nhiên.",
+  "fix": "(a) id lead tất định = `L_<post_url|comment_url>` (đã có `leadKey`) cho MỌI chế độ, `create()` thay `set()` → idempotent; (b) `seen` gắn `expireAt` 60 ngày + TTL policy (BrightData `posts_to_not_include` ≤200 + probe dừng ở bài seen đầu vẫn giữ chi phí)."
+ },
+ {
+  "id": "Q-3",
+  "group": "quet",
+  "sev": "Vừa",
+  "title": "Bình luận chỉ được quét lại cho bài NẰM TRONG lượt (20 bài mới nhất) — bài cũ có bình luận mới bị bỏ",
+  "where": "index.js:235–245 (`cand` chỉ dựng từ `collected` lượt này) · 246–277 (nhịp refresh 3 h/12 h chỉ áp cho bài trong `cand`)",
+  "desc": "Bài bán hàng đăng 2 ngày trước rơi khỏi 20 bài mới nhất của group → không bao giờ được gọi dataset comment nữa, dù người mua vẫn vào hỏi \"còn không / giá bao nhiêu\" (đúng kiểu comment-lead giá trị nhất theo LỆNH #34). Chế độ `qualified_only` còn cắt sớm hơn.",
+  "fix": "Hàng đợi \"bài đáng theo dõi\": bài có ≥1 comment-lead hoặc bài bán hàng có tương tác cao → refresh comment theo nhịp riêng (6 h, tối đa 3 ngày) độc lập với việc bài còn trong top 20; giới hạn N bài/nguồn để giữ chi phí."
+ },
+ {
+  "id": "Q-4",
+  "group": "quet",
+  "sev": "Thấp",
+  "title": "Không đo \"độ trễ phát hiện\" (giờ đăng → giờ phát hiện)",
+  "where": "index.js:445 (`time: x.post.time` chuỗi BrightData) · 452 (`detected_at`) — không có field/thống kê chênh lệch",
+  "desc": "Lead nóng phát hiện sau 3 giờ khác hẳn sau 15 phút (khách đã chốt với người khác). Hiện không biết nguồn nào chậm, nhịp gieo 10′ có đủ không; KPI SLA chỉ tính từ `detected_at`.",
+  "fix": "Ghi `post_ms` (parse `time`) + `detect_lag_min` lên lead; thống kê trung vị theo nguồn ở Lịch sử quét/Bảng brand; cảnh báo khi trung vị > 60′."
+ },
+ {
+  "id": "Q-5",
+  "group": "quet",
+  "sev": "Thấp",
+  "title": "Nguồn `authAccountId` (quét bằng nick) còn nguyên đường code chết + 5 nguồn đã tắt",
+  "where": "index.js:174–198 (`fetchPostsAuth`, cần `BROWSER_SVC_URL`) · LỆNH #22 tắt 5 nguồn `test-agency`",
+  "desc": "Đường quét group riêng tư bằng nick vẫn được duyệt mỗi lượt cho nguồn có `authAccountId`; hiện 0 nguồn bật nên vô hại, nhưng bật lại là quay về `scrapeErrors` cố định nếu thiếu cookie/BROWSER_SVC.",
+  "fix": "Giữ tắt; nếu cần group riêng tư thì đi qua worker AdsPower (đã có nick + proxy) thay vì microservice cookie."
+ },
+ {
+  "id": "L-1",
+  "group": "loc",
+  "sev": "Cao",
+  "title": "Từ khoá INCLUDE (toàn cục + theo nguồn + thư viện ngành) KHÔNG ảnh hưởng gì tới quét/chấm — chỉ `exclude` có tác dụng",
+  "where": "index.js:34 (`gKw`), 168 (`effSrc.keywords`), 322 (`const pass = !isExcluded(x.post.text, x.effSrc)` — cổng DUY NHẤT) · scorer.js:133–147 (`scoreLead` chỉ đọc `source.industry`, không đọc `keywords`)",
+  "desc": "Trang \"Từ khoá & bộ lọc\", bước 3 wizard, nút \"Thêm bộ keyword ngành\" đều ghi `config.keywords`/`source.keywords` nhưng scanner không dùng ở bất kỳ tầng nào (không gate, không đưa vào prompt). Người vận hành tin rằng thêm từ khoá = quét trúng hơn; thực tế chỉ `exclude` đổi kết quả. Đây là ô cấu hình \"giả\" lớn nhất của mảng quét.",
+  "fix": "Biến từ khoá thành TỪ VỰNG BRAND đưa vào prompt tầng 1 + tầng 2 (\"khách brand này hay viết: …\") và làm dấu hiệu cộng điểm minh bạch; tuỳ chọn per-source `strict:true` = phải khớp ≥1 từ khoá mới gọi AI (tiết kiệm ở group ồn). Sửa nhãn UI cho đúng vai trò."
+ },
+ {
+  "id": "L-2",
+  "group": "loc",
+  "sev": "Cao",
+  "title": "Prompt tầng 1 & tầng 2 viết cho AGENCY MARKETING, hồ sơ brand chỉ là đoạn \"ghi đè\" nối đuôi",
+  "where": "scorer.js:23–33 (SYS: \"bộ lọc lead cho một agency marketing\", tiêu chí loại/gợi ý service marketing) · 38–43 (PRE_SYS liệt kê ads/TikTok Shop/KOC…) · 9–21 (`brandAiCtx` nối sau, bảo \"áp dụng THAY CHO mặc định\")",
+  "desc": "Brand không có hoặc thiếu Hồ sơ AI (`brands.ai` rỗng, nguồn chưa gán brand) → AI chấm theo tiêu chí agency marketing: khách hải sản/tuyển dụng bị tầng 1 trả `maybe:false` và biến mất im lặng (`prefiltered_out`, TTL 3 ngày, không ai xem lại). Ngay cả khi có hồ sơ, mô hình phải \"giải\" 2 bộ tiêu chí mâu thuẫn → điểm dao động; `service` gợi ý vẫn bị kéo về danh sách marketing.",
+  "fix": "Dựng prompt THEO BRAND từ đầu (ngành, sản phẩm, khách mục tiêu, ví dụ lead thật/không phải lead của chính brand) — không còn khối \"agency marketing\" mặc định; brand chưa có hồ sơ → chặn bật quét cho nguồn đó thay vì chấm sai. Tầng 1 thêm trường `reason` ngắn để soi."
+ },
+ {
+  "id": "L-3",
+  "group": "loc",
+  "sev": "Vừa",
+  "title": "Bài tầng 1 loại (prefiltered_out ≈ 50 % bài) không thể kiểm lại: TTL 3 ngày + không có nút \"chấm lại\"",
+  "where": "index.js:84 (`TTL_MS` = `SCANNED_TTL_DAYS` 3), 136 (`expireAt` cho bài không giữ), 349 (`decision:'prefiltered_out'`)",
+  "desc": "Không có cách đo tỷ lệ bỏ sót (false negative) của tầng 1 — 14/27 bài trong mẫu 3 h bị loại bởi model rẻ, không ai biết đúng sai. Sau 3 ngày bằng chứng bị xoá.",
+  "fix": "(a) Giữ bài `prefiltered_out` 14 ngày (bản rút gọn 600 ký tự — chi phí Firestore nhỏ); (b) mỗi tuần lấy mẫu 50 bài/brand chấm lại bằng model mạnh → báo % bỏ sót; (c) nút \"Chấm lại bằng AI\" trên Bài đã quét (CF `rescorePost`) → bài đúng thành lead + thành ví dụ huấn luyện."
+ },
+ {
+  "id": "L-4",
+  "group": "loc",
+  "sev": "Vừa",
+  "title": "Không có bộ nhớ NGƯỜI BÁN: cùng 1 người bán đăng mỗi ngày vẫn tốn tầng 1 + tầng 2 lặp lại",
+  "where": "index.js:312–325 (Pha 2 chỉ kiểm `seen` theo bài + `self_comment`) · 414–416 (vai `seller` chỉ dùng cho bài đó)",
+  "desc": "Group mua bán có 20–30 % bài là người bán đăng lặp (LỆNH #31a: 47 bình luận \"mùi người bán\", KHỐI 4: 5 seller/3 h). Mỗi bài mới của họ lại đi qua 2 tầng AI rồi mới bị gắn seller → tốn tiền, chậm lượt, và thỉnh thoảng lọt thành lead.",
+  "fix": "`author_memory/{profileKey|tên bỏ dấu+group}`: AI gắn seller/poster_self ≥2 lần trong 30 ngày → Pha 2 bỏ qua trước AI (decision `seller_known`), hết hạn 60 ngày; ngược lại người từng là lead chốt/đang chăm quay lại đăng → cờ \"khách cũ quay lại\" + push cho sales."
+ },
+ {
+  "id": "L-5",
+  "group": "loc",
+  "sev": "Thấp",
+  "title": "`exclude` là chuỗi khớp thô, không biết ranh giới từ/dấu (không xem được `lib/filter.js`)",
+  "where": "index.js:322 (`isExcluded`) — `lib/filter.js` chưa dump",
+  "desc": "Từ loại ngắn (vd \"tuyển\") có thể chặn cả \"tuyển chọn hải sản\"; không rõ có bỏ dấu/khoảng trắng. Cần dump 1 lần để kết luận.",
+  "fix": "LỆNH chỉ đọc dump `lib/filter.js`; nếu khớp thô → ranh giới từ Unicode + bỏ dấu + hiển thị \"bài này bị loại bởi từ X\" trong Bài đã quét."
+ },
+ {
+  "id": "C-1",
+  "group": "cham",
+  "sev": "Cao",
+  "title": "Điểm AI là 1 con số \"cảm tính\" — không có tiêu chí con, không có độ tin cậy, `weights` gần như vô hiệu",
+  "where": "scorer.js:25 (JSON chỉ có `hotness`), 124–131 (`weightsHint` → \"Ưu tiên chấm điểm theo trọng số: Ngân sách: 30 %…\" — model không thể áp dụng số %), index.js:6 (`tempOf` 80/60/40 cứng)",
+  "desc": "Không thể giải thích vì sao lead này 82 mà lead kia 58; không hiệu chỉnh được theo brand; trang \"Chấm điểm AI\" cho chỉnh trọng số nhưng thực chất chỉ đổi 1 câu văn trong prompt. Hiệu chỉnh điểm (calibCard) chỉ hiển thị, không tác động ngược.",
+  "fix": "Chấm THEO TIÊU CHÍ CON (0–3 mỗi mục: nhu cầu rõ · gấp/thời điểm · ngân sách/quy mô · khớp sản phẩm brand · có cách liên hệ) + `confidence`; `hotness` = tổng trọng số TÍNH BẰNG CODE từ `config.weights` → trọng số có tác dụng thật, thẻ lead hiện \"vì sao điểm này\", ngưỡng nóng/ấm chỉnh được theo brand."
+ },
+ {
+  "id": "C-2",
+  "group": "cham",
+  "sev": "Cao",
+  "title": "Không có vòng phản hồi: sales bấm Loại / Không thành / AI chấm lại loại… nhưng AI không học được gì",
+  "where": "FE: `dropped`, `lost_reason`, `rescore`, calibCard chỉ đọc · backend: prompt cố định, không ví dụ theo brand",
+  "desc": "Mỗi ngày đội sales tạo ra nhãn thật (lead nào là rác, lý do không thành, deal chốt) — hiện chỉ để đếm KPI. Sai lặp lại cùng kiểu (vd tin cho thuê mặt bằng chấm nóng cho brand hải sản) không tự hết.",
+  "fix": "\"Sổ tay brand\" tự học: mỗi tuần 1 CF gom 20 lead bị loại + 20 lead chốt gần nhất → model tóm thành 5–8 quy tắc ngắn (positive/negative) lưu `brands.ai.rules` → nối vào prompt; kèm 3–5 ví dụ thật (few-shot) theo brand. Super duyệt trước khi áp (1 nút)."
+ },
+ {
+  "id": "C-3",
+  "group": "cham",
+  "sev": "Vừa",
+  "title": "Lead lạnh 40–59 (≈ 40–50 % lead hợp lệ) vào thẳng feed như lead thật",
+  "where": "config.js:18 (`MIN_KEEP_SCORE` 40) · index.js:415 · số #41: hscl-01 60 ngày 637 hợp lệ / 140 nóng",
+  "desc": "Lead lạnh chiếm phần lớn khối lượng nhưng tỷ lệ chốt thấp (calibCard có thể xác nhận), làm feed dài, đội sales mất niềm tin vào chip \"Nóng/Ấm/Lạnh\"; automation cũng chỉ react. Cần quyết định sản phẩm: lạnh = \"theo dõi\" hay = lead.",
+  "fix": "Chờ anh chốt: (a) lạnh vào tab \"Theo dõi\" (không đếm KPI lead hợp lệ, không push), tự lên feed nếu người đó đăng lại/tương tác thêm; hoặc (b) giữ như hiện tại nhưng nâng `MIN_KEEP_SCORE` theo brand."
+ },
+ {
+  "id": "C-4",
+  "group": "cham",
+  "sev": "Vừa",
+  "title": "Gọi lại tầng 2 tới 2 lần chỉ để lấy `reply` — chấm lại toàn bộ, tốn 3× chi phí và có thể ra điểm khác",
+  "where": "index.js:422–432 (miss-reply: gọi `scoreLead` đầy đủ, chỉ lấy `reply`)",
+  "desc": "Khi model quên `reply`, hệ thống chấm lại nguyên bài (và bỏ điểm mới, chỉ lấy reply). Với gpt-5.6-sol ~8–15 s/lượt → lead chậm thêm 30 s và gấp 3 token.",
+  "fix": "Gọi riêng prompt ngắn \"viết gợi ý phản hồi\" (không chấm lại) hoặc tách `reply` khỏi bước chấm: chấm trước → ghi lead ngay → soạn reply nền (lead xuất hiện sớm hơn)."
+ },
+ {
+  "id": "C-5",
+  "group": "cham",
+  "sev": "Vừa",
+  "title": "`industry`/`service` là chữ tự do của model → báo cáo theo ngành/dịch vụ không gom được",
+  "where": "index.js:444–446 (`industry: ai.industry || x.src.industry`, `service: ai.service`) · scorer.js:29",
+  "desc": "Cùng 1 nhu cầu ra \"Hải sản khô\", \"hải sản\", \"đồ khô\"… → attribution/Report theo dịch vụ vụn; Content Studio không map được sang sản phẩm brand.",
+  "fix": "`service` phải chọn trong danh sách sản phẩm của brand (Hồ sơ AI / Content Studio) hoặc \"khác\"; `industry` theo taxonomy 14 ngành INDUSTRY_LIB (P52 đã có sẵn ở FE)."
+ },
+ {
+  "id": "C-6",
+  "group": "cham",
+  "sev": "Thấp",
+  "title": "Bài dài bị cắt 1.500 ký tự (tầng 2) / 1.200 (tầng 1), bài gốc của comment cắt 500",
+  "where": "scorer.js:57–66 (`buildPostContent`), 80, 144",
+  "desc": "Tin \"cần tìm nhà cung cấp… (danh sách dài) … liên hệ 09xx\" có SĐT/nhu cầu ở cuối → mất; comment-lead mất ngữ cảnh bài bán dài.",
+  "fix": "Cắt thông minh: giữ 1.000 đầu + 400 cuối; bài gốc comment 800."
+ },
+ {
+  "id": "D-1",
+  "group": "lam-giau",
+  "sev": "Vừa",
+  "title": "SĐT/Zalo chỉ lấy từ CHÍNH văn bản bài/bình luận của lead — bỏ qua bình luận cùng tác giả và bài gốc",
+  "where": "index.js:433 (`enrichPhoneFromText(x.post.text)`), 451",
+  "desc": "Người mua hay viết \"ib mình\" rồi để SĐT ở bình luận kế hoặc trả lời người bán; comment-lead \"còn không?\" có SĐT ở comment thứ 2 của cùng người. Các comment đó ĐÃ được tải (Pha 1b) nhưng không được gom về lead.",
+  "fix": "Khi tạo lead từ bài: quét mọi comment cùng tác giả (khớp `user_url`/tên) trong lô tìm SĐT/Zalo/email → gắn `phone` + `contact_source:'comment'`; comment-lead: gom các comment khác của cùng người dưới bài đó vào `text_extra`."
+ },
+ {
+  "id": "D-2",
+  "group": "lam-giau",
+  "sev": "Vừa",
+  "title": "`author_url` thiếu ở ~69 % lead → kết bạn/inbox/gộp trùng/profile-scan đều tắc từ dữ liệu nguồn",
+  "where": "scraper.js:16 (`user_url: p.user_url || p.profile_url || p.user_profile_url`), index.js:437 (profile-scan chỉ khi có `user_url`)",
+  "desc": "Đây là giới hạn dataset BrightData \"posts by group URL\" (đã ghi nhận 29/08). Mọi bước sau (automation R-1, gộp trùng Q-1, profile) phụ thuộc field này.",
+  "fix": "Thử 1 lần: (a) kiểm dataset BrightData có trường `user_url`/`profile_id` ẩn dưới tên khác (dump 3 record thô); (b) với lead NÓNG thiếu profile → worker AdsPower mở `post_url` bằng nick, đọc link tác giả (1 lượt xem bài, không thao tác) → ghi `author_url` — chi phí thấp, chỉ cho nóng."
+ },
+ {
+  "id": "D-3",
+  "group": "lam-giau",
+  "sev": "Thấp",
+  "title": "Kiểm Zalo qua eKYC cho MỌI lead có SĐT (kể cả lạnh) + quét vét 20 lead/lượt",
+  "where": "index.js:433 (`doCheck` mặc định bật), 469–480",
+  "desc": "Tốn lượt eKYC cho lead lạnh ít khi gọi; quét vét mỗi lượt đọc `where phone_has_zalo == null limit 50`.",
+  "fix": "Chỉ kiểm Zalo cho nóng/ấm hoặc khi sales mở lead (lazy); giữ cache 90 ngày."
+ },
+ {
+  "id": "G-1",
+  "group": "giam-sat",
+  "sev": "Vừa",
+  "title": "Không có cảnh báo \"quét chạy nhưng không ra lead\" / nguồn chết",
+  "where": "index.js:488–503 (summary `scans`), bySource có `posts/leads/error` nhưng không ai tổng hợp theo ngày",
+  "desc": "BrightData lên, AI lên nhưng 0 lead cả buổi sáng (như 26/08 heuristic hay group đổi URL/private → `dead_page` liên tục) chỉ lộ khi chạy script tay. Nguồn \"chết\" vẫn được gieo snapshot đều đặn.",
+  "fix": "`system_status/yield`: mỗi lượt cộng dồn theo nguồn (bài/ngày, lead/ngày, dead_page liên tiếp); quy tắc: nguồn 5 ngày 0 bài → cảnh báo + đề nghị tắt; toàn hệ 0 lead trong 6 h ban ngày dù có bài → ERROR (alert #9); hiện ở Nguồn quét dạng \"sức khoẻ nguồn\"."
+ },
+ {
+  "id": "G-2",
+  "group": "giam-sat",
+  "sev": "Vừa",
+  "title": "Chi phí AI ước tính có thể đang dùng đơn giá gpt-4o-mini cho gpt-5.6-sol",
+  "where": "config.js:35–38 (`LLM_PRICE_IN` 0,15 / `LLM_PRICE_OUT` 0,60 USD/1M mặc định) · index.js:485–486 (`costUsd`) → `scans`, `bd_month`, ROI",
+  "desc": "Nếu `.env` chưa đặt `LLM_PRICE_*` theo model thật thì mọi số \"chi phí AI\" trên web (Lịch sử quét, ROI, attribution) thấp hơn thực tế nhiều lần. Cần kiểm 1 dòng `.env`.",
+  "fix": "LỆNH chỉ đọc in `LLM_PRICE_*` (không in key); nếu thiếu → đặt theo bảng giá model đang dùng + ghi model vào `scans` để đổi giá sau."
+ },
+ {
+  "id": "G-3",
+  "group": "giam-sat",
+  "sev": "Thấp",
+  "title": "Nhịp gieo cố định 10′ cho mọi nguồn, không theo độ sôi động",
+  "where": "index.js (sowDue theo `scanIntervalMin` toàn cục, LỆNH #21) · config.js:14",
+  "desc": "Group 200 bài/ngày và group 2 bài/tuần cùng nhịp → nguồn sôi động phát hiện chậm, nguồn im tốn snapshot rỗng (dead_page).",
+  "fix": "Nhịp thích ứng theo nguồn: tính bài/giờ 7 ngày → 5′/10′/30′/120′; super vẫn đặt trần/sàn (P23 đã nêu, giờ có đủ số liệu `group_state`)."
+ },
+ {
+  "id": "F-A1",
+  "group": "fe",
+  "sev": "Cao",
+  "title": "`srcOut` trong buildData KHÔNG mang `authAccountId`/`groupId` → form sửa nguồn đọc rỗng → Lưu ghi `authAccount",
+  "where": "50-config-views.js:127 + live.js:161-167",
+  "desc": "`srcOut` trong buildData KHÔNG mang `authAccountId`/`groupId` → form sửa nguồn đọc rỗng → Lưu ghi `authAccountId:''` → nguồn private mất nick quét (hiện 5 nguồn nick đang TẮT nên chưa gây hại).",
+  "fix": ""
+ },
+ {
+  "id": "F-A2",
+  "group": "fe",
+  "sev": "Cao",
+  "title": "`config.keywords/exclude` rỗng → view \"Từ khoá\" hiển thị GỘP keyword/exclude của mọi nguồn như thể toàn cục; b",
+  "where": "live.js:170 + 50-config-views.js:176",
+  "desc": "`config.keywords/exclude` rỗng → view \"Từ khoá\" hiển thị GỘP keyword/exclude của mọi nguồn như thể toàn cục; bấm × 1 chip → `persist()` ghi `{keywords: main, exclude: ex}` = tạo bộ lọc toàn cục chưa từng tồn tại, áp lên MỌI nguồn/brand (exclude là cổng thật ở backend → nguy hiểm).",
+  "fix": ""
+ },
+ {
+  "id": "F-A3",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "keyword theo nguồn chỉ tách `,`, không fold dấu, không dedupe (toàn cục có, :187-190).",
+  "where": "50-config-views.js:118",
+  "desc": "keyword theo nguồn chỉ tách `,`, không fold dấu, không dedupe (toàn cục có, :187-190).",
+  "fix": ""
+ },
+ {
+  "id": "F-A4",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "không kiểm trùng giữa `main` và `exclude`.",
+  "where": "50-config-views.js:159-162",
+  "desc": "không kiểm trùng giữa `main` và `exclude`.",
+  "fix": ""
+ },
+ {
+  "id": "F-A5",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "`INDUSTRY_LIB` có keyword 1 từ cực rộng ('chó','mèo','son','váy','tour','visa','crm','content','cua'); exclude",
+  "where": "10-core-overview.js:133-146",
+  "desc": "`INDUSTRY_LIB` có keyword 1 từ cực rộng ('chó','mèo','son','váy','tour','visa','crm','content','cua'); exclude rộng ('tuyển','pass','bán').",
+  "fix": ""
+ },
+ {
+  "id": "F-A6",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "\"Keyword hiệu quả\" khớp `includes` trên chuỗi fold, không biên từ.",
+  "where": "50-config-views.js:488",
+  "desc": "\"Keyword hiệu quả\" khớp `includes` trên chuỗi fold, không biên từ.",
+  "fix": ""
+ },
+ {
+  "id": "F-B1",
+  "group": "fe",
+  "sev": "Cao",
+  "title": "`weights` FE↔Firestore; backend chỉ dùng làm 1 câu gợi ý (`weightsHint`, scorer.js:124-131) → gần như vô hiệu;",
+  "where": "50-config-views.js:404 ↔ live.js:193",
+  "desc": "`weights` FE↔Firestore; backend chỉ dùng làm 1 câu gợi ý (`weightsHint`, scorer.js:124-131) → gần như vô hiệu; không validate tổng=100 (:393/:403); ngưỡng 80/60/40 chuỗi cứng HTML (:337-340).",
+  "fix": ""
+ },
+ {
+  "id": "F-B2",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "slider mutate tại chỗ `D.scoringWeights` (= `DEF_WEIGHTS` chung, live.js:76) → kéo rồi không lưu vẫn bẩn mặc đ",
+  "where": "50-config-views.js:400",
+  "desc": "slider mutate tại chỗ `D.scoringWeights` (= `DEF_WEIGHTS` chung, live.js:76) → kéo rồi không lưu vẫn bẩn mặc định phiên, không có Đặt lại.",
+  "fix": ""
+ },
+ {
+  "id": "F-B3",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "calibCard khuyên chỉnh trọng số \"độ tin cậy nguồn\" KHÔNG tồn tại (6 key thật: intent/fit/timing/industry/area/",
+  "where": "50-config-views.js:376",
+  "desc": "calibCard khuyên chỉnh trọng số \"độ tin cậy nguồn\" KHÔNG tồn tại (6 key thật: intent/fit/timing/industry/area/quality).",
+  "fix": ""
+ },
+ {
+  "id": "F-B4",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "calibCard chia dải theo `score` nhưng gọi tên theo `temp`; cột \"Loại/không thành\" gộp `lost||dropped` (2 tín h",
+  "where": "50-config-views.js:371",
+  "desc": "calibCard chia dải theo `score` nhưng gọi tên theo `temp`; cột \"Loại/không thành\" gộp `lost||dropped` (2 tín hiệu ngược nhau: AI/vận hành loại vs sales chăm không thành).",
+  "fix": ""
+ },
+ {
+  "id": "F-B5",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "chỉ vẽ lại, không ghi ngược; cohort = cửa sổ lead đã nạp, không có dòng phạm vi.",
+  "where": "bindCalib :387",
+  "desc": "chỉ vẽ lại, không ghi ngược; cohort = cửa sổ lead đã nạp, không có dòng phạm vi.",
+  "fix": ""
+ },
+ {
+  "id": "F-B6",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "không có lạnh), 25-agency.js:22 (`agyTempOf` fallback), 65-charts-lead-modal.js:471 (demo).",
+  "where": "FE tự tính nhiệt độ ở 4 chỗ lệch nhau: live.js:174 (lọc `score>=60` nhưng nhãn theo `temp`), 50-config-views.js:468 (`score>=80?'hot':'warm'`",
+  "desc": "không có lạnh), 25-agency.js:22 (`agyTempOf` fallback), 65-charts-lead-modal.js:471 (demo).",
+  "fix": ""
+ },
+ {
+  "id": "F-B7",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "`chip(temp)` không fallback → lead thiếu `temp` render \"undefined\".",
+  "where": "10-core-overview.js:97",
+  "desc": "`chip(temp)` không fallback → lead thiếu `temp` render \"undefined\".",
+  "fix": ""
+ },
+ {
+  "id": "F-C1",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "`feedHidden` gộp `dropped` (người/AI loại) + `lost` (sales chăm không thành) + `temp==='junk'` vào 1 chip \"Rác",
+  "where": "20-feed.js:717 + :485",
+  "desc": "`feedHidden` gộp `dropped` (người/AI loại) + `lost` (sales chăm không thành) + `temp==='junk'` vào 1 chip \"Rác · Loại\" → không phân biệt lead nào do AI loại để phản hồi.",
+  "fix": ""
+ },
+ {
+  "id": "F-C2",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "Loại lead KHÔNG ghi lý do (`dropped:true, dropped_at, dropped_by` thôi), trong khi Không thành có `lost_reason",
+  "where": "30-pipeline.js:298 & :335",
+  "desc": "Loại lead KHÔNG ghi lý do (`dropped:true, dropped_at, dropped_by` thôi), trong khi Không thành có `lost_reason` (65:221) → không có dữ liệu hiệu chỉnh AI.",
+  "fix": ""
+ },
+ {
+  "id": "F-C3",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "tìm SĐT máy chủ báo \"đã nạp\" nhưng lead dropped/lost/junk bị feed ẩn ngay → \"Không có lead khớp\".",
+  "where": "70-shell-tools.js:66",
+  "desc": "tìm SĐT máy chủ báo \"đã nạp\" nhưng lead dropped/lost/junk bị feed ẩn ngay → \"Không có lead khớp\".",
+  "fix": ""
+ },
+ {
+  "id": "F-C4",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "KPI \"Lead hợp lệ\" giữ `lost`, feed ẩn `lost` → số KPI luôn > số thẻ.",
+  "where": "live.js:130 vs 20-feed.js:717",
+  "desc": "KPI \"Lead hợp lệ\" giữ `lost`, feed ẩn `lost` → số KPI luôn > số thẻ.",
+  "fix": ""
+ },
+ {
+  "id": "F-C5",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "feed không có bộ lọc theo nguồn/brand (chỉ temp + junk).",
+  "where": "20-feed.js:239-244",
+  "desc": "feed không có bộ lọc theo nguồn/brand (chỉ temp + junk).",
+  "fix": ""
+ },
+ {
+  "id": "F-D1",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "`decision` lạ → `DECIS[d]||DECIS.scored_low` hiển thị SAI (\"Đã chấm · chưa đạt\") thay vì trung tính.",
+  "where": "60-scan-views.js:159",
+  "desc": "`decision` lạ → `DECIS[d]||DECIS.scored_low` hiển thị SAI (\"Đã chấm · chưa đạt\") thay vì trung tính.",
+  "fix": ""
+ },
+ {
+  "id": "F-D2",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "4 chip lọc trộn đơn vị (nhóm/item/số bình luận).",
+  "where": "60-scan-views.js:452-455",
+  "desc": "4 chip lọc trộn đơn vị (nhóm/item/số bình luận).",
+  "fix": ""
+ },
+ {
+  "id": "F-D3",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "nhóm vừa có lead vừa có comment bị loại xuất hiện ở cả 2 bộ lọc.",
+  "where": "60-scan-views.js:434",
+  "desc": "nhóm vừa có lead vừa có comment bị loại xuất hiện ở cả 2 bộ lọc.",
+  "fix": ""
+ },
+ {
+  "id": "F-D4",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "nối bài ↔ lead bằng TÊN tác giả `find(x=>x.name===p.author)` → trùng tên mở nhầm lead, \"Ẩn danh\" mất nút. Back",
+  "where": "60-scan-views.js:272 (+:239,:246)",
+  "desc": "nối bài ↔ lead bằng TÊN tác giả `find(x=>x.name===p.author)` → trùng tên mở nhầm lead, \"Ẩn danh\" mất nút. Backend nên ghi `leadId` vào `scanned_posts`.",
+  "fix": ""
+ },
+ {
+  "id": "F-D5",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "`spHl` replace regex trên chuỗi đã HTML-escape/đã chèn `<mark>` → tín hiệu có `&<\"` không khớp, tín hiệu ngắn ",
+  "where": "60-scan-views.js:262",
+  "desc": "`spHl` replace regex trên chuỗi đã HTML-escape/đã chèn `<mark>` → tín hiệu có `&<\"` không khớp, tín hiệu ngắn hỏng markup (không XSS).",
+  "fix": ""
+ },
+ {
+  "id": "F-D6",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "brand user đọc lý do loại (keyword/exclude) nhưng không có quyền sửa.",
+  "where": "60-scan-views.js:179-181 + 10-core:260",
+  "desc": "brand user đọc lý do loại (keyword/exclude) nhưng không có quyền sửa.",
+  "fix": ""
+ },
+ {
+  "id": "F-D7",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "chữ \"tự xoá sau 1 ngày\" vs \"~3 ngày\".",
+  "where": "60-scan-views.js:171 vs :201",
+  "desc": "chữ \"tự xoá sau 1 ngày\" vs \"~3 ngày\".",
+  "fix": ""
+ },
+ {
+  "id": "F-E1",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "bôi nổi SĐT chỉ khi `normPhoneVN(m)===l.phone` → bài có 2 số hoặc backend sót số thì FE không gợi ý gì.",
+  "where": "20-feed.js:829",
+  "desc": "bôi nổi SĐT chỉ khi `normPhoneVN(m)===l.phone` → bài có 2 số hoặc backend sót số thì FE không gợi ý gì.",
+  "fix": ""
+ },
+ {
+  "id": "F-E2",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "`normPhoneVN` chỉ di động `^[35789]\\d{8}$` (bỏ cố định 02x, số viết chữ/full-width).",
+  "where": "20-feed.js:759",
+  "desc": "`normPhoneVN` chỉ di động `^[35789]\\d{8}$` (bỏ cố định 02x, số viết chữ/full-width).",
+  "fix": ""
+ },
+ {
+  "id": "F-E3",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "\"Độ tin cậy hồ sơ\" thuần heuristic FE; `warn` \"chưa để lại SĐT\" đúng với đa số → chip gần như luôn \"còn điểm c",
+  "where": "20-feed.js:765-785",
+  "desc": "\"Độ tin cậy hồ sơ\" thuần heuristic FE; `warn` \"chưa để lại SĐT\" đúng với đa số → chip gần như luôn \"còn điểm cần xác minh\", mất giá trị.",
+  "fix": ""
+ },
+ {
+  "id": "F-F1",
+  "group": "fe",
+  "sev": "Vừa",
+  "title": "group đã tồn tại bị bỏ qua im lặng (`.filter(r=>!r.err&&!r.dup)`) → brand mới tưởng có nguồn, nguồn vẫn thuộc ",
+  "where": "87-brand-wizard.js:193",
+  "desc": "group đã tồn tại bị bỏ qua im lặng (`.filter(r=>!r.err&&!r.dup)`) → brand mới tưởng có nguồn, nguồn vẫn thuộc brand cũ.",
+  "fix": ""
+ },
+ {
+  "id": "F-F2",
+  "group": "fe",
+  "sev": "Thấp",
+  "title": "mọi nguồn nhập hàng loạt cùng `industry` + cùng keyword, không chỉnh per-nguồn.",
+  "where": "87-brand-wizard.js:196",
+  "desc": "mọi nguồn nhập hàng loạt cùng `industry` + cùng keyword, không chỉnh per-nguồn.",
+  "fix": ""
+ }
+]

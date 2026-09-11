@@ -1,0 +1,64 @@
+{
+ "pipeline": [
+  {
+   "step": "1 · Gieo",
+   "what": "Mỗi nguồn tới nhịp `scanIntervalMin` (10′) → trigger snapshot BrightData: probe 5 bài (`PROBE_POSTS`), sweep 20 bài mỗi 2 h (`FULLSWEEP_HOURS`), loại trừ `group_state.recentIds` ≤200 qua `posts_to_not_include`; ghi `pending_snapshots`, `group_state.lastTriggerAt`.",
+   "where": "index.js:200–226 · scraper.js:92–108, 147–191",
+   "risk": "Nhịp cố định cho mọi nguồn; không đo giờ đăng → giờ phát hiện; `dead_page` = hết bài mới (đã hiểu đúng từ #22b)."
+  },
+  {
+   "step": "2 · Gặt + chuẩn hoá",
+   "what": "Lượt kế gặt snapshot chín → `normalizePost`: `post_id` (fallback url/random), `author` ('Ẩn danh' khi thiếu), `user_url` (≈31 % có), `text`, `url`; stub-filter loại record rỗng/lỗi.",
+   "where": "scraper.js:11–22, 173–186",
+   "risk": "`author_url` thiếu ~69 % → gộp trùng/kết bạn/inbox/profile-scan tắc từ nguồn dữ liệu (D-2)."
+  },
+  {
+   "step": "3 · Bình luận",
+   "what": "Dataset comment gieo/gặt (LỆNH #23) cho bài NẰM TRONG lượt theo `cmt_scrape` 3 h/12 h, `qualified_only`; `normalizeComment` giữ `parent_text/parent_author/parent_url`; `self_comment` xác định trước AI (LỆNH #31).",
+   "where": "index.js:230–305 · scraper.js:26–57, 245–293",
+   "risk": "Bài rơi khỏi top 20 không bao giờ được quét bình luận nữa (Q-3)."
+  },
+  {
+   "step": "4 · Lọc rẻ",
+   "what": "`seen/{post_id}` chống trùng (ghi theo lô, không TTL) rồi `isExcluded(text, effSrc)` — CHỈ `exclude` là cổng; keyword INCLUDE (toàn cục/nguồn/thư viện ngành) không tham gia.",
+   "where": "index.js:312–329 (`const pass = !isExcluded(...)`)",
+   "risk": "L-1 include chết · Q-2 seen phình + id lead ngẫu nhiên · L-5 exclude khớp thô."
+  },
+  {
+   "step": "5 · Tầng 1 AI",
+   "what": "`prefilterLead` gpt-5-nano, pool 10: PRE_SYS (agency marketing) + `brandAiCtx` ghi đè; lỗi → cho qua (fail-open); loại → `scanned_posts` decision `prefiltered_out` (TTL 3 ngày).",
+   "where": "index.js:343–352 · scorer.js:38–43, 69–100",
+   "risk": "≈50 % bài bị loại không kiểm lại được (L-3); prompt lệch ngành (L-2)."
+  },
+  {
+   "step": "6 · Tầng 2 AI",
+   "what": "`scoreLead` gpt-5.6-sol, pool 6: hotness 0–100 · role buyer/seller/poster_self/other · reply · need/intent/service/industry · phone; `isLead` = hotness ≥ 40 & role không seller/poster_self; miss-reply gọi lại ≤2 lần; `tempOf` 80/60/40. Từ LỆNH #46: `llmChat46` retry 4 lần, `score_retry` hoãn 3′→6 h, sweeper chấm lại `ai_scored:false` ≤12/lượt, `[LLM-DOWN]`.",
+   "where": "index.js:407–454 · scorer.js:133–174 · lenh-46-patch.cjs",
+   "risk": "Điểm 1 con số không tiêu chí con (C-1); không học từ sales (C-2); lạnh 40–59 vào feed (C-3); gọi lại 3× (C-4)."
+  },
+  {
+   "step": "7 · Làm giàu",
+   "what": "`enrichPhoneFromText` (chỉ text của chính lead) → `checkZalo` eKYC mọi lead có SĐT + quét vét 20/lượt → profile-scan (chỉ nóng + `user_url`, ≤5).",
+   "where": "index.js:433–437, 469–480",
+   "risk": "Bỏ SĐT ở bình luận cùng tác giả/bài gốc (D-1); eKYC cả lead lạnh (D-3)."
+  },
+  {
+   "step": "8 · Tạo lead",
+   "what": "`commitLeadNow`: multitouch gộp 48 h theo `identityKey(author_url|phone|email)` → `touches`/`group_count`; id ngẫu nhiên (`force` mới dùng `leadKey`); brand đóng dấu theo nguồn; `statsOnLead` cộng `daily_stats`; `onLeadCreated` báo kênh khi ≥ 80.",
+   "where": "index.js:358–402 · stats.js",
+   "risk": "Trùng người không có link/SĐT không gộp (Q-1); backfill/force có thể ra 2 lead (Q-2)."
+  },
+  {
+   "step": "9 · Ghi vết + tổng kết",
+   "what": "`recordPost` → `scanned_posts` (decision, TTL 3 ngày cho bài không thành lead); `scans` (bySource, tokens, `costUsd` = token × `LLM_PRICE_*`); `bd_month`; `cleanupScannedPosts` hằng ngày.",
+   "where": "index.js:116–138, 482–531",
+   "risk": "Không cảnh báo nguồn chết/quét không ra lead (G-1); đơn giá có thể sai model (G-2)."
+  },
+  {
+   "step": "10 · Web",
+   "what": "`buildData` (live.js) → Lead mới / Pipeline / KPI 14 ngày (`daily_stats`) / Bài đã quét / Nguồn quét / Từ khoá / Chấm điểm AI (weights + calibCard) / wizard brand; chip nhiệt độ · vai · Điểm tạm.",
+   "where": "live.js:100–230 · src/app/20, 50, 60, 65, 87",
+   "risk": "Cấu hình hứa một đằng backend làm một nẻo (F-A*, F-B*); lead AI loại/điểm tạm hiện chưa rõ (F-C*, F-D*)."
+  }
+ ]
+}

@@ -1,0 +1,122 @@
+== LỆNH #47c dữ liệu — 2026-09-12 11:44 VN ==
+
+=== N2. nguồn theo dạng URL (H1 slug ↔ số) ===
+  không-group (3):
+   [test-agency] (tắt) T vn Du hc Nht-Hn-c ·  · id=duhoc
+   [test-agency] (tắt) Cng ng F&B - Ch qun c ph ·  · id=fnb
+   [test-agency] (tắt) Hi ch Spa - Thm m vin ·  · id=spa
+  slug (12):
+   [z15mrc-tts-1] TUYỂN DỤNG SINH VIÊN MỚI RA TR · https://www.facebook.com/groups/HNInternship/ · id=HNInternship_
+   [test-agency] (tắt) Tư vấn Du học Nhật - Hàn - Úc · https://www.facebook.com/groups/PUBLIC_GROUP_ID_HERE · id=PUBLIC_GROUP_ID_HERE
+   [test-agency] kn2 · https://www.facebook.com/groups/businesskhoinghiep/ · id=businesskhoinghiep_
+   [hscl-01] Cá khô sỉ 1 · https://www.facebook.com/groups/cakhocacloaigiasi/ · id=cakhocacloaigiasi_
+   [test-agency] chuquancaphe1 · https://www.facebook.com/groups/chuquancapheekhach/ · id=chuquancapheekhach_
+   [test-agency] Chuyen Nha Ban · https://www.facebook.com/groups/chuyennhaban · id=chuyennhaban
+   [test-agency] (tắt) hhqcvain1 · https://www.facebook.com/groups/hiephoiquangcaomienbac · id=hiephoiquangcaomienbac
+   [test-agency] (tắt) Tm S Con Sen · https://www.facebook.com/groups/tamsu.content · id=tamsu
+   [z15mrc-tts-1] TUYỂN DỤNG THỰC TẬP SINH DIGIT · https://www.facebook.com/groups/tuyenthuctapmarketing/ · id=tuyenthuctapmarketing_
+   [z15mrc-tuyendung1] Việc làm Marketing tại Hải Phò · https://www.facebook.com/groups/vieclammarketinghaiphong/ · id=vieclammarketinghaiphong_
+   [z15mrc-tuyendung1] VIỆC LÀM SINH VIÊN HẢI PHÒNG ( · https://www.facebook.com/groups/vieclamsinhvienhaiphong.2/ · id=vieclamsinhvienhaiphong_2_
+   [z15mrc-tuyendung1] Việc làm cho sinh viên Hải Phò · https://www.facebook.com/groups/vieclamtotchosv/ · id=vieclamtotchosv_
+  id nguồn không phải gid (25): 1012913754446766_, 1577634563426167_, 385547859372527_, 393110223866580_, 431687893534467_, 466756217226031_, 5625084894205038_, 603723076477510_, 618434384239519_, 731268347810116_, 801123344673978_, 885860204936224_
+  (sources 0 s)
+
+=== G2. scan_jobs · bd_month ===
+  scan_jobs (31 doc đọc): field aiMode, candidatesTotal, commentsFetched, costUsd, createdAt, durationMs, finishedAt, hotLeads, id, leadsCreated, phase, postsFetched, postsMatched, postsScored, prefilterDone, range, scanComments, scanId, scannedLogged, scoreErrors, scrapeErrors, skippedSeen, sourceUrl, sourcesDone, sourcesTotal, status, trigger, twoStage, updatedAt
+  status {"done":29,"running":2} · trigger {"backfill":31} · running >30′: 2 · mới nhất 06-29 10:25
+  bd_month: 2026-08, 2026-09 · 2026-09 field: aiUsd, bdCommentRecords, bdPostRecords, ekycChecks, hotLeads, leads, month, runs, src, updatedAt · src: 21 · bdPostRecords 23325 · bdCommentRecords 18213 · aiUsd 83.7973799999999
+  (scan_jobs+bd_month 0 s)
+
+=== R3/T. scans 7 ngày (trang 200, chỉ field số) ===
+  lượt 7 ngày: 3346 · trigger {"scheduled":3346} · có field llm*: 365
+  duration s: trung vị 15.094 · p95 39.432 · max 108 · >120 s: 0 · >600 s: 0 · >1500 s: 0
+  khoảng cách 2 lượt (phút): trung vị 3 · p95 3.4 · >6′: 0 · >15′: 0  ← T: tick thật vs lịch 3′
+  Σ bdRecords 16396 · Σ postsFetched 11268 · record dư (bd−posts)/bd = 31.3% · Σ skippedSeen 69 · Σ candidates 11147 · Σ leadsCreated 583 · Σ hotLeads 192 · Σ costUsd 48.65
+  sweepRuns>0: 912 lượt, trong đó bdRecords>0: 578  ← N1-3 · probeEscalated Σ 673 · probeIdle Σ 295
+  comment: Σ commentsFetched 2021 · Σ bdCommentRecords 12413 · Σ commentsRefreshSkipped 69 · lượt có comment>0: 692
+  lỗi: Σ scrapeErrors 299 · Σ scoreErrors 0 · llmOk/llmFail/llmDeferred/llmFallback/llmRescored/llmPreFail = 544/1/0/0/0/0 · Σ backfillSkipped 0 · aborted 0
+  T/H7: lượt thuần skip: 1044/3346 (31.2%)
+  lượt KHÔNG theo lịch: 0 · có bdRecords>0: 0 · có lead: 0  ← N3-2
+  theo giờ VN (lượt/bài/lead/dur trung vị): 0h 140/122/19/5 · 1h 139/56/9/4 · 2h 140/50/11/4 · 3h 139/15/3/4 · 4h 140/17/2/4 · 5h 140/71/3/4 · 6h 140/170/2/10 · 7h 140/291/8/12 · 8h 140/517/11/14 · 9h 139/1060/26/25 · 10h 140/1050/41/26 · 11h 141/921/43/22 · 12h 140/457/26/20 · 13h 138/523/20/19 · 14h 139/837/39/25 · 15h 139/849/41/25 · 16h 139/863/31/23 · 17h 136/607/33/20 · 18h 137/487/29/21 · 19h 140/518/31/22 · 20h 140/583/53/22 · 21h 140/537/41/20 · 22h 140/405/37/18 · 23h 140/262/24/15
+  theo ngày (lượt/bài/record/lead): 09-05 245/860/1190/61 · 09-06 480/1158/1597/60 · 09-07 478/1797/2610/65 · 09-08 479/1713/2569/79 · 09-09 479/1816/2673/85 · 09-10 478/1768/2652/99 · 09-11 471/1674/2443/103 · 09-12 236/482/662/31
+  bySource 24h (474 lượt) — theo nguồn (lượt · bài · record · lead · nóng · lỗi · gieo ok · lần cuối có bài):
+   Chợ Hải Sản Vân Đồn Quảng Ninh     474 · 292 · 504 · 6 · 2 · lỗi 0 · ok 296 · 09-12 11:09
+   Intern - Tuyển Dụng Thực Tập Sinh  474 · 280 · 303 · 44 · 17 · lỗi 0 · ok 283 · 09-12 11:21
+   Cá khô sỉ 1                        474 · 257 · 340 · 11 · 7 · lỗi 0 · ok 289 · 09-12 11:39
+   Việc làm cho sinh viên Hải Phòng   474 · 239 · 230 · 12 · 0 · lỗi 0 · ok 275 · 09-12 11:12
+   TUYỂN DỤNG VIỆC LÀM TẠI HẢI PHÒNG  474 · 151 · 148 · 0 · 0 · lỗi 0 · ok 277 · 09-12 11:36
+   TUYỂN DỤNG SINH VIÊN MỚI RA TRƯỜNG 474 · 137 · 131 · 7 · 6 · lỗi 0 · ok 282 · 09-12 11:42
+   TUYỂN DỤNG THỰC TẬP SINH DIGITAL M 474 · 106 · 114 · 7 · 6 · lỗi 0 · ok 271 · 09-12 11:36
+   CHỢ ĐẦU MỐI SỈ HẢI SẢN HÀ NỘI      474 · 87 · 33 · 6 · 1 · lỗi 0 · ok 286 · 09-12 11:39
+   khoinghiep1                        474 · 74 · 96 · 4 · 1 · lỗi 0 · ok 274 · 09-12 10:27
+   Thực tập sinh Hành chính Nhân sự   474 · 74 · 46 · 0 · 0 · lỗi 0 · ok 272 · 09-12 11:42
+   Việc Làm Sinh Viên, Tuyển Dụng Thự 474 · 71 · 58 · 0 · 0 · lỗi 0 · ok 271 · 09-12 11:21
+   VIỆC LÀM SINH VIÊN HẢI PHÒNG ( PAR 474 · 65 · 59 · 2 · 0 · lỗi 0 · ok 282 · 09-12 11:42
+   Tuyển dụng thực tập sinh Hà Nội    474 · 37 · 29 · 3 · 2 · lỗi 0 · ok 281 · 09-12 11:27
+   CHỢ ĐẦU MỐI HẢI SẢN QUẢNG NINH     474 · 13 · 32 · 0 · 0 · lỗi 0 · ok 293 · 09-12 11:27
+   chuquancaphe1                      474 · 13 · 17 · 0 · 0 · lỗi 0 · ok 278 · 09-11 22:06
+   Chuyen Nha Ban                     474 · 10 · 8 · 0 · 0 · lỗi 0 · ok 272 · 09-12 07:24
+   Việc làm Marketing tại Hải Phòng   474 · 9 · 8 · 1 · 1 · lỗi 0 · ok 287 · 09-12 11:30
+   chuquancaphe2                      474 · 8 · 3 · 0 · 0 · lỗi 0 · ok 285 · 09-11 17:49
+   Việc làm Content/ Marketing tại Hả 474 · 5 · 5 · 0 · 0 · lỗi 0 · ok 273 · 09-11 17:34
+   edf                                474 · 2 · 2 · 0 · 0 · lỗi 0 · ok 272 · 09-11 22:03
+   Hội chủ quán 2 - T2                474 · 0 · 0 · 0 · 0 · lỗi 0 · ok 256 · chưa có bài
+   Hội chủ quán - T1                  474 · 0 · 0 · 0 · 0 · lỗi 0 · ok 273 · chưa có bài
+   kn2                                474 · 0 · 0 · 0 · 0 · lỗi 0 · ok 277 · chưa có bài
+  nguồn bật nhưng 0 bài 24h: Hội chủ quán 2 - T2, Hội chủ quán - T1, kn2  ← S9
+  H8: dòng nguồn có record comment 391 · ≥30/lượt: 1 · lượt có lỗi BrightData 429/rate/not active: 0
+  (scans 4 s)
+
+=== R4/B. leads 30 ngày (trang 300, select) ===
+  lead 30 ngày: 2059 · brand {"z15mrc-tts-1":856,"z15mrc-tuyendung1":370,"hscl-01":686,"test-agency":147} · temp {"hot":480,"warm":792,"cold":514,"junk":273} · kind {"post":1629,"comment":430}
+  ai_scored:false: 2 (mở 0) · rescored_at 48h: 298 · rescored tổng: 298 · rescore_tries>0 chưa xong: 0
+  dropped_by: {"rescore":26,"lenh31b":158,"rescore_role":248} · lost 1 · closed 0 · stage {"new":2044,"checked":7,"booked":1,"responded":4,"closed":1,"inbox":2}
+  N4-3: lead AI chấm lại 298 → loại 274 · có người thật chăm 0 → trong đó temp=junk 0 · dropped 0  (đang bị giấu khỏi feed/Hộp việc)
+  group_count>=2: 21 · identityKey rỗng: 64.4% · author_url có: 33.2% · uid số trong author_url: 9.4%
+  B3. multitouch: lead gộp 21 · touch từ nguồn brand KHÁC brand lead: 0
+  phone: 12.8% · cố định (+842x/02x): 0 · phone_has_zalo {"true":253,"false":11} · email 32
+  post_id rỗng: 2059 · comment_id (lead comment): {"số":430} · comment_url rỗng: 0
+  Q-4/T: lag phát hiện (detected_at − time bài) phút: trung vị 11 · p95 36 · <1′: 0% · <15′: 69.6% · >60′: 3.2% · n=2059  ← tốc độ post→lead hôm nay
+  lag trung vị theo nguồn (phút): TUYỂN DỤNG THỰC TẬ 10 · Việc làm Marketing 93 · TUYỂN DỤNG SINH VI 12 · Intern - Tuyển Dụn 11 · CHỢ ĐẦU MỐI SỈ HẢI 12 · Việc làm cho sinh  10 · Chợ Hải Sản Vân Đồ 13 · khoinghiep1 10 · Cá khô sỉ 1 9 · VIỆC LÀM SINH VIÊN 11 · Tuyển dụng thực tậ 16 · Chuyen Nha Ban 8 · CHỢ ĐẦU MỐI HẢI SẢ 14 · chuquancaphe1 10
+  Q-1: cặp lead cùng brand ≤14 ngày text trùng ≥0,8 (bài, ≥80 ký tự): 161 cặp · lead dính: 198/1087
+  R6c: lead nóng 7 ngày 192 · zalo_notified {"true":192} · brand_tagged_by {"scanner-inline":192} · brand_pending 0
+  role: {"buyer":546,"other":19,"(rỗng)":1088,"poster_self":158,"seller":248} · self_comment 158 · outreach chạm 43 · outreach_replied 0
+  lead/ngày 7 ngày gần nhất theo brand: hscl-01 09-05:17 · hscl-01 09-06:9 · hscl-01 09-07:14 · hscl-01 09-08:8 · hscl-01 09-09:10 · hscl-01 09-10:13 · hscl-01 09-11:19 · hscl-01 09-12:7 · test-agency 09-05:2 · test-agency 09-06:2 · test-agency 09-08:4 · test-agency 09-09:3 · test-agency 09-10:5 · test-agency 09-11:3 · test-agency 09-12:1 · z15mrc-tts-1 09-05:59 · z15mrc-tts-1 09-06:28 · z15mrc-tts-1 09-07:43 · z15mrc-tts-1 09-08:51 · z15mrc-tts-1 09-09:54 · z15mrc-tts-1 09-10:61 · z15mrc-tts-1 09-11:68 · z15mrc-tts-1 09-12:19 · z15mrc-tuyendung1 09-05:19 · z15mrc-tuyendung1 09-06:21 · z15mrc-tuyendung1 09-07:8 · z15mrc-tuyendung1 09-08:16 · z15mrc-tuyendung1 09-09:18 · z15mrc-tuyendung1 09-10:20 · z15mrc-tuyendung1 09-11:13 · z15mrc-tuyendung1 09-12:4
+  (leads 5 s)
+
+=== R5. scanned_posts 3 ngày (trang 300, select) ===
+  doc: 6099 (09-09 11:45 → 09-12 11:42) · decision {"prefiltered_out":3937,"scored_low":228,"seller":528,"lead":309,"self_comment":446,"excluded":651} · kind {"post":5072,"comment":1027} · brand {"z15mrc-tts-1":2503,"z15mrc-tuyendung1":1537,"hscl-01":1770,"test-agency":289}
+  theo nguồn (n · exclude · tầng1 loại · lead · thấp · vai · ai_wait):
+   Chợ Hải Sản Vân Đồn Quảng Ninh     967 · 273 · 560 · 14 · 17 · 103 · 0
+   Intern - Tuyển Dụng Thực Tập Sinh  932 · 23 · 538 · 131 · 55 · 185 · 0
+   Việc làm cho sinh viên Hải Phòng   750 · 46 · 552 · 44 · 19 · 89 · 0
+   Cá khô sỉ 1                        619 · 183 · 366 · 20 · 11 · 39 · 0
+   TUYỂN DỤNG VIỆC LÀM TẠI HẢI PHÒNG  526 · 77 · 396 · 0 · 6 · 47 · 0
+   TUYỂN DỤNG SINH VIÊN MỚI RA TRƯỜNG 501 · 18 · 333 · 27 · 11 · 112 · 0
+   TUYỂN DỤNG THỰC TẬP SINH DIGITAL M 344 · 5 · 229 · 27 · 2 · 81 · 0
+   Việc Làm Sinh Viên, Tuyển Dụng Thự 298 · 6 · 208 · 1 · 3 · 80 · 0
+   Thực tập sinh Hành chính Nhân sự   249 · 16 · 153 · 1 · 13 · 66 · 0
+   VIỆC LÀM SINH VIÊN HẢI PHÒNG ( PAR 222 · 0 · 184 · 9 · 9 · 20 · 0
+   Tuyển dụng thực tập sinh Hà Nội    179 · 1 · 106 · 8 · 2 · 62 · 0
+   khoinghiep1                        156 · 0 · 82 · 7 · 31 · 36 · 0
+   CHỢ ĐẦU MỐI SỈ HẢI SẢN HÀ NỘI      130 · 0 · 87 · 11 · 8 · 24 · 0
+   chuquancaphe1                      77 · 1 · 47 · 2 · 24 · 3 · 0
+   CHỢ ĐẦU MỐI HẢI SẢN QUẢNG NINH     54 · 0 · 43 · 4 · 0 · 7 · 0
+   Chuyen Nha Ban                     37 · 1 · 16 · 2 · 8 · 10 · 0
+   Việc làm Marketing tại Hải Phòng   27 · 1 · 19 · 1 · 2 · 4 · 0
+   Việc làm Content/ Marketing tại Hả 12 · 0 · 7 · 0 · 0 · 5 · 0
+   chuquancaphe2                      10 · 0 · 5 · 0 · 4 · 1 · 0
+   edf                                9 · 0 · 6 · 0 · 3 · 0 · 0
+  N3-7/N1-4: comment 1027 · parent_url không thuộc nguồn nào: 57 · brand doc ≠ brand nguồn theo gid(parent_url): 0
+  N2-10: bài ai_wait lặp >1 dòng: 0
+  bài (post) có >1 dòng scanned_posts trong 3 ngày: 0  ← chấm đôi / quét lại?
+  mẫu 6 bài bị exclude (text 90 ký tự):
+   [hscl-01 · Cá khô sỉ 1] 
+   [hscl-01 · Chợ Hải Sản Vân Đồ] 
+   [hscl-01 · Chợ Hải Sản Vân Đồ] 
+   [hscl-01 · Cá khô sỉ 1] 
+   [hscl-01 · Cá khô sỉ 1] 
+   [hscl-01 · Cá khô sỉ 1] 
+  (scanned_posts 18 s)
+
+== XONG — file: /home/xuanvinhsc68_work/scan-data-0912c.txt (dán nguyên output vào chat) ==

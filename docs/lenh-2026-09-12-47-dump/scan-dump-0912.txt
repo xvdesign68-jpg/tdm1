@@ -1,0 +1,2376 @@
+== LỆNH #47 R1 — mã đang chạy · 2026-09-12T03:39Z ==
+== wc ==
+  1289 index.js
+    41 lib/approveEngagement.js
+   301 lib/autoSend.js
+    78 lib/config.js
+    18 lib/filter.js
+    52 lib/generateDrafts.js
+     8 lib/logger.js
+   113 lib/multitouch.js
+    68 lib/needsynth.js
+   214 lib/scorer.js
+   360 lib/scraper.js
+    92 lib/zaloCheck.js
+   123 stats.js
+    74 push.js
+   479 outreach.js
+   162 content.js
+  3472 total
+== index.js: import + export + hàm top-level ==
+1:import { cfgVal } from './cfgpriv.js'; // v119-42: config/private
+10:import { onSchedule } from 'firebase-functions/v2/scheduler';
+11:import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
+12:import { onRequest } from 'firebase-functions/v2/https';
+13:import { setGlobalOptions } from 'firebase-functions/v2';
+14:import { initializeApp } from 'firebase-admin/app';
+15:import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+16:import { getAuth } from 'firebase-admin/auth';
+18:import { CFG } from './lib/config.js';
+19:import { fetchPosts, fetchComments, fetchPostsAuth, harvestComments } from './lib/scraper.js';
+20:import { keywordHit, isExcluded } from './lib/filter.js';
+21:import { scoreLead, prefilterLead } from './lib/scorer.js';
+22:import { dispatch } from './lib/alerts/index.js';
+23:import { enrichPhoneFromText, checkZalo } from './lib/zaloCheck.js'; // v89 them checkZalo
+24:import { tryMergeTouch, mtIdentityKey, mtTouch } from './lib/multitouch.js';
+25:import { synthNeeds } from './lib/needsynth.js';
+29:async function __brandAiOf(src) {
+53:async function __bdProfCfg(){
+58:async function __bdProfFetch(url,opts){
+63:async function __bdProfTrigger(profUrl){
+72:function __bdProfPick(rec){
+86:async function __bdProfCollect(){
+112:export const synthNeedsOnUpdate = onDocumentUpdated('leads/{id}', async (event) => {
+148:async function verifyCaller(req) {
+165:async function loadSources() {
+173:async function seenRef(postId) { return db.collection('seen').doc(postId.replace(/[^\w-]/g, '_').slice(0, 480)); }
+176:async function loadConfig() {
+184:function computeRange(range, customStart, customEnd) {
+197:async function mapPool(items, limit, fn) {
+212:async function scanAll(trigger = 'scheduled', opts = {}) {
+871:export const scheduledScan = onSchedule(
+877:export const onLeadCreated = onDocumentCreated('leads/{id}', async (event) => {
+885:export const manualScan = onRequest({ cors: true }, async (req, res) => {
+912:export const cleanupScannedPosts = onSchedule(
+934:export const brightdataUsage = onRequest({ cors: true }, async (req, res) => {
+999:export const gcpUsage = onRequest({ cors: true }, async (req, res) => {
+1099:import { onRequest as __acReq } from 'firebase-functions/v2/https';
+1100:import { defineSecret as __acSecret } from 'firebase-functions/params';
+1101:import { getAuth as __acAuth } from 'firebase-admin/auth';
+1102:import { getFirestore as __acDbF, FieldValue as __acFV } from 'firebase-admin/firestore';
+1110:async function __acUser(req) {
+1283:export * from "./fbaccounts.js";
+1284:export * from './outreach.js';
+1285:export * from './content.js';
+1286:export * from './admin.js';
+1287:export * from './push.js';
+1288:export * from './stats.js'; // v119-49: daily_stats counter (Bảng brand)
+1289:export * from './scanstats.js'; // v119-78: counter bài đã quét theo brand (daily_stats.scanned)
+== index.js: mốc quan trọng ==
+10:import { onSchedule } from 'firebase-functions/v2/scheduler';
+12:import { onRequest } from 'firebase-functions/v2/https';
+19:import { fetchPosts, fetchComments, fetchPostsAuth, harvestComments } from './lib/scraper.js';
+52:// Cong tac o config/app: profileScanEnabled (true/false), profileDatasetId (gd_xxx), profileScanMax (mac dinh 5).
+55:    return { on:c.profileScanEnabled===true, ds:String(c.profileDatasetId||'').trim(), max:Number(c.profileScanMax)||5 };
+63:async function __bdProfTrigger(profUrl){
+86:async function __bdProfCollect(){
+175:/* Cấu hình toàn cục từ Firestore (config/app): keyword, exclude, weights, channels */
+204:const seenDoc = id => db.collection('seen').doc(String(id).replace(/[^\w-]/g, '_').slice(0, 480));
+208:const groupStateDoc = url => db.collection('group_state').doc(String(url || '').replace(/[^\w-]/g, '_').slice(0, 480));
+210:/* Quét nguồn (SONG SONG) + chấm điểm AI (POOL) + ghi TIẾN ĐỘ realtime vào scan_jobs/{jobId}.
+212:async function scanAll(trigger = 'scheduled', opts = {}) {
+215:  const brandBySource = {}; try { (sources || []).forEach(s => { if (s && s.name) brandBySource[s.name] = String(s.brand || '').trim(); }); } catc
+216:  const srcByGroup = {}; try { (sources || []).forEach(s => { const m = String(s.url || s.link || '').match(/facebook\.com\/groups\/([^\/\?#]+)/);
+221:  const job = opts.jobId ? db.collection('scan_jobs').doc(String(opts.jobId).slice(0, 200)) : null;
+234:  /* v-sow 05/09/2026: quét theo LỊCH gieo snapshot BrightData rồi gặt ở lượt sau (không chờ 90 s/nguồn trong lượt → lượt
+236:  const sowMode = trigger === 'scheduled' && !force && !(opts.startDate || opts.endDate) && CFG.BD_SOW_MODE !== false;
+243:  let llmDeferred = 0, llmFallback = 0, rescored46 = 0; const __h0 = { ok: Number((scoreLead.health46 || {}).ok) || 0, fail: Number((scoreLead.hea
+272:     Chỉ ghi bài MỚI (bài trùng đã bị bỏ ở Pha 2 trước recordPost) nên lượng ghi nhỏ.
+292:  /* v-selfcmt (LỆNH #31b 05/09/2026): bình luận của CHÍNH chủ bài → không phải lead (bỏ trước AI, không tốn tiền). So t
+307:  function recordPost(x, fields) {
+314:      brand: String(brandBySource[x.post.source || x.src.name || ''] || '').trim(), // v87 dong-dau brand tung bai
+334:  try { await __bdProfCollect(); } catch (e) { console.error('[profile-scan] collect:', (e&&e.message)||e); }
+350:  if (liveProbe && sources.length) { try { gsSnaps = await db.getAll(...sources.map(s => groupStateDoc(s.url))); } catch (e) { gsSnaps = []; } }
+386:        try { await groupStateDoc(src.url).set({ url: src.url || '', lastSweepAt: FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {}
+398:      let sowDue = true; // v-sow: gieo khi tới nhịp nguồn (lastTriggerAt trong group_state)
+399:      if (sowMode) { const gs = gsBy.get(src.url); sowDue = (nowMs0 - (Number(gs && gs.lastTriggerAt) || 0)) >= SRC_IV_MS; }
+400:      const posts = await fetchPosts(src, { startDate: opts.startDate, endDate: opts.endDate, numPosts: liveProbe ? liveNum : opts.numPosts, notIn
+407:        let snaps = []; try { snaps = await db.getAll(...posts.map(p => seenDoc(p.post_id))); } catch (e) { snaps = []; }
+412:          try { const full = await fetchPosts(src, { numPosts: CFG.POSTS_PER_GROUP, notInclude: (function(){ const g = gsBy.get(src.url); return (
+417:      if (didSweep) { try { await groupStateDoc(src.url).set({ url: src.url || '', lastSweepAt: FieldValue.serverTimestamp() }, { merge: true }); 
+423:  /* ---- v-sow bdwatch 05/09/2026: BrightData ngưng (vd 'trigger 400: Customer is not active') → log JSON severity ERROR
+442:  /* ---- Pha 1b: QUÉT COMMENT của mọi bài vừa lấy (nếu bật) → coi mỗi comment như 1 ứng viên lead ----
+455:      ctx.set(k, { effSrc: x.effSrc, src: x.src, row: x.row, parentAuthor: x.post.author || '', parentText: x.post.text || '', parentUrl: x.post.u
+458:    /* v-sowc 05/09/2026: quét theo LỊCH không còn chờ snapshot comment trong lượt (bdWait tới 510 s):
+463:    if (sowMode) {
+465:        // harvestComments: import tĩnh ở đầu file
+468:        const hv = await harvestComments({ billed: hvBilled, srcOf: (u) => { const c = srcCtx.get(String(u || '')); return c ? c.src : null; } });
+473:      } catch (e) { console.error('harvestComments lỗi:', e.message); }
+510:      for (const [k, v] of hvBilled) cmtBilled.set(k, (cmtBilled.get(k) || 0) + v); // v-sowc: record comment BrightData của snapshot vừa gặ
+511:      const cmts = await fetchComments(items, { perPost: CFG.COMMENTS_PER_POST, billed: cmtBilled, sow: sowMode, metaOf: sowMetaOf }); // v-sowc: 
+521:      for (const { comment, parentUrl } of [...hvCmts, ...cmts]) { // v-sowc: comment đã gặt + comment quét ngay (quét tay/backfill)
+529:        comment.parent_user_url = c.parentUserUrl || ''; comment.self_comment = __slIsSelfComment31(comment); /* v-selfcmt */
+537:  /* ---- Pha 2: chống trùng (đọc/ghi seen theo LÔ) + bỏ bài RÁC (exclude).
+541:  let selfSkipped = 0; /* v-selfcmt */
+545:    try { snaps = await db.getAll(...slice.map(x => seenDoc(x.post.post_id))); } catch (e) { snaps = []; }
+550:      if (!wasSeen) { wb.set(seenDoc(x.post.post_id), { at: FieldValue.serverTimestamp() }); writes++; }
+551:      if (x.post.self_comment) { selfSkipped++; recordPost(x, { decision: 'self_comment' }); return; } /* v-selfcmt: chủ bài tự bình luận 
+554:      else recordPost(x, { decision: twoStage ? 'excluded' : 'no_keyword' });
+562:  /* ---- Pha 3a: TẦNG 1 theo chế độ AI của TỪNG group.
+579:      else recordPost(x, { decision: 'prefiltered_out' });
+586:  if (selfSkipped) console.log('[self-comment] bỏ ' + selfSkipped + ' bình luận của chính chủ bài (không gọi AI)'); /* v-selfcmt */
+588:  async function commitLeadNow(row, lead) {
+592:      if (_gm && srcByGroup[_gm[1]] && lead.source !== srcByGroup[_gm[1]]) {
+593:        console.warn('[v-fixgrp] doi nguon', lead.source, '->', srcByGroup[_gm[1]], 'theo group', _gm[1]);
+594:        lead.source = srcByGroup[_gm[1]];
+595:        if (Array.isArray(lead.touches)) lead.touches.forEach(t => { if (t) t.source = srcByGroup[_gm[1]]; });
+621:     Gateway ZBS (onDocumentUpdated) thay dung cu chuyen-trang-thai justTagged -> ZNS som hon, khong phu thuoc event bus.
+622:     Neu nhip nay loi: tagLeadBrand (da bat RETRY) van la luoi du phong nhu cu. */
+624:    const _b = (typeof brandBySource !== 'undefined' && brandBySource[lead.source]) || '';
+633:/* ---- Pha 3b: TẦNG 2 — model THÔNG MINH chấm sâu + viết phản hồi (song song) ---- */
+637:  /* ===== LENH #46 (11/09/2026): LLM hỏng → KHÔNG tạo lead bằng heuristic. Bài vào score_retry/{R_<post_id>} rồi lượt quét theo 
+648:    const ref = db.collection('score_retry').doc('R_' + key);
+652:    } catch (e2) { console.error('[LLM-RETRY] ghi score_retry lỗi:', e2 && e2.message); return 'error'; }
+656:      const rq = await db.collection('score_retry').where('nextAt', '<=', Date.now()).orderBy('nextAt').limit(30).get();
+665:      if (n46) console.log('[LLM-RETRY] nạp ' + n46 + ' bài chờ AI chấm lại (score_retry tới hạn)');
+666:    } catch (e) { console.warn('[LLM-RETRY] nạp score_retry lỗi:', e && e.message); }
+670:    catch (e46) { // LENH #46: hỏng → xếp hàng chấm lại (không lead) · quá hạn/request hỏng → dự phòng kẹp ≤ 59 · ghi 
+673:      else { scored++; if (r46 === 'error') scoreErrors++; else llmDeferred++; recordPost(x, { decision: r46 === 'error' ? 'error' : 'ai_wait' });
+676:    if (x.deferredRef) { rescored46++; await x.deferredRef.delete().catch(() => {}); x.deferredRef = null; } // LENH #46: bài chờ đã được
+680:    const __role = String(ai.role || '').toLowerCase().trim(), __roleBlock = (__role === 'seller' || __role === 'poster_self'); /* v-selfcmt: ngư
+682:    recordPost(x, { decision: isLead ? 'lead' : (__roleBlock ? (__role === 'seller' ? 'seller' : 'self_comment') : 'scored_low'), score: ai.hotnes
+688:    if (ai._llm !== false && !(ai.reply && String(ai.reply).trim())) { // LENH #46: đang dùng dự phòng thì không gọi lại
+691:          const __ai2 = await scoreLead(x.post, x.effSrc, config.weights, await __brandAiOf(x.effSrc), { tries: 2 }); // LENH #46
+704:        const __sid = await __bdProfTrigger(x.post.user_url);
+708:    await commitLeadNow(x.row, { ...__pf,
+722:  /* ---- Pha 4: LƯU lead (batch — vẫn kích hoạt onLeadCreated để cảnh báo) ---- */
+725:  // v16-patch: lead da duoc ghi TUC THI o Pha 3b (commitLeadNow) — khoi batch cu da go. Backup: index.js.bak-leadnow
+748:  /* ===== LENH #46: CHẤM LẠI lead "Điểm tạm" (ai_scored:false) bằng AI khi LLM đang khoẻ — ≤ 12 lead/lượt (pool 3), mới nh
+749:     Ghi đè score/temp/intent/need/service/reply/role + ai_scored:true + rescored_at + ai_prev; AI nói KHÔNG phải lead → dropped (rescore 
+751:  let rescoredLeads46 = 0, rescoreDropped46 = 0;
+760:          .filter(c => !c.l.dropped && !c.l.lost && !c.l.closed_at && (Number(c.l.rescore_tries) || 0) < 8 && (__ms46(c.l.detected_at) || 0) >= cu
+770:          catch (e) { const k = (e && e.kind) || ''; await c.ref.set({ rescore_tries: FieldValue.increment(1), rescore_err: String((e && e.message
+776:          const up = { score: h, temp: t, intent: ai.intent || '', need: ai.need || ai.intent || '', service: ai.service || '', role, role_reason:
+779:            if (human) up.rescore_note = 'AI chấm lại: không phải lead (' + (roleBlock ? 'vai ' + role : 'điểm ' + h) + ') – giữ vì
+780:            else { up.dropped = true; up.dropped_by = roleBlock ? 'rescore_role' : 'rescore'; up.dropped_at = Date.now(); up.dropped_reason = role
+782:          await c.ref.set(up, { merge: true }); rescoredLeads46++;
+783:          try { await db.collection('leads').doc(c.id).collection('notes').add({ leadId: c.id, brand: l.brand || '', vis: 'team', text: 'AI đã c
+785:        if (cand46.length) console.log('[LLM-RESCORE] chấm lại ' + rescoredLeads46 + '/' + cand46.length + ' lead điểm tạm' + (rescoreDro
+791:  /* ===== LENH #46: GIÁM SÁT LLM — lượt này ≥ 2 lượt chấm hỏng & 0 thành công (hoặc lỗi auth/quota/model) → console ERRO
+818:    llmDeferred, llmFallback, llmRescored: rescored46, llmRescoredLeads: rescoredLeads46, llmOk: llmOk46, llmFail: llmFail46, llmErr: llmErr46, ll
+871:export const scheduledScan = onSchedule(
+881:  await dispatch({ id: event.params.id, ...lead }, config.channels);
+885:export const manualScan = onRequest({ cors: true }, async (req, res) => {
+912:export const cleanupScannedPosts = onSchedule(
+934:export const brightdataUsage = onRequest({ cors: true }, async (req, res) => {
+999:export const gcpUsage = onRequest({ cors: true }, async (req, res) => {
+1099:import { onRequest as __acReq } from 'firebase-functions/v2/https';
+----- index.js scanAll dòng 212 → 762 -----
+   212	async function scanAll(trigger = 'scheduled', opts = {}) {
+   213	  const t0 = Date.now();
+   214	  let sources = await loadSources();
+   215	  const brandBySource = {}; try { (sources || []).forEach(s => { if (s && s.name) brandBySource[s.name] = String(s.brand || '').trim(); }); } catch (e) {} // v17 dong-dau-kep
+   216	  const srcByGroup = {}; try { (sources || []).forEach(s => { const m = String(s.url || s.link || '').match(/facebook\.com\/groups\/([^\/\?#]+)/); if (m && s.name) srcByGroup[m[1]] = s.name; }); } catch (e) {} /* v-fixgrp: map group that -> ten nguon */
+   217	
+   218	  if (opts.sourceUrl) sources = sources.filter(s => s.url === opts.sourceUrl);
+   219	  const config = await loadConfig();
+   220	  const gKw = config.keywords || [], gEx = config.exclude || [];
+   221	  const job = opts.jobId ? db.collection('scan_jobs').doc(String(opts.jobId).slice(0, 200)) : null;
+   222	  const range = (opts.startDate || opts.endDate)
+   223	    ? { label: opts.rangeLabel || 'custom', start: opts.startDate || null, end: opts.endDate || null } : null;
+   224	
+   225	  // Chế độ AI: 'saver' (2 tầng — model rẻ lọc trước) hoặc 'max' (model thông minh chấm MỌI bài).
+   226	  // Super Admin chỉnh qua config/app.aiMode; fallback theo biến môi trường TWO_STAGE.
+   227	  const aiMode = config.aiMode === 'max' ? 'max'
+   228	               : config.aiMode === 'saver' ? 'saver'
+   229	               : (CFG.TWO_STAGE !== false ? 'saver' : 'max');
+   230	  const twoStage = aiMode === 'saver'; // chế độ MẶC ĐỊNH toàn cục
+   231	  // Mỗi group có thể GHI ĐÈ: src.aiMode ('max'|'saver') > cấu hình chung (aiMode)
+   232	  const srcMode = (src) => { const m = src && src.aiMode; return (m === 'max' || m === 'saver') ? m : aiMode; };
+   233	  const force = !!opts.force; // QUÉT LẠI TỪ ĐẦU: bỏ chống trùng → quét & chấm lại mọi bài trong khoảng
+   234	  /* v-sow 05/09/2026: quét theo LỊCH gieo snapshot BrightData rồi gặt ở lượt sau (không chờ 90 s/nguồn trong lượt → lượt ≈ 30 s thay vì 7–13').
+   235	     Nhịp gieo mỗi nguồn: config/app.scanIntervalMin (Super Admin) > .env SCAN_SOURCE_INTERVAL_MIN (mặc định 10'). Quét tay / backfill / force giữ cách cũ (chờ trong lượt). */
+   236	  const sowMode = trigger === 'scheduled' && !force && !(opts.startDate || opts.endDate) && CFG.BD_SOW_MODE !== false;
+   237	  const SRC_IV_MS = Math.max(3, Number(config.scanIntervalMin) || CFG.SCAN_SOURCE_INTERVAL_MIN || 10) * 60e3;
+   238	  // Quét comment: Super Admin bật/tắt qua config/app.scanComments (true/false) > biến môi trường SCAN_COMMENTS.
+   239	  const scanComments = (config.scanComments === true)
+   240	    || (config.scanComments !== false && CFG.SCAN_COMMENTS === true);
+   241	  let scanned = 0, commentsScanned = 0, candTotal = 0, prefilterDone = 0, matched = 0, scored = 0, kept = 0, hot = 0, srcDone = 0;
+   242	  let skippedSeen = 0, scoreErrors = 0, scrapeErrors = 0;
+   243	  let llmDeferred = 0, llmFallback = 0, rescored46 = 0; const __h0 = { ok: Number((scoreLead.health46 || {}).ok) || 0, fail: Number((scoreLead.health46 || {}).fail) || 0, pre: Number((scoreLead.health46 || {}).preFail) || 0 }; // LENH #46
+   244	  let backfillSkipped = 0, commentsRefreshSkipped = 0; // chống lãng phí: bỏ qua backfill trùng / quét lại comment chưa tới nhịp
+   245	  let scoreCalls = 0, preCalls = 0;                 // số lượt gọi model thông minh / model rẻ
+   246	  let mainIn = 0, mainOut = 0, preIn = 0, preOut = 0; // token theo từng model
+   247	  const dist = { hot: 0, warm: 0, cold: 0, junk: 0 };
+   248	  const bySource = [];
+   249	
+   250	  // Ghi tiến độ (throttle ~1.2s) để dashboard hiển thị realtime
+   251	  let lastWrite = 0;
+   252	  const prog = async (phase, force) => {
+   253	    if (!job) return;
+   254	    const now = Date.now();
+   255	    if (!force && now - lastWrite < 1200) return;
+   256	    lastWrite = now;
+   257	    try {
+   258	      await job.set({
+   259	        status: 'running', phase, trigger, range, sourceUrl: opts.sourceUrl || null, twoStage, aiMode,
+   260	        sourcesTotal: sources.length, sourcesDone: srcDone,
+   261	        postsFetched: scanned, commentsFetched: commentsScanned, scanComments, candidatesTotal: candTotal, prefilterDone,
+   262	        postsMatched: matched, postsScored: scored,
+   263	        leadsCreated: kept, hotLeads: hot, skippedSeen, scrapeErrors, scoreErrors,
+   264	        updatedAt: FieldValue.serverTimestamp()
+   265	      }, { merge: true });
+   266	    } catch (e) {}
+   267	  };
+   268	  if (job) { try { await job.set({ createdAt: FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {} }
+   269	
+   270	  /* ---- Nhật ký "tất cả bài đã quét": ghi MỌI bài (kèm điểm & quyết định) theo LÔ, realtime.
+   271	     Ghi cho CẢ quét thủ công LẪN quét nền theo lịch → danh sách "Bài đã quét" phản ánh đúng hoạt động nền.
+   272	     Chỉ ghi bài MỚI (bài trùng đã bị bỏ ở Pha 2 trước recordPost) nên lượng ghi nhỏ.
+   273	     Bài KHÔNG phù hợp gắn expireAt = giờ + N ngày (hàm cleanupScannedPosts tự dọn); lead giữ vĩnh viễn. ---- */
+   274	  const logPosts = CFG.LOG_SCANNED_POSTS !== false;
+   275	  const TTL_MS = Math.max(0, CFG.SCANNED_TTL_DAYS || 1) * 86400e3;
+   276	  let postLogged = 0;
+   277	  const postBuf = [];
+   278	  let flushingPosts = false;
+   279	  async function flushPosts(force) {
+   280	    if (flushingPosts) return;
+   281	    if (!force && postBuf.length < 25) return;
+   282	    flushingPosts = true;
+   283	    try {
+   284	      while (postBuf.length) {
+   285	        const chunk = postBuf.splice(0, 400);
+   286	        const wb = db.batch();
+   287	        chunk.forEach(r => wb.set(db.collection('scanned_posts').doc(), r));
+   288	        try { await wb.commit(); postLogged += chunk.length; } catch (e) {}
+   289	      }
+   290	    } finally { flushingPosts = false; }
+   291	  }
+   292	  /* v-selfcmt (LỆNH #31b 05/09/2026): bình luận của CHÍNH chủ bài → không phải lead (bỏ trước AI, không tốn tiền). So tên bỏ dấu hoặc link profile; tên ẩn danh không tính. */
+   293	  const __SL_ANON31 = /an danh|anonymous|nguoi tham gia|facebook user|nguoi dung facebook/;
+   294	  function __slFold31(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+   295	  function __slProfileKey31(u) {
+   296	    const s = String(u || '').trim(); if (!s) return '';
+   297	    let m = s.match(/profile\.php\?id=(\d+)/) || s.match(/\/people\/[^/]+\/(\d+)/); if (m) return 'id:' + m[1];
+   298	    m = s.match(/facebook\.com\/([A-Za-z0-9.]{3,})\/?(?:[?#]|$)/);
+   299	    return (m && !/^(groups|people|profile\.php|photo|photos|watch|share|reel|reels|stories|events|pages|marketplace|hashtag|posts|permalink\.php|story\.php)$/i.test(m[1])) ? 'u:' + m[1].toLowerCase() : '';
+   300	  }
+   301	  function __slIsSelfComment31(c) {
+   302	    const a = __slFold31(c.author), p = __slFold31(c.parent_author);
+   303	    if (a && p && a === p && !__SL_ANON31.test(a)) return true;
+   304	    const ka = __slProfileKey31(c.user_url), kp = __slProfileKey31(c.parent_user_url);
+   305	    return !!(ka && kp && ka === kp);
+   306	  }
+   307	  function recordPost(x, fields) {
+   308	    if (!logPosts) return;
+   309	    const kept = !!fields.kept;
+   310	    postBuf.push({
+   311	      jobId: opts.jobId || null, trigger,
+   312	      source: x.post.source || x.src.name || '',
+   313	      sourceUrl: x.src.url || '',
+   314	      brand: String(brandBySource[x.post.source || x.src.name || ''] || '').trim(), // v87 dong-dau brand tung bai
+   315	      author: String(x.post.author || '').slice(0, 120),
+   316	      text: String(x.post.text || '').slice(0, 600),
+   317	      post_url: x.post.url || '', time: x.post.time || '',
+   318	      kind: x.post.kind || 'post', parent_url: x.post.parent_url || '',
+   319	      parent_author: String(x.post.parent_author || '').slice(0, 120),
+   320	      parent_text: String(x.post.parent_text || '').slice(0, 300),
+   321	      comment_id: x.post.comment_id || '',
+   322	      comment_url: x.post.comment_url || '',
+   323	      decision: fields.decision || 'scored_low',
+   324	      score: Number(fields.score) || 0, temp: fields.temp || null,
+   325	      intent: fields.intent || '', service: fields.service || '', kept, role: String(fields.role || '').slice(0, 24),
+   326	      createdAt: FieldValue.serverTimestamp(),
+   327	      expireAt: kept ? null : new Date(Date.now() + TTL_MS)
+   328	    });
+   329	  }
+   330	
+   331	  await prog('starting', true);
+   332	
+   333	  /* v-patch profile-scan: thu ket qua ho so BD dang cho (da dat lenh tu nhip truoc) */
+   334	  try { await __bdProfCollect(); } catch (e) { console.error('[profile-scan] collect:', (e&&e.message)||e); }
+   335	  /* ---- Pha 1: SCRAPE các nguồn song song (pool 3) ---- */
+   336	  await prog('scraping', true);
+   337	  const collected = []; // { post, effSrc, src, row }
+   338	  // Chống quét lại backfill: khoá theo [group + khoảng ngày]. Live scan (không có ngày) KHÔNG bị ảnh hưởng.
+   339	  const isBackfill = !!(opts.startDate || opts.endDate);
+   340	  const bfKey = (url) => ('bf_' + String(url || '') + '|' + (opts.startDate || '') + '|' + (opts.endDate || '')).replace(/[^\w-]/g, '_').slice(0, 480);
+   341	  // ===== PROBE + FULL-SWEEP (chống lãng phí tiền lấy bài) =====
+   342	  // Quét sống: mỗi nhịp chỉ lấy PROBE_POSTS bài mới nhất. Feed Bright Data sắp mới-nhất-trước → nếu các bài đầu đã "seen"
+   343	  // thì phía dưới cũng cũ → bỏ qua nguồn. Nếu CẢ probe đều mới → có thể còn bài → lấy đủ POSTS_PER_GROUP.
+   344	  // Định kỳ FULLSWEEP_HOURS giờ vẫn lấy đủ 1 lần (lưới an toàn chống sót bài ghim/lệch thứ tự + làm mới comment).
+   345	  const liveProbe = !isBackfill && !force;
+   346	  const PROBE = Math.max(1, CFG.PROBE_POSTS || 5);
+   347	  const SWEEP_MS = Math.max(0, CFG.FULLSWEEP_HOURS || 2) * 3600 * 1000;
+   348	  const nowMs0 = Date.now();
+   349	  let gsSnaps = [];
+   350	  if (liveProbe && sources.length) { try { gsSnaps = await db.getAll(...sources.map(s => groupStateDoc(s.url))); } catch (e) { gsSnaps = []; } }
+   351	  const gsBy = new Map(); sources.forEach((s, i) => { const sn = gsSnaps[i]; gsBy.set(s.url, (sn && sn.exists) ? sn.data() : null); });
+   352	  let probeRuns = 0, sweepRuns = 0, probeEscalated = 0, probeIdle = 0, bdRecords = 0, authCheckpoints = 0, authRuns = 0;
+   353	  let bdCmtRecords = 0; // v-patch chi-phí: tổng record COMMENT BrightData tính tiền lượt này
+   354	  await mapPool(sources, 3, async (src) => {
+   355	    // v-patch chi-phí 16/08: bdPosts/bdComments = record BrightData TÍNH TIỀN (đếm TRƯỚC khi cắt seen);
+   356	    // nguồn private (quét bằng nick/browser) KHÔNG tốn BrightData → bdPosts giữ 0. ekyc = lead có SĐT (1 lượt check).
+   357	    const row = { name: src.name || '', industry: src.industry || '', url: src.url || '', posts: 0, matched: 0, leads: 0, hot: 0, error: null, bdPosts: 0, bdComments: 0, ekyc: 0 };
+   358	    bySource.push(row);
+   359	    const effSrc = { ...src, keywords: [...(src.keywords || []), ...gKw], exclude: [...(src.exclude || []), ...gEx] };
+   360	    if (isBackfill && !force) {
+   361	      try { const bd = await db.collection('backfill_done').doc(bfKey(src.url)).get(); if (bd.exists) { row.error = 'đã backfill khoảng này — bỏ qua'; backfillSkipped++; srcDone++; await prog('scraping'); return; } } catch (e) {}
+   362	    }
+   363	    try {
+   364	      // ===== NGUỒN PRIVATE: quét bằng NICK qua microservice trình duyệt (chỉ theo nhịp sweep, browser nặng) =====
+   365	      if (src.authAccountId && !isBackfill) {
+   366	        authRuns++;
+   367	        const gs = gsBy.get(src.url);
+   368	        const lastSweep = (gs && gs.lastSweepAt && gs.lastSweepAt.toMillis) ? gs.lastSweepAt.toMillis() : 0;
+   369	        if (!force && (nowMs0 - lastSweep) < SWEEP_MS) { row.error = 'auth: chưa tới nhịp'; srcDone++; await prog('scraping'); return; }
+   370	        let acc = null;
+   371	        try {
+   372	          const md = await db.collection('fb_accounts').doc(src.authAccountId).get();
+   373	          if (md.exists && md.data().status === 'quarantined') { row.error = 'nick đang bị cách ly'; srcDone++; await prog('scraping'); return; }
+   374	          const sd = await db.collection('fb_account_secrets').doc(src.authAccountId).get();
+   375	          if (sd.exists) acc = sd.data();
+   376	        } catch (e) {}
+   377	        if (!acc || !acc.cookie) { row.error = 'thiếu cookie nick'; scrapeErrors++; srcDone++; await prog('scraping'); return; }
+   378	        const res = await fetchPostsAuth(src, acc, { numPosts: CFG.AUTH_POSTS_PER_GROUP });
+   379	        if (res.checkpoint) {
+   380	          try { await db.collection('fb_accounts').doc(src.authAccountId).set({ status: 'quarantined', quarantineReason: 'checkpoint', quarantinedAt: FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {}
+   381	          row.error = 'CHECKPOINT — đã cách ly nick'; authCheckpoints++; scrapeErrors++; srcDone++; await prog('scraping'); return;
+   382	        }
+   383	        const aposts = res.posts || [];
+   384	        bdRecords += aposts.length; row.posts = aposts.length; scanned += aposts.length;
+   385	        for (const post of aposts) collected.push({ post, effSrc, src, row });
+   386	        try { await groupStateDoc(src.url).set({ url: src.url || '', lastSweepAt: FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {}
+   387	        try { await db.collection('fb_accounts').doc(src.authAccountId).set({ lastUsedAt: FieldValue.serverTimestamp(), status: 'active', lastPosts: aposts.length }, { merge: true }); } catch (e) {}
+   388	        srcDone++; await prog('scraping'); return;
+   389	      }
+   390	      // Chọn số bài lấy: backfill/force giữ nguyên; live = probe (PROBE) hoặc sweep (đủ POSTS_PER_GROUP) khi tới hạn.
+   391	      let liveNum, didSweep = false;
+   392	      if (liveProbe) {
+   393	        const gs = gsBy.get(src.url);
+   394	        const lastSweep = (gs && gs.lastSweepAt && gs.lastSweepAt.toMillis) ? gs.lastSweepAt.toMillis() : 0;
+   395	        if ((nowMs0 - lastSweep) >= SWEEP_MS) { liveNum = CFG.POSTS_PER_GROUP; didSweep = true; sweepRuns++; }
+   396	        else { liveNum = PROBE; probeRuns++; }
+   397	      }
+   398	      let sowDue = true; // v-sow: gieo khi tới nhịp nguồn (lastTriggerAt trong group_state)
+   399	      if (sowMode) { const gs = gsBy.get(src.url); sowDue = (nowMs0 - (Number(gs && gs.lastTriggerAt) || 0)) >= SRC_IV_MS; }
+   400	      const posts = await fetchPosts(src, { startDate: opts.startDate, endDate: opts.endDate, numPosts: liveProbe ? liveNum : opts.numPosts, notInclude: (function(){ const g = gsBy.get(src.url); return (liveProbe && g && Array.isArray(g.recentIds)) ? g.recentIds : undefined; })(), sow: sowMode, sowDue, sweep: didSweep });
+   401	      row.bd = posts.bd || 'ok'; // 'ok' = đã gọi BrightData thành công (bdwatch), 'skip' = chưa tới nhịp
+   402	      if (posts.sweep) didSweep = true; // gặt snapshot đã gieo ở nhịp sweep → không cắt theo bài đã thấy
+   403	      bdRecords += posts.length; row.bdPosts += posts.length;
+   404	      let usePosts = posts;
+   405	      if (liveProbe && !didSweep && posts.length) {
+   406	        // Đếm số bài MỚI ở đầu danh sách (chưa thấy). Gặp bài đã-seen đầu tiên là dừng (phía dưới đều cũ hơn).
+   407	        let snaps = []; try { snaps = await db.getAll(...posts.map(p => seenDoc(p.post_id))); } catch (e) { snaps = []; }
+   408	        let leadingNew = 0; for (let j = 0; j < posts.length; j++) { if (snaps[j] && snaps[j].exists) break; leadingNew++; }
+   409	        if (leadingNew === 0) { usePosts = []; probeIdle++; }
+   410	        else if (leadingNew >= posts.length && posts.length >= (liveNum || 0)) { // probe đầy bài mới → có thể còn nữa → lấy đủ
+   411	          probeEscalated++;
+   412	          try { const full = await fetchPosts(src, { numPosts: CFG.POSTS_PER_GROUP, notInclude: (function(){ const g = gsBy.get(src.url); return (g && Array.isArray(g.recentIds)) ? g.recentIds : undefined; })(), sow: sowMode, sowDue: true }); bdRecords += full.length; row.bdPosts += full.length; usePosts = full.length ? full : posts; } catch (e) { usePosts = posts; }
+   413	        } else { usePosts = posts.slice(0, leadingNew); }
+   414	      }
+   415	      row.posts = usePosts.length; scanned += usePosts.length;
+   416	      for (const post of usePosts) collected.push({ post, effSrc, src, row });
+   417	      if (didSweep) { try { await groupStateDoc(src.url).set({ url: src.url || '', lastSweepAt: FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {} }
+   418	      if (isBackfill) { try { await db.collection('backfill_done').doc(bfKey(src.url)).set({ url: src.url || '', startDate: opts.startDate || '', endDate: opts.endDate || '', at: FieldValue.serverTimestamp(), posts: usePosts.length }, { merge: true }); } catch (e) {} }
+   419	    } catch (e) { console.error('scrape', src.name, e.message); scrapeErrors++; row.error = e.message.slice(0, 140); }
+   420	    srcDone++; await prog('scraping');
+   421	  });
+   422	
+   423	  /* ---- v-sow bdwatch 05/09/2026: BrightData ngưng (vd 'trigger 400: Customer is not active') → log JSON severity ERROR
+   424	     (alert policy 'lỗi Cloud Functions/Run' → email Super Admin) + system_status/brightdata {ok,since,sample}. Hết ngưng → WARNING [BRIGHTDATA-UP]. ---- */
+   425	  try {
+   426	    const isBdErr = r => !!(r.error && /trigger \d{3}|snapshot|not active|fetch failed|ECONN|ETIMEDOUT|ENOTFOUND/i.test(r.error));
+   427	    const bdErrs = bySource.filter(isBdErr), bdOks = bySource.filter(r => r.bd === 'ok');
+   428	    const nBd = bySource.filter(r => r.bd || isBdErr(r)).length;
+   429	    const stRef = db.collection('system_status').doc('brightdata');
+   430	    if (nBd >= 1 && bdErrs.length >= Math.min(3, nBd) && bdOks.length === 0) {
+   431	      const sample = String(bdErrs[0].error || '').slice(0, 160);
+   432	      const prev = await stRef.get().catch(() => null); const pd = prev && prev.exists ? prev.data() : null;
+   433	      const since = (pd && pd.ok === false && pd.since) ? pd.since : Date.now();
+   434	      await stRef.set({ ok: false, since, at: Date.now(), runs: FieldValue.increment(1), errors: bdErrs.length, sources: nBd, sample }, { merge: true });
+   435	      console.log(JSON.stringify({ severity: 'ERROR', message: `[BRIGHTDATA-DOWN] ${bdErrs.length}/${nBd} nguồn lỗi BrightData, 0 nguồn OK (từ ${new Date(since + 7 * 3600e3).toISOString().slice(0, 16).replace('T', ' ')} VN): ${sample}` }));
+   436	    } else if (bdOks.length) {
+   437	      const prev = await stRef.get().catch(() => null); const pd = prev && prev.exists ? prev.data() : null;
+   438	      if (!pd || pd.ok !== true) { await stRef.set({ ok: true, at: Date.now(), recoveredAt: Date.now(), runs: 0 }, { merge: true }); if (pd && pd.ok === false) console.log(JSON.stringify({ severity: 'WARNING', message: '[BRIGHTDATA-UP] BrightData hoạt động lại' })); }
+   439	    }
+   440	  } catch (e) { console.warn('[bdwatch]', e && e.message); }
+   441	
+   442	  /* ---- Pha 1b: QUÉT COMMENT của mọi bài vừa lấy (nếu bật) → coi mỗi comment như 1 ứng viên lead ----
+   443	     Comment đi CHUNG pipeline (chống trùng → lọc rác → tầng 1 → tầng 2) với effSrc/src/row của bài cha. */
+   444	  if (scanComments) {
+   445	    await prog('comments', true);
+   446	    // Bright Data trả post_url có thể THÊM query (vd ?locale=en_US) / thừa dấu "/" → chuẩn hoá khi so khớp bài cha.
+   447	    const urlKey = u => String(u || '').split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase();
+   448	    // gom URL bài (kèm src) để gọi dataset comment; map URLkey → {effSrc, src, row, parent...}
+   449	    const ctx = new Map();
+   450	    const cand = []; // ứng viên bài (đã khử trùng theo URL trong lần chạy này)
+   451	    for (const x of collected) {
+   452	      if (x.post.kind === 'comment') continue;
+   453	      const u = x.post.url; if (!u) continue;
+   454	      const k = urlKey(u); if (ctx.has(k)) continue;
+   455	      ctx.set(k, { effSrc: x.effSrc, src: x.src, row: x.row, parentAuthor: x.post.author || '', parentText: x.post.text || '', parentUrl: x.post.url || '', parentUserUrl: x.post.user_url || '' }); /* v-selfcmt */
+   456	      cand.push({ k, url: u, src: x.src });
+   457	    }
+   458	    /* v-sowc 05/09/2026: quét theo LỊCH không còn chờ snapshot comment trong lượt (bdWait tới 510 s):
+   459	       (1) GẶT các snapshot comment đã gieo ở lượt trước → thêm bài cha vào ctx (nguồn tra theo url trong lượt này) rồi đi chung vòng xử lý bên dưới;
+   460	       (2) fetchComments({sow:true}) chỉ GIEO snapshot (pending_snapshots kind='comments' kèm bài cha) rồi trả về ngay. Quét tay/backfill/force giữ cách cũ. */
+   461	    let hvCmts = []; const hvBilled = new Map();
+   462	    const sowMetaOf = (u) => { const c = ctx.get(urlKey(u)); return c ? { url: u, srcUrl: String((c.src && c.src.url) || ''), parentUrl: c.parentUrl || u, parentAuthor: String(c.parentAuthor || '').slice(0, 200), parentText: String(c.parentText || '').slice(0, 1500), parentUserUrl: String(c.parentUserUrl || '').slice(0, 300) } : null; };
+   463	    if (sowMode) {
+   464	      try {
+   465	        // harvestComments: import tĩnh ở đầu file
+   466	        const srcCtx = new Map();
+   467	        for (const s of sources) { const u = String(s.url || ''); const r = bySource.find(rr => rr.url === u); if (u && r && !srcCtx.has(u)) srcCtx.set(u, { src: s, effSrc: { ...s, keywords: [...(s.keywords || []), ...gKw], exclude: [...(s.exclude || []), ...gEx] }, row: r }); }
+   468	        const hv = await harvestComments({ billed: hvBilled, srcOf: (u) => { const c = srcCtx.get(String(u || '')); return c ? c.src : null; } });
+   469	        let orphan = 0;
+   470	        for (const m of hv.metas) { const cc = m && srcCtx.get(String(m.srcUrl || '')); const k = urlKey((m && (m.parentUrl || m.url)) || ''); if (!cc || !k) { orphan++; continue; } if (!ctx.has(k)) ctx.set(k, { effSrc: cc.effSrc, src: cc.src, row: cc.row, parentAuthor: m.parentAuthor || '', parentText: m.parentText || '', parentUrl: m.parentUrl || m.url || '', parentUserUrl: m.parentUserUrl || '' }); }
+   471	        hvCmts = hv.items;
+   472	        if (hv.harvested || hv.pending || hv.failed) console.log(`[sowc] gặt ${hv.harvested} snapshot comment → ${hv.items.length} comment (${orphan} bài cha không còn nguồn) · còn chờ ${hv.pending} · hỏng/quá hạn ${hv.failed}`);
+   473	      } catch (e) { console.error('harvestComments lỗi:', e.message); }
+   474	    }
+   475	    // CHỐNG LÃNG PHÍ: chỉ quét comment cho bài MỚI, hoặc bài cũ theo NHỊP tối thiểu (3h nếu ≤48h kể từ lần đầu, 12h nếu hơn).
+   476	    // Bookkeeping: collection "cmt_scrape" doc id = urlKey → { firstAt, lastAt }. Lỗi đọc → fail-open (vẫn quét, không mất lead).
+   477	    const HMS = 3600 * 1000;
+   478	    const freshWin = Math.max(0, CFG.COMMENT_FRESH_WINDOW_HOURS || 48) * HMS;
+   479	    const freshIv = Math.max(0, CFG.COMMENT_REFRESH_FRESH_HOURS || 3) * HMS;
+   480	    const oldIv = Math.max(0, CFG.COMMENT_REFRESH_OLD_HOURS || 12) * HMS;
+   481	    const nowMs = Date.now();
+   482	    const cmtDoc = k => db.collection('cmt_scrape').doc(String(k).replace(/[^\w-]/g, '_').slice(0, 480));
+   483	    let bk = [];
+   484	    try { if (cand.length) bk = await db.getAll(...cand.map(c => cmtDoc(c.k))); } catch (e) { bk = []; }
+   485	    const items = [];
+   486	    const bw = db.batch(); let bwN = 0;
+   487	    cand.forEach((c, i) => {
+   488	      const snap = bk[i]; const d = (snap && snap.exists) ? snap.data() : null;
+   489	      const qualifiedOnly = !!(c.src && c.src.commentMode === 'qualified_only');
+   490	      let doIt = true;
+   491	      if (d && !force) {
+   492	        // 'qualified_only': bài đã quét lần đầu mà CHƯA từng ra lead → ngừng refresh (tiết kiệm). Bài mới (d==null) vẫn quét 1 lần.
+   493	        if (qualifiedOnly && d.qualified !== true) { doIt = false; }
+   494	        else {
+   495	          const firstMs = (d.firstAt && d.firstAt.toMillis) ? d.firstAt.toMillis() : nowMs;
+   496	          const lastMs = (d.lastAt && d.lastAt.toMillis) ? d.lastAt.toMillis() : 0;
+   497	          const iv = (nowMs - firstMs) <= freshWin ? freshIv : oldIv;
+   498	          doIt = (nowMs - lastMs) >= iv; // chưa tới nhịp → bỏ qua lần này (đã quét gần đây rồi)
+   499	        }
+   500	      }
+   501	      if (doIt) {
+   502	        items.push({ url: c.url, source: c.src });
+   503	        bw.set(cmtDoc(c.k), d ? { lastAt: FieldValue.serverTimestamp() } : { firstAt: FieldValue.serverTimestamp(), lastAt: FieldValue.serverTimestamp() }, { merge: true });
+   504	        bwN++;
+   505	      } else { commentsRefreshSkipped++; }
+   506	    });
+   507	    if (bwN) { try { await bw.commit(); } catch (e) {} }
+   508	    try {
+   509	      const cmtBilled = new Map(); // v-patch chi-phí: parentUrl → số record comment BrightData TÍNH TIỀN
+   510	      for (const [k, v] of hvBilled) cmtBilled.set(k, (cmtBilled.get(k) || 0) + v); // v-sowc: record comment BrightData của snapshot vừa gặt
+   511	      const cmts = await fetchComments(items, { perPost: CFG.COMMENTS_PER_POST, billed: cmtBilled, sow: sowMode, metaOf: sowMetaOf }); // v-sowc: sow=true → chỉ gieo
+   512	      for (const [pu, n] of cmtBilled) {
+   513	        bdCmtRecords += n;
+   514	        const c = ctx.get(urlKey(pu));
+   515	        if (c) c.row.bdComments += n;
+   516	        else { // record không khớp bài cha (BD trả post_url lạ) → gán nguồn ĐẦU của lô để không mất tiền nào khỏi sổ
+   517	          const first = bySource.find(r => !r.error) || bySource[0];
+   518	          if (first) first.bdComments += n;
+   519	        }
+   520	      }
+   521	      for (const { comment, parentUrl } of [...hvCmts, ...cmts]) { // v-sowc: comment đã gặt + comment quét ngay (quét tay/backfill)
+   522	        const c = ctx.get(urlKey(parentUrl)) || ctx.get(urlKey(comment.parent_url));
+   523	        if (!c) continue;                       // không khớp bài cha → bỏ
+   524	        if (!comment.text || !comment.text.trim()) continue;
+   525	        // Lưu kèm thông tin bài cha vào comment để UI dựng được tiêu đề kể cả khi bài gốc không nằm trong cửa sổ tải.
+   526	        comment.parent_url = c.parentUrl || comment.parent_url || parentUrl; // dùng URL bài cha đã quét (khớp post_url)
+   527	        comment.parent_author = c.parentAuthor || '';
+   528	        comment.parent_text = c.parentText || '';
+   529	        comment.parent_user_url = c.parentUserUrl || ''; comment.self_comment = __slIsSelfComment31(comment); /* v-selfcmt */
+   530	        commentsScanned++; c.row.posts++;       // tính comment vào số item của nguồn
+   531	        collected.push({ post: comment, effSrc: c.effSrc, src: c.src, row: c.row });
+   532	      }
+   533	    } catch (e) { console.error('fetchComments lỗi:', e.message); }
+   534	    await prog('comments', true);
+   535	  }
+   536	
+   537	  /* ---- Pha 2: chống trùng (đọc/ghi seen theo LÔ) + bỏ bài RÁC (exclude).
+   538	     Chế độ 2 tầng KHÔNG dùng cổng keyword "include" — để AI tầng 1 đọc hiểu mọi bài còn lại. ---- */
+   539	  await prog('filtering', true);
+   540	  const candidates = [];
+   541	  let selfSkipped = 0; /* v-selfcmt */
+   542	  for (let i = 0; i < collected.length; i += 300) {
+   543	    const slice = collected.slice(i, i + 300);
+   544	    let snaps = [];
+   545	    try { snaps = await db.getAll(...slice.map(x => seenDoc(x.post.post_id))); } catch (e) { snaps = []; }
+   546	    const wb = db.batch(); let writes = 0;
+   547	    slice.forEach((x, j) => {
+   548	      const wasSeen = snaps[j] && snaps[j].exists;
+   549	      if (wasSeen && !force) { skippedSeen++; return; }            // chống trùng (tắt khi quét lại từ đầu)
+   550	      if (!wasSeen) { wb.set(seenDoc(x.post.post_id), { at: FieldValue.serverTimestamp() }); writes++; }
+   551	      if (x.post.self_comment) { selfSkipped++; recordPost(x, { decision: 'self_comment' }); return; } /* v-selfcmt: chủ bài tự bình luận → không phải lead, không gọi AI */
+   552	      const pass = !isExcluded(x.post.text, x.effSrc); // luôn để AI đọc hiểu ngữ cảnh (chỉ bỏ bài rác theo exclude)
+   553	      if (pass) candidates.push(x);
+   554	      else recordPost(x, { decision: twoStage ? 'excluded' : 'no_keyword' });
+   555	    });
+   556	    if (writes) { try { await wb.commit(); } catch (e) {} }
+   557	    await flushPosts();
+   558	    await prog('filtering');
+   559	  }
+   560	  candTotal = candidates.length;
+   561	
+   562	  /* ---- Pha 3a: TẦNG 1 theo chế độ AI của TỪNG group.
+   563	     'saver' → model rẻ lọc trước; 'max' → bỏ tầng lọc, vào thẳng tầng 2. ---- */
+   564	  const toScore = [];
+   565	  const saverList = candidates.filter(x => srcMode(x.src) === 'saver');
+   566	  const maxList   = candidates.filter(x => srcMode(x.src) === 'max');
+   567	  // 'max': chấm sâu thẳng mọi bài
+   568	  maxList.forEach(x => { matched++; x.row.matched++; toScore.push(x); });
+   569	  // 'saver': qua tầng 1 (model rẻ) — chỉ bài tiềm năng mới lên tầng 2
+   570	  if (saverList.length) {
+   571	    candTotal = saverList.length; // số bài thực sự đi qua tầng 1 (cho thanh tiến độ)
+   572	    await prog('prefiltering', true);
+   573	    await mapPool(saverList, CFG.PREFILTER_CONCURRENCY || 10, async (x) => {
+   574	      const pf = await prefilterLead(x.post, await __brandAiOf(x.effSrc || x.src || x.source)); /* v-brandai */
+   575	      const u = pf._usage || {}; if (pf._llm) preCalls++;
+   576	      preIn += u.prompt || 0; preOut += u.completion || 0;
+   577	      prefilterDone++;
+   578	      if (pf.maybe) { matched++; x.row.matched++; toScore.push(x); }
+   579	      else recordPost(x, { decision: 'prefiltered_out' });
+   580	      await flushPosts();
+   581	      await prog('prefiltering');
+   582	    });
+   583	  }
+   584	
+   585	    // ==== v16-patch 09/08/2026: ghi lead TUC THI khi cham dat — feed realtime, khong mat lead neu function chet giua chung ====
+   586	  if (selfSkipped) console.log('[self-comment] bỏ ' + selfSkipped + ' bình luận của chính chủ bài (không gọi AI)'); /* v-selfcmt */
+   587	  const leadKey = u => 'L_' + String(u || '').replace(/[^\w-]/g, '_').slice(0, 470);
+   588	  async function commitLeadNow(row, lead) {
+   589	    /* v-fixgrp: comment co the bi khop nham bai cha trong batch -> doi chieu group that tu URL, sua lai nguon truoc khi ghi */
+   590	    try {
+   591	      const _gm = String((lead && (lead.comment_url || lead.post_url || lead.url)) || '').match(/facebook\.com\/groups\/([^\/\?#]+)/);
+   592	      if (_gm && srcByGroup[_gm[1]] && lead.source !== srcByGroup[_gm[1]]) {
+   593	        console.warn('[v-fixgrp] doi nguon', lead.source, '->', srcByGroup[_gm[1]], 'theo group', _gm[1]);
+   594	        lead.source = srcByGroup[_gm[1]];
+   595	        if (Array.isArray(lead.touches)) lead.touches.forEach(t => { if (t) t.source = srcByGroup[_gm[1]]; });
+   596	      }
+   597	    } catch (e) {}
+   598	  // [multitouch A] Gop khach xuat hien nhieu nhom trong 48h. Fail-safe: loi -> tao lead thuong.
+   599	  try {
+   600	    const _mtHot = (typeof CFG !== 'undefined' && CFG && typeof CFG.HOT_THRESHOLD === 'number') ? CFG.HOT_THRESHOLD : 80;
+   601	    if (await tryMergeTouch(db, lead, { windowH: 48, hotThreshold: _mtHot })) return true;
+   602	  } catch (e) { console.error('[multitouch] merge loi, tao lead thuong:', e && e.message); }
+   603	  // [multitouch A] Gan khoa dinh danh + touch dau cho lead MOI (de lan sau con gop duoc).
+   604	  try {
+   605	    if (lead && !lead.identityKey) {
+   606	      lead.identityKey = mtIdentityKey(lead.author_url, lead.phone, lead.email);
+   607	      lead.touches = [ mtTouch({ source: lead.source, time: lead.time, kind: lead.kind, url: lead.post_url || lead.url, text: lead.text }, Date.now()) ];
+   608	      lead.group_count = 1;
+   609	      lead.base_score = Number(lead.score || 0);
+   610	      lead.last_seen_ms = Date.now();
+   611	    }
+   612	  } catch (e) { console.error('[multitouch] tag lead loi:', e && e.message); }
+   613	
+   614	    let ref;
+   615	    if (force && lead.post_url) {
+   616	      ref = db.collection('leads').doc(leadKey(lead.post_url));
+   617	      try { const s = await ref.get(); if (s.exists) return false; } catch (e) {}
+   618	    } else ref = db.collection('leads').doc();
+   619	    try { await ref.set(lead); } catch (e) { return false; }
+   620	  /* v17 DONG-DAU-KEP: scanner tu dong dau brand ngay sau khi ghi lead (~50ms).
+   621	     Gateway ZBS (onDocumentUpdated) thay dung cu chuyen-trang-thai justTagged -> ZNS som hon, khong phu thuoc event bus.
+   622	     Neu nhip nay loi: tagLeadBrand (da bat RETRY) van la luoi du phong nhu cu. */
+   623	  try {
+   624	    const _b = (typeof brandBySource !== 'undefined' && brandBySource[lead.source]) || '';
+   625	    if (_b) await ref.update({ brand: _b, brand_pending: FieldValue.delete(), brand_tagged_at: FieldValue.serverTimestamp(), brand_tagged_by: 'scanner-inline' });
+   626	    else await ref.update({ brand_pending: true, brand_tagged_at: FieldValue.serverTimestamp(), brand_tagged_by: 'scanner-inline' });
+   627	  } catch (e) { console.warn('[birthstamp] loi dong dau inline (luoi du phong se do):', e.message); }
+   628	
+   629	    kept++; row.leads++; if ((lead.score || 0) >= CFG.HOT_THRESHOLD) { hot++; row.hot++; }
+   630	    if (lead && lead.phone) row.ekyc = (row.ekyc || 0) + 1; // v-patch chi-phí: 1 lead có SĐT ≈ 1 lượt check eKYC
+   631	    return true;
+   632	  }
+   633	/* ---- Pha 3b: TẦNG 2 — model THÔNG MINH chấm sâu + viết phản hồi (song song) ---- */
+   634	  await prog('scoring', true);
+   635	  const leads = [];
+   636	  const qualifiedUrls = new Set(); // bài (theo urlKey) đã ra lead → cho phép tiếp tục refresh comment ở chế độ 'qualified_only'
+   637	  /* ===== LENH #46 (11/09/2026): LLM hỏng → KHÔNG tạo lead bằng heuristic. Bài vào score_retry/{R_<post_id>} rồi lượt quét theo lịch chấm lại
+   638	     (3′ → 10′ → 30′ → 1 h → 3 h → 6 h, tối đa 6 lần/24 h); quá hạn → lead dự phòng KẸP ≤ 59 (lạnh) + ai_scored:false (sweeper cuối lượt chấm lại khi AI khoẻ). ===== */
+   639	  const sow46 = !isBackfill && !opts.sourceUrl && !force;
+   640	  const RETRY_WAIT46 = [3, 10, 30, 60, 180, 360]; // phút
+   641	  const slimPost46 = p => { const o = {}; for (const k of Object.keys(p || {})) { const v = p[k]; if (k.charAt(0) === '_') continue; if (typeof v === 'string') o[k] = v.slice(0, k === 'text' ? 4000 : 1500); else if (typeof v === 'number' || typeof v === 'boolean') o[k] = v; } return o; };
+   642	  async function deferPost46(x, e) {
+   643	    const kind = (e && e.kind) || 'unknown', msg = String((e && e.message) || e).slice(0, 200);
+   644	    const key = String((x.post && x.post.post_id) || '').replace(/[^\w-]/g, '_').slice(0, 470);
+   645	    if (!key || kind === 'badreq') { if (x.deferredRef) { await x.deferredRef.delete().catch(() => {}); x.deferredRef = null; } return 'fallback'; } // không định danh được / request hỏng cho riêng bài này → dự phòng ngay
+   646	    const prev = x.deferredDoc || null; const tries = (prev ? Number(prev.tries) || 0 : 0) + 1; const firstAt = (prev && Number(prev.firstAt)) || Date.now();
+   647	    if (tries > RETRY_WAIT46.length || Date.now() - firstAt > 24 * 3600e3) { if (x.deferredRef) { await x.deferredRef.delete().catch(() => {}); x.deferredRef = null; } return 'fallback'; }
+   648	    const ref = db.collection('score_retry').doc('R_' + key);
+   649	    try {
+   650	      await ref.set({ post: slimPost46(x.post), src: { name: (x.src && x.src.name) || '', url: (x.src && x.src.url) || '', industry: (x.src && x.src.industry) || '', brand: String((x.src && x.src.brand) || '') }, tries, firstAt, nextAt: Date.now() + RETRY_WAIT46[tries - 1] * 60000, lastErr: msg, kind, updatedAt: FieldValue.serverTimestamp() });
+   651	      x.deferredRef = null; return 'deferred';
+   652	    } catch (e2) { console.error('[LLM-RETRY] ghi score_retry lỗi:', e2 && e2.message); return 'error'; }
+   653	  }
+   654	  if (sow46) {
+   655	    try {
+   656	      const rq = await db.collection('score_retry').where('nextAt', '<=', Date.now()).orderBy('nextAt').limit(30).get();
+   657	      let n46 = 0;
+   658	      for (const d of rq.docs) {
+   659	        const r = d.data() || {}; const src = sources.find(s => s.url === (r.src && r.src.url)) || null;
+   660	        if (!src || !r.post || !r.post.post_id) { await d.ref.delete().catch(() => {}); continue; } // nguồn đã xoá/tắt → bỏ
+   661	        const effSrc = { ...src, keywords: [...(src.keywords || []), ...gKw], exclude: [...(src.exclude || []), ...gEx] };
+   662	        let row = bySource.find(b => b.url === src.url); if (!row) { row = { name: src.name || '', industry: src.industry || '', url: src.url || '', posts: 0, matched: 0, leads: 0, hot: 0, error: null, bdPosts: 0, bdComments: 0, ekyc: 0 }; bySource.push(row); }
+   663	        toScore.push({ post: r.post, effSrc, src, row, deferredRef: d.ref, deferredDoc: r }); n46++;
+   664	      }
+   665	      if (n46) console.log('[LLM-RETRY] nạp ' + n46 + ' bài chờ AI chấm lại (score_retry tới hạn)');
+   666	    } catch (e) { console.warn('[LLM-RETRY] nạp score_retry lỗi:', e && e.message); }
+   667	  }
+   668	  await mapPool(toScore, CFG.SCORE_CONCURRENCY || 6, async (x) => {
+   669	    let ai; try { ai = await scoreLead(x.post, x.effSrc, config.weights, await __brandAiOf(x.effSrc)); }
+   670	    catch (e46) { // LENH #46: hỏng → xếp hàng chấm lại (không lead) · quá hạn/request hỏng → dự phòng kẹp ≤ 59 · ghi score_retry lỗi → 'error' như cũ
+   671	      const r46 = await deferPost46(x, e46);
+   672	      if (r46 === 'fallback') { ai = scoreLead.heuristic46(x.post, x.effSrc); llmFallback++; }
+   673	      else { scored++; if (r46 === 'error') scoreErrors++; else llmDeferred++; recordPost(x, { decision: r46 === 'error' ? 'error' : 'ai_wait' }); await flushPosts(); await prog('scoring'); return; }
+   674	    }
+   675	    const u = ai._usage || {}; if (ai._llm) scoreCalls++;
+   676	    if (x.deferredRef) { rescored46++; await x.deferredRef.delete().catch(() => {}); x.deferredRef = null; } // LENH #46: bài chờ đã được AI chấm → xoá hàng chờ
+   677	    mainIn += u.prompt || 0; mainOut += u.completion || 0;
+   678	    const t = tempOf(ai.hotness || 0); if (dist[t] !== undefined) dist[t]++;
+   679	    scored++; await prog('scoring');
+   680	    const __role = String(ai.role || '').toLowerCase().trim(), __roleBlock = (__role === 'seller' || __role === 'poster_self'); /* v-selfcmt: người bán/đối thủ hoặc chính chủ bài → không phải lead */
+   681	    const isLead = !!ai.is_real_lead && !__roleBlock && (ai.hotness || 0) >= CFG.MIN_KEEP_SCORE;
+   682	    recordPost(x, { decision: isLead ? 'lead' : (__roleBlock ? (__role === 'seller' ? 'seller' : 'self_comment') : 'scored_low'), score: ai.hotness || 0, temp: t,
+   683	      intent: ai.intent || '', service: ai.service || '', kept: isLead, role: __role });
+   684	    await flushPosts();
+   685	    if (!isLead) return;
+   686	    { const pURL = (x.post.kind === 'comment') ? (x.post.parent_url || x.post.url) : x.post.url; if (pURL) qualifiedUrls.add(urlKey(pURL)); }
+   687	    // v-patch miss-reply 18/08: model quen/cat truong reply -> goi cham lai toi da 2 lan, khong de lead trong goi y
+   688	    if (ai._llm !== false && !(ai.reply && String(ai.reply).trim())) { // LENH #46: đang dùng dự phòng thì không gọi lại
+   689	      for (let __rt = 0; __rt < 2; __rt++) {
+   690	        try {
+   691	          const __ai2 = await scoreLead(x.post, x.effSrc, config.weights, await __brandAiOf(x.effSrc), { tries: 2 }); // LENH #46
+   692	          const __u2 = __ai2._usage || {}; if (__ai2._llm) scoreCalls++;
+   693	          mainIn += __u2.prompt || 0; mainOut += __u2.completion || 0;
+   694	          if (__ai2.reply && String(__ai2.reply).trim()) { ai.reply = __ai2.reply; break; }
+   695	        } catch (e) {}
+   696	      }
+   697	      if (!(ai.reply && String(ai.reply).trim())) console.error('[miss-reply] van rong sau 3 luot:', x.post.url || x.post.author || '');
+   698	    }
+   699	    const _zc = await enrichPhoneFromText((x.post.text || ''), { db, apiKey: process.env.EKYCPRO_API_KEY, doCheck: process.env.ZALO_CHECK_ENABLED !== 'false', cacheDays: 90 });
+   700	    // v-patch profile-scan: lead NONG + co link profile -> dat lenh quet ho so BD (ket qua ve o nhip scan sau)
+   701	    let __pf = {};
+   702	    try {
+   703	      if (t === 'hot' && x.post.user_url) {
+   704	        const __sid = await __bdProfTrigger(x.post.user_url);
+   705	        if (__sid) __pf = { profile_status:'pending', profile_snapshot:__sid, profile_url:String(x.post.user_url).slice(0,300) };
+   706	      }
+   707	    } catch (e) { console.error('[profile-scan] trigger:', (e&&e.message)||e); }
+   708	    await commitLeadNow(x.row, { ...__pf,
+   709	      name: x.post.author, score: ai.hotness, temp: t,
+   710	      industry: ai.industry || x.src.industry || '', source: x.post.source,
+   711	      time: x.post.time, need: ai.need || ai.intent || '', text: x.post.text, intent: ai.intent || '',
+   712	      service: ai.service || '', stage: 'new', assignee: null, reply: ai.reply || '', role: __role, role_reason: String(ai.role_reason || '').slice(0, 160),
+   713	      ai_scored: ai._llm !== false, // s18b: false = cham bang bo du phong -> giao dien gan nhan "diem tam" (chi Super Admin thay)
+   714	      post_url: x.post.url, kind: x.post.kind || 'post', parent_url: x.post.parent_url || '',
+   715	      author_url: x.post.user_url || '', parent_author: x.post.parent_author || '', parent_text: x.post.parent_text || '',
+   716	        comment_id: x.post.comment_id || '', comment_url: x.post.comment_url || '',
+   717	        phone: _zc.phone, phone_has_zalo: _zc.phone_has_zalo, email: _zc.email || '',
+   718	      detected_at: FieldValue.serverTimestamp()
+   719	    });
+   720	  });
+   721	
+   722	  /* ---- Pha 4: LƯU lead (batch — vẫn kích hoạt onLeadCreated để cảnh báo) ---- */
+   723	  await prog('saving', true);
+   724	  // Khi QUÉT LẠI TỪ ĐẦU: tránh tạo lead TRÙNG theo post_url và KHÔNG ghi đè lead cũ (giữ nguyên giai đoạn pipeline đã chỉnh).
+   725	  // v16-patch: lead da duoc ghi TUC THI o Pha 3b (commitLeadNow) — khoi batch cu da go. Backup: index.js.bak-leadnow
+   726	  // Đánh dấu bài đã ra lead → 'qualified' để chế độ 'qualified_only' tiếp tục refresh comment các bài này (kể cả lead nằm trong comment của bài rác).
+   727	  if (qualifiedUrls.size) {
+   728	    let qb = db.batch(), qn = 0;
+   729	    for (const k of qualifiedUrls) { qb.set(cmtScrapeDoc(k), { qualified: true, qualifiedAt: FieldValue.serverTimestamp() }, { merge: true }); if (++qn % 400 === 0) { try { await qb.commit(); } catch (e) {} qb = db.batch(); } }
+   730	    if (qn % 400 !== 0) { try { await qb.commit(); } catch (e) {} }
+   731	  }
+   732	  await flushPosts(true); // ghi nốt nhật ký bài đã quét còn trong bộ đệm
+   733	
+   734	  // v89 quet-vet zalo: check bu cac lead co SDT nhung chua co ket qua (timeout truoc do) — toi da 20 lead/luot
+   735	  try {
+   736	    const _zsnap = await db.collection('leads').where('phone_has_zalo', '==', null).limit(50).get();
+   737	    let _zn = 0;
+   738	    for (const _zdoc of _zsnap.docs) {
+   739	      if (_zn >= 20) break;
+   740	      const _zp = String((_zdoc.data() || {}).phone || '');
+   741	      if (!_zp) continue;
+   742	      const _zres = await checkZalo(_zp, { db, apiKey: process.env.EKYCPRO_API_KEY, cacheDays: 90 });
+   743	      if (typeof _zres.registered === 'boolean') { await _zdoc.ref.update({ phone_has_zalo: _zres.registered }); _zn++; }
+   744	    }
+   745	    if (_zn) console.log('[zaloCheck] v89: da check bu ' + _zn + ' lead thieu ket qua Zalo');
+   746	  } catch (e) { console.warn('[zaloCheck] v89 quet-vet loi: ' + (e && e.message)); }
+   747	
+   748	  /* ===== LENH #46: CHẤM LẠI lead "Điểm tạm" (ai_scored:false) bằng AI khi LLM đang khoẻ — ≤ 12 lead/lượt (pool 3), mới nhất trước, ≤ 30 ngày, ≤ 8 lần thử/lead.
+   749	     Ghi đè score/temp/intent/need/service/reply/role + ai_scored:true + rescored_at + ai_prev; AI nói KHÔNG phải lead → dropped (rescore / rescore_role); sales đang chăm → chỉ cập nhật điểm, không loại.
+   750	     Chỉ lượt quét theo lịch (không backfill/không quét riêng nguồn/không force). Tắt: RESCORE_FALLBACK=false (.env). ===== */
+   751	  let rescoredLeads46 = 0, rescoreDropped46 = 0;
+   752	  const __ms46 = v => !v ? 0 : (typeof v === 'number' ? v : (typeof v.toMillis === 'function' ? v.toMillis() : (v.seconds ? v.seconds * 1000 : (Date.parse(v) || 0))));
+   753	  if (sow46 && CFG.RESCORE_FALLBACK !== false && process.env.RESCORE_FALLBACK !== 'false') {
+   754	    const __hn = scoreLead.health46 || {}; const okNow = (Number(__hn.ok) || 0) - __h0.ok, failNow = (Number(__hn.fail) || 0) - __h0.fail;
+   755	    if (okNow > 0 || failNow === 0) {
+   756	      try {
+   757	        const rs = await db.collection('leads').where('ai_scored', '==', false).limit(80).get();
+   758	        const cut46 = Date.now() - 30 * 86400e3;
+   759	        const cand46 = rs.docs.map(d => ({ id: d.id, ref: d.ref, l: d.data() || {} }))
+   760	          .filter(c => !c.l.dropped && !c.l.lost && !c.l.closed_at && (Number(c.l.rescore_tries) || 0) < 8 && (__ms46(c.l.detected_at) || 0) >= cut46)
+   761	          .sort((a, b) => (__ms46(b.l.detected_at) || 0) - (__ms46(a.l.detected_at) || 0)).slice(0, Math.max(1, Number(process.env.RESCORE_PER_RUN) || 12));
+   762	        const brandAiCache46 = {}; let stop46 = false;
+--- index.js :: /onSchedule\(/ từ dòng 871 (45 dòng) ---
+   871	export const scheduledScan = onSchedule(
+   872	  { schedule: `every ${CFG.POLL_MINUTES} minutes`, timeZone: 'Asia/Ho_Chi_Minh', timeoutSeconds: 1800, maxInstances: 1 },
+   873	  async () => { await scanAll('scheduled'); }
+   874	);
+   875	
+   876	/* 2) Lead NÓNG mới → cảnh báo đa kênh */
+   877	export const onLeadCreated = onDocumentCreated('leads/{id}', async (event) => {
+   878	  const lead = event.data?.data(); if (!lead) return;
+   879	  if ((lead.score || 0) < CFG.HOT_THRESHOLD) return;
+   880	  const config = await loadConfig();
+   881	  await dispatch({ id: event.params.id, ...lead }, config.channels);
+   882	});
+   883	
+   884	/* 3) Quét thủ công từ dashboard (nút "Quét ngay") */
+   885	export const manualScan = onRequest({ cors: true }, async (req, res) => {
+   886	  const b = (req.body && typeof req.body === 'object') ? req.body : {};
+   887	  // Phân quyền: chấp nhận API_TOKEN (server-to-server) HOẶC Firebase ID token có vai trò được phép chạy quét.
+   888	  const tokenOK = CFG.API_TOKEN && req.get('X-API-Token') === CFG.API_TOKEN;
+   889	  if (!tokenOK) {
+   890	    const caller = await verifyCaller(req);
+   891	    if (!caller || caller.role !== 'superadmin') {
+   892	      res.status(403).json({ error: 'forbidden', message: 'Tài khoản không có quyền chạy quét.' });
+   893	      return;
+   894	    }
+   895	  }
+   896	  const jobId = (typeof b.jobId === 'string' && b.jobId) ? b.jobId : null; // theo dõi tiến độ realtime
+   897	  // QUÉT QUÁ KHỨ: { mode:'backfill', range:'24h|3d|7d|30d|90d|custom', start_date?, end_date?, sourceUrl?, jobId? }
+   898	  if (b.mode === 'backfill') {
+   899	    const { start, end } = computeRange(b.range, b.start_date, b.end_date);
+   900	    const opts = { startDate: start, endDate: end, rangeLabel: b.range || 'custom',
+   901	                   sourceUrl: b.sourceUrl || null, numPosts: b.numPosts || undefined, jobId, force: !!b.force };
+   902	    const sum = await scanAll('backfill', opts);
+   903	    res.json({ ok: true, mode: 'backfill', range: { label: opts.rangeLabel, start, end }, summary: sum });
+   904	    return;
+   905	  }
+   906	  const sum = await scanAll('manual', { jobId, force: !!b.force });
+   907	  res.json({ ok: true, summary: sum });
+   908	});
+   909	
+   910	/* 4) Tự dọn nhật ký bài đã quét hết hạn (bài KHÔNG phù hợp) — chạy mỗi ngày.
+   911	   Lead có expireAt = null nên KHÔNG bao giờ bị xoá. */
+   912	export const cleanupScannedPosts = onSchedule(
+   913	  { schedule: 'every 24 hours', timeZone: 'Asia/Ho_Chi_Minh' },
+   914	  async () => {
+   915	    const now = new Date();
+--- index.js :: /manualScan ?= ?onRequest/ từ dòng 885 (45 dòng) ---
+   885	export const manualScan = onRequest({ cors: true }, async (req, res) => {
+   886	  const b = (req.body && typeof req.body === 'object') ? req.body : {};
+   887	  // Phân quyền: chấp nhận API_TOKEN (server-to-server) HOẶC Firebase ID token có vai trò được phép chạy quét.
+   888	  const tokenOK = CFG.API_TOKEN && req.get('X-API-Token') === CFG.API_TOKEN;
+   889	  if (!tokenOK) {
+   890	    const caller = await verifyCaller(req);
+   891	    if (!caller || caller.role !== 'superadmin') {
+   892	      res.status(403).json({ error: 'forbidden', message: 'Tài khoản không có quyền chạy quét.' });
+   893	      return;
+   894	    }
+   895	  }
+   896	  const jobId = (typeof b.jobId === 'string' && b.jobId) ? b.jobId : null; // theo dõi tiến độ realtime
+   897	  // QUÉT QUÁ KHỨ: { mode:'backfill', range:'24h|3d|7d|30d|90d|custom', start_date?, end_date?, sourceUrl?, jobId? }
+   898	  if (b.mode === 'backfill') {
+   899	    const { start, end } = computeRange(b.range, b.start_date, b.end_date);
+   900	    const opts = { startDate: start, endDate: end, rangeLabel: b.range || 'custom',
+   901	                   sourceUrl: b.sourceUrl || null, numPosts: b.numPosts || undefined, jobId, force: !!b.force };
+   902	    const sum = await scanAll('backfill', opts);
+   903	    res.json({ ok: true, mode: 'backfill', range: { label: opts.rangeLabel, start, end }, summary: sum });
+   904	    return;
+   905	  }
+   906	  const sum = await scanAll('manual', { jobId, force: !!b.force });
+   907	  res.json({ ok: true, summary: sum });
+   908	});
+   909	
+   910	/* 4) Tự dọn nhật ký bài đã quét hết hạn (bài KHÔNG phù hợp) — chạy mỗi ngày.
+   911	   Lead có expireAt = null nên KHÔNG bao giờ bị xoá. */
+   912	export const cleanupScannedPosts = onSchedule(
+   913	  { schedule: 'every 24 hours', timeZone: 'Asia/Ho_Chi_Minh' },
+   914	  async () => {
+   915	    const now = new Date();
+   916	    let total = 0;
+   917	    for (let i = 0; i < 50; i++) { // tối đa 50 lô × 400 = 20k bài mỗi lần chạy
+   918	      let snap;
+   919	      try { snap = await db.collection('scanned_posts').where('expireAt', '<=', now).limit(400).get(); }
+   920	      catch (e) { console.error('cleanupScannedPosts query lỗi:', e.message); break; }
+   921	      if (snap.empty) break;
+   922	      const wb = db.batch();
+   923	      snap.forEach(d => wb.delete(d.ref));
+   924	      try { await wb.commit(); } catch (e) { console.error('cleanupScannedPosts commit lỗi:', e.message); break; }
+   925	      total += snap.size;
+   926	      if (snap.size < 400) break;
+   927	    }
+   928	    console.log(`cleanupScannedPosts: đã xoá ${total} bài hết hạn`);
+   929	  }
+--- index.js :: /__bdProfTrigger/ từ dòng 63 (45 dòng) ---
+    63	async function __bdProfTrigger(profUrl){
+    64	  const pc=await __bdProfCfg(); const TOK=CFG.BRIGHTDATA_TOKEN;
+    65	  if(!pc.on||!pc.ds||!TOK||!profUrl) return '';
+    66	  const r=await __bdProfFetch('https://api.brightdata.com/datasets/v3/trigger?dataset_id='+encodeURIComponent(pc.ds)+'&include_errors=true',
+    67	    { method:'POST', headers:{ Authorization:'Bearer '+TOK, 'Content-Type':'application/json' }, body: JSON.stringify([{ url: profUrl }]) });
+    68	  const sid=(r.json&&(r.json.snapshot_id||r.json.id))||'';
+    69	  if(!sid) console.error('[profile-scan] trigger loi:', r.status, r.text);
+    70	  return sid;
+    71	}
+    72	function __bdProfPick(rec){
+    73	  const g=(...ks)=>{ for(const k of ks){ const v=rec&&rec[k]; if(v!==undefined&&v!==null&&v!=='') return v; } return ''; };
+    74	  return {
+    75	    /* profile-pick-v2: map dung ten truong that cua BD Facebook-Profiles; sua bug !! lam mat link avatar */
+    76	    p_name:String(g('name','profile_name','full_name')).slice(0,120),
+    77	    p_followers:Number(g('followers','follower_count','num_followers'))||0,
+    78	    p_friends:Number(g('friends','friends_count','num_friends'))||0,
+    79	    p_avatar:String(g('profile_photo','profile_image_link','avatar','image')).slice(0,500),
+    80	    p_intro:String(g('intro','about','bio','description')).slice(0,300),
+    81	    p_location:String(g('location','city','current_city')).slice(0,120),
+    82	    p_work:String(g('work','work_title','job')).slice(0,160),
+    83	    p_edu:String(g('college','education','high_school')).slice(0,160)
+    84	  };
+    85	}
+    86	async function __bdProfCollect(){
+    87	  const pc=await __bdProfCfg(); const TOK=CFG.BRIGHTDATA_TOKEN;
+    88	  if(!pc.on||!TOK) return;
+    89	  const qs=await db.collection('leads').where('profile_status','==','pending').limit(pc.max||5).get();
+    90	  for(const d of qs.docs){
+    91	    const dd=d.data()||{}; const sid=dd.profile_snapshot;
+    92	    if(!sid){ await d.ref.update({ profile_status:'error' }); continue; }
+    93	    const r=await __bdProfFetch('<che>'+encodeURIComponent(sid)+'?format=json',
+    94	      { headers:{ Authorization:'Bearer '+TOK } });
+    95	    if(r.status===202){ continue; } // BD dang chay -> nhip scan sau lay tiep
+    96	    if(!r.ok||!r.json){
+    97	      const age=Date.now()-(d.updateTime?d.updateTime.toMillis():0);
+    98	      if(age>24*3600*1000) await d.ref.update({ profile_status:'error' }); // qua 24h van loi -> dong, khong treo mai
+    99	      console.error('[profile-scan] snapshot loi:', sid, r.status, r.text); continue;
+   100	    }
+   101	    const rec=Array.isArray(r.json)?r.json[0]:r.json;
+   102	    await d.ref.update({ profile_status:'done', profile:__bdProfPick(rec||{}), profile_at: FieldValue.serverTimestamp() });
+   103	    console.log('[profile-scan] da ghi ho so cho lead', d.id);
+   104	  }
+   105	}
+   106	// ===== het v-patch profile-scan =====
+   107	
+--- index.js :: /__bdProfCollect/ từ dòng 86 (45 dòng) ---
+    86	async function __bdProfCollect(){
+    87	  const pc=await __bdProfCfg(); const TOK=CFG.BRIGHTDATA_TOKEN;
+    88	  if(!pc.on||!TOK) return;
+    89	  const qs=await db.collection('leads').where('profile_status','==','pending').limit(pc.max||5).get();
+    90	  for(const d of qs.docs){
+    91	    const dd=d.data()||{}; const sid=dd.profile_snapshot;
+    92	    if(!sid){ await d.ref.update({ profile_status:'error' }); continue; }
+    93	    const r=await __bdProfFetch('<che>'+encodeURIComponent(sid)+'?format=json',
+    94	      { headers:{ Authorization:'Bearer '+TOK } });
+    95	    if(r.status===202){ continue; } // BD dang chay -> nhip scan sau lay tiep
+    96	    if(!r.ok||!r.json){
+    97	      const age=Date.now()-(d.updateTime?d.updateTime.toMillis():0);
+    98	      if(age>24*3600*1000) await d.ref.update({ profile_status:'error' }); // qua 24h van loi -> dong, khong treo mai
+    99	      console.error('[profile-scan] snapshot loi:', sid, r.status, r.text); continue;
+   100	    }
+   101	    const rec=Array.isArray(r.json)?r.json[0]:r.json;
+   102	    await d.ref.update({ profile_status:'done', profile:__bdProfPick(rec||{}), profile_at: FieldValue.serverTimestamp() });
+   103	    console.log('[profile-scan] da ghi ho so cho lead', d.id);
+   104	  }
+   105	}
+   106	// ===== het v-patch profile-scan =====
+   107	
+   108	setGlobalOptions({ region: 'asia-southeast1', memory: '512MiB', timeoutSeconds: 540 });
+   109	
+   110	/* [needsynth B] AI tong hop "Ho so nhu cau" cho lead multi-touch. Chi chay khi insight_stale && group_count>=2.
+   111	   Loop-safe: thanh cong -> insight_stale=false (khong tu kich lai); that bai -> khong ghi gi; tran synth_count>=6 -> bo co. */
+   112	export const synthNeedsOnUpdate = onDocumentUpdated('leads/{id}', async (event) => {
+   113	  /* [leadNo v1 22/08/2026] Cap SO THU TU CO DINH theo brand — gan 1 lan khi lead co brand, khong bao gio tinh lai */
+   114	  try {
+   115	    const _a = event.data && event.data.after ? event.data.after.data() : null;
+   116	    if (_a && _a.brand && !_a.leadNo) {
+   117	      const _ctr = db.collection('lead_counters').doc(String(_a.brand).replace(/[^\w-]/g, '_').slice(0, 100));
+   118	      const _lref = event.data.after.ref;
+   119	      await db.runTransaction(async (tx) => {
+   120	        const _cs = await tx.get(_ctr);
+   121	        const _ls = await tx.get(_lref);
+   122	        const _cur = _ls.exists ? _ls.data() : null;
+   123	        if (!_cur || _cur.leadNo || _cur.brand !== _a.brand) return;
+   124	        const _next = (Number(_cs.exists ? (_cs.data() || {}).n : 0) || 0) + 1;
+   125	        tx.set(_ctr, { n: _next, brand: _a.brand, updated_at: FieldValue.serverTimestamp() }, { merge: true });
+   126	        tx.update(_lref, { leadNo: _next, leadNo_at: FieldValue.serverTimestamp() });
+   127	      });
+   128	    }
+   129	  } catch (e) { console.error('[leadNo] cap so loi:', e && e.message); }
+   130	
+--- index.js :: KHONG THAY MOC /function tagLeadBrand|tagLeadBrand ?=/
+--- index.js :: KHONG THAY MOC /notifyLead|sendAlerts|alerts\./
+== lib: các file ==
+total 228
+drwxrwxr-x 3 xuanvinhsc68_work xuanvinhsc68_work  4096 Sep 11 10:09 .
+drwxrwxr-x 4 xuanvinhsc68_work xuanvinhsc68_work  4096 Sep 11 10:09 ..
+drwxrwxr-x 2 xuanvinhsc68_work xuanvinhsc68_work  4096 Aug  9 09:41 alerts
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  2957 Sep  5 04:01 approveEngagement.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  2874 Sep  5 04:01 approveEngagement.js.bak-20260905-040147.
+-rw-r--r-- 1 xuanvinhsc68_work xuanvinhsc68_work 11113 Sep  5 03:58 autoSend.js
+-rw-r--r-- 1 xuanvinhsc68_work xuanvinhsc68_work 11053 Sep  5 03:58 autoSend.js.bak-20260905-035825.
+-rw-r--r-- 1 xuanvinhsc68_work xuanvinhsc68_work  4403 Sep  6 00:58 config.js
+-rw-r--r-- 1 xuanvinhsc68_work xuanvinhsc68_work  4093 Sep  6 00:58 config.js.bak-20260906-005817
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work   909 Jun 28 05:36 filter.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work   909 Jun 28 05:36 filter.js.bak-s14
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  3190 Aug 19 22:52 generateDrafts.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  2233 Aug 19 22:52 generateDrafts.js.bak-brandai
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work   363 Jun 28 05:36 logger.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work   363 Jun 28 05:36 logger.js.bak-s14
+-rw-rw-r-- 1 xuanvinhsc68_work xuanvinhsc68_work  6301 Aug 19 10:34 multitouch.js
+-rw-rw-r-- 1 xuanvinhsc68_work xuanvinhsc68_work  5457 Aug 19 10:34 multitouch.js.bak_needsplit
+-rw-rw-r-- 1 xuanvinhsc68_work xuanvinhsc68_work  4257 Aug 19 22:52 needsynth.js
+-rw-rw-r-- 1 xuanvinhsc68_work xuanvinhsc68_work  4152 Aug 19 22:52 needsynth.js.bak-brandai
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work 18299 Sep 11 10:09 scorer.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  9569 Sep  5 22:12 scorer.js.bak-20260905-221250
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work 12796 Sep 11 10:09 scorer.js.bak-20260911-100914
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work 22408 Sep  5 04:43 scraper.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work 18044 Sep  5 04:43 scraper.js.bak-20260905-044358
+-rw-rw-r-- 1 xuanvinhsc68_work xuanvinhsc68_work 16127 Aug 19 06:31 scraper.js.bak_userurl
+-rw-rw-r-- 1 xuanvinhsc68_work xuanvinhsc68_work  3923 Aug 17 23:28 zaloCheck.js
+-rw-rw-r-- 1 xuanvinhsc68_work xuanvinhsc68_work  3512 Aug 17 23:28 zaloCheck.js.bak-v89b
+----- FILE lib/filter.js (18 dòng) -----
+     1	/* Chỉ kiểm tra từ khoá LOẠI TRỪ (rác) — dùng cho chế độ 2 tầng (AI đọc hiểu mọi bài còn lại). */
+     2	export function isExcluded(text, source) {
+     3	  const t = (text || '').toLowerCase();
+     4	  if (!t) return true;
+     5	  const exclude = (source.exclude || []).map(s => s.toLowerCase());
+     6	  return exclude.some(k => t.includes(k));
+     7	}
+     8	
+     9	/* Tiền lọc bằng keyword — rẻ & nhanh, chạy trước khi gọi LLM để tiết kiệm chi phí. */
+    10	export function keywordHit(text, source) {
+    11	  const t = (text || '').toLowerCase();
+    12	  if (!t) return false;
+    13	  const exclude = (source.exclude || []).map(s => s.toLowerCase());
+    14	  if (exclude.some(k => t.includes(k))) return false;
+    15	  const keywords = (source.keywords || []).map(s => s.toLowerCase());
+    16	  if (keywords.length === 0) return true; // không cấu hình keyword → cho qua để AI quyết
+    17	  return keywords.some(k => t.includes(k));
+    18	}
+----- FILE lib/multitouch.js (113 dòng) -----
+     1	// lib/multitouch.js — SmartLead (Session 17) — BƯỚC A: gộp lead "multi-touch"
+     2	// Cùng một người (identityKey = user_url / SĐT / email) đăng/comment ở NHIỀU nơi trong cửa sổ 48h
+     3	// (trượt theo lần gần nhất, chỉ gộp lead CÒN MỞ) -> gộp về 1 lead + mảng touches + boost điểm nóng.
+     4	// Nguyên tắc: "thà sót còn hơn nhầm" — chỉ gộp khi khoá định danh mạnh; ẩn danh không contact thì để riêng.
+     5	// Fail-safe: hàm này CHỈ được gọi trong try/catch ở index.js; lỗi -> tạo lead thường, không bao giờ chặn lead.
+     6	// ESM, khớp ~/firebase-s13/functions.
+     7	
+     8	function isOpen(stage){ const s = String(stage || 'new'); return s !== 'closed' && s !== 'won' && s !== 'lost'; }
+     9	
+    10	// Khoá nhận diện người: user_url -> SĐT -> email. Rỗng nếu ẩn danh & không có contact (=> không gộp).
+    11	export function mtIdentityKey(userUrl, phone, email){
+    12	  const u = String(userUrl || '').trim().toLowerCase().replace(/\/+$/, '');
+    13	  if (u) return 'u:' + u;
+    14	  if (phone) return 'p:' + String(phone).trim();
+    15	  if (email) return 'e:' + String(email).trim().toLowerCase();
+    16	  return '';
+    17	}
+    18	
+    19	// 1 lần chạm — đúng shape frontend cần: {source,time,kind,url,snippet,ts}
+    20	// atMs (tùy chọn): mốc thời gian THỰC của bài/comment (epoch ms). Nếu không có -> dùng nowMs (lúc quét).
+    21	export function mtTouch({ source, time, kind, url, text, atMs } = {}, nowMs){
+    22	  const fallback = nowMs || Date.now();
+    23	  return {
+    24	    source: String(source || ''),
+    25	    time: String(time || ''),
+    26	    kind: String(kind || 'post'),
+    27	    url: String(url || ''),
+    28	    snippet: String(text || '').replace(/\s+/g, ' ').trim().slice(0, 240),
+    29	    ts: (Number(atMs) > 0 ? Number(atMs) : fallback)
+    30	  };
+    31	}
+    32	
+    33	// Nhãn khoảng thời gian giữa touch cũ nhất -> mới nhất (VD "35 phút", "2 giờ", "2 ngày").
+    34	// Trả '' khi span quá nhỏ (< 2 phút) — thường do nhiều bài được quét trong cùng 1 lần chạy,
+    35	// mốc ts bị trùng nên nhãn "0 phút" sẽ gây hiểu nhầm; lúc đó để trống, frontend chỉ hiện số nhóm.
+    36	function spanLabel(touches){
+    37	  const ts = touches.map(t => t.ts || 0).filter(Boolean);
+    38	  if (ts.length < 2) return '';
+    39	  const ms = Math.max(...ts) - Math.min(...ts);
+    40	  if (ms < 2 * 60000) return '';
+    41	  const m = Math.round(ms / 60000);
+    42	  if (m < 60) return m + ' phút';
+    43	  const h = Math.round(ms / 3600000);
+    44	  if (h < 24) return h + ' giờ';
+    45	  return Math.round(ms / 86400000) + ' ngày';
+    46	}
+    47	
+    48	// Boost điểm CHỈ theo số NHÓM khác nhau — tín hiệu chắc chắn, không phụ thuộc mốc thời gian quét.
+    49	// +7 mỗi nhóm tăng thêm, trần +20 (2 nhóm +7, 3 nhóm +14, 4+ nhóm +20).
+    50	function calcBoost(groupCount){
+    51	  return Math.min(20, Math.max(0, groupCount - 1) * 7);
+    52	}
+    53	
+    54	/* Gộp 1 lead mới vào lead multi-touch đang mở của cùng người (nếu có).
+    55	 * db: Firestore admin; lead: object lead sắp ghi (đã có author_url/phone/email/source/time/kind/post_url/text/score);
+    56	 * opts: { windowH=48, hotThreshold=80 }.
+    57	 * Trả TRUE nếu ĐÃ gộp (đã update lead cũ, KHÔNG tạo lead mới, KHÔNG bắn ZNS lại); FALSE nếu không có gì để gộp. */
+    58	export async function tryMergeTouch(db, lead, opts = {}){
+    59	  const windowH = opts.windowH || 48;
+    60	  const hotThreshold = (typeof opts.hotThreshold === 'number') ? opts.hotThreshold : 80;
+    61	  const idk = mtIdentityKey(lead.author_url, lead.phone, lead.email);
+    62	  if (!idk) return false;                                   // ẩn danh, không contact -> không gộp
+    63	
+    64	  const now = Date.now();
+    65	  const cutoff = now - windowH * 3600 * 1000;
+    66	  const snap = await db.collection('leads')
+    67	    .where('identityKey', '==', idk)
+    68	    .where('last_seen_ms', '>=', cutoff)
+    69	    .orderBy('last_seen_ms', 'desc').limit(6).get();
+    70	
+    71	  let doc = null;
+    72	  snap.forEach(d => { if (!doc) { const x = d.data() || {}; if (isOpen(x.stage)) doc = d; } });
+    73	  if (!doc) return false;                                   // không có lead mở phù hợp -> tạo lead mới bình thường
+    74	
+    75	  const cur = doc.data() || {};
+    76	  /* v-patch need-split: cung 1 nguoi nhung NHU CAU KHAC NHAU -> khong gop, de tao lead rieng.
+    77	     Chi gop khi dung kieu "rai cung 1 bai di nhieu nhom" (noi dung trung cao / cung SDT). */
+    78	  try {
+    79	    const __pA = String(cur.phone||'').replace(/\D/g,''), __pB = String(lead.phone||'').replace(/\D/g,'');
+    80	    if (__pA && __pB && __pA.slice(-9) !== __pB.slice(-9)) return false;   // 2 so dien thoai khac nhau -> 2 nhu cau
+    81	    const __tok = z => new Set(String(z||'').toLowerCase().replace(/[^0-9a-z\u00c0-\u1ef9\s]/gi,' ').split(/\s+/).filter(w=>w.length>1));
+    82	    const __A = __tok(cur.text), __B = __tok(lead.text);
+    83	    if (__A.size && __B.size) {
+    84	      let __i = 0; for (const w of __B) if (__A.has(w)) __i++;
+    85	      if (__i / (__A.size + __B.size - __i) < 0.55) return false;          // noi dung khac han -> lead rieng
+    86	    }
+    87	  } catch (e) {}
+    88	  const touches = Array.isArray(cur.touches) ? cur.touches.slice() : [];
+    89	  const atMs = Number(lead.post_ts || lead.date_posted_ms || 0) || now;  // mốc thực nếu index.js có, không thì lúc quét
+    90	  const url = lead.post_url || lead.url || '';
+    91	  const nt = mtTouch({ source: lead.source, time: lead.time, kind: lead.kind, url, text: lead.text, atMs }, now);
+    92	
+    93	  // Bài này đã nằm trong hồ sơ (quét lại đúng 1 bài) -> "nhận" để KHÔNG tạo lead trùng, nhưng không ghi lại gì.
+    94	  if (nt.url && touches.some(t => t.url === nt.url)) return true;
+    95	  touches.push(nt);
+    96	
+    97	  const group_count = new Set(touches.map(t => t.source).filter(Boolean)).size;
+    98	  const base_score = Math.max(Number(cur.base_score || cur.score || 0), Number(lead.score || 0));
+    99	  const score = Math.min(100, base_score + calcBoost(group_count));
+   100	
+   101	  const upd = {
+   102	    touches, group_count, base_score, score,
+   103	    last_seen_ms: now,
+   104	    merged_at_ms: now,
+   105	    insight_stale: group_count >= 2            // đánh dấu cần AI tổng hợp lại (BƯỚC B xử lý)
+   106	  };
+   107	  const wl = spanLabel(touches);
+   108	  if (wl) upd.window_label = wl;               // chỉ đặt khi có nhãn hợp lý, tránh ghi đè bằng "0 phút"
+   109	  if (score >= hotThreshold) upd.temp = 'hot';  // multi-touch mạnh -> nóng
+   110	
+   111	  await doc.ref.update(upd);
+   112	  return true;
+   113	}
+----- FILE lib/alerts.js: KHONG CO -----
+----- FILE stats.js (123 dòng) -----
+     1	/* stats.js — v119-49 (nhóm 3 · P35): counter server-side `daily_stats/{brand}__{YYYY-MM-DD giờ VN}` cho Bảng brand (agency).
+     2	   Trigger onDocumentWritten leads/{id} → FieldValue.increment (an toàn ghi đồng thời từ nhiều nguồn, không đọc-rồi-ghi).
+     3	   Field: new (lead hợp lệ, không junk) · hot/warm/cold/junk · contacted (first_care_at lần đầu) · careN/careMinSum/careLe15/30/60/120
+     4	          · responded/booked/closed/lost/dropped (chuyển trạng thái LẦN ĐẦU) · deal (Σ deal_value khi chốt / chỉnh sau) · atMs.
+     5	   Khởi tạo Admin SDK LƯỜI trong handler (bài học LỆNH #10: initializeApp top-level làm Firebase CLI không phân tích được codebase).
+     6	   Xoá lead: KHÔNG trừ (số quá khứ giữ nguyên) — cần đối soát thì chạy lại backfill (_stats_backfill.mjs). */
+     7	import { onDocumentWritten } from '<che>';
+     8	import { initializeApp, getApps } from 'firebase-admin/app';
+     9	import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+    10	
+    11	const REGION = 'asia-southeast1', OFF = 7 * 3600e3;
+    12	export const vnDay = ms => new Date((Number(ms) || Date.now()) + OFF).toISOString().slice(0, 10);
+    13	export const toMs = v => { if (!v) return 0; if (typeof v === 'number') return v; if (typeof v.toMillis === 'function') return v.toMillis(); if (v.seconds) return v.seconds * 1000; const d = new Date(v); return isNaN(d) ? 0 : d.getTime(); };
+    14	export const tempOf = l => { const t = l && l.temp; if (t === 'hot' || t === 'warm' || t === 'cold' || t === 'junk') return t; const s = Number(l && l.score) || 0; return s >= 80 ? 'hot' : s >= 60 ? 'warm' : s >= 40 ? 'cold' : 'junk'; };
+    15	const RESP = new Set(['responded', 'booked', 'closed']), BOOK = new Set(['booked', 'closed']);
+    16	/* LENH #36 (06/09/2026) — HIỆU QUẢ NỘI DUNG: counter cộng dồn content_stats/{brand} = { brandCode, atMs, all:{sent,rep,tagged}, <dim>:{<khoá>:{sent,rep}} }
+    17	   dim = mode/style/parent/cta/variant (khớp CS_META_VI ở FE 45-outreach). Khoá làm sạch: variant → v0..v5 (vx = -1/không xoay), rỗng → none, ký tự lạ → _.
+    18	   sent = lead có outreach.inbox_at (đếm lần đầu xuất hiện) · rep = lead ĐÃ inbox rồi có phản hồi (đếm 1 lần) · tagged = lead có content meta (lần đầu).
+    19	   Hàm thuần (không I/O) → backfill (_cs_backfill.mjs, before=null) dùng chung. FE: csEffFromCounters đổi ngược khoá → nhãn. */
+    20	const C_DIMS = ['mode', 'style', 'parent', 'cta', 'variant'];
+    21	export const contentKey = (dim, v) => { if (dim === 'variant') { const n = Number(v); return Number.isFinite(n) && n >= 0 ? 'v' + Math.min(9, Math.floor(n)) : 'vx'; } const k = String(v == null ? '' : v).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 24); return k || 'none'; };
+    22	const isRep = l => !!(l && (l.outreach_replied || (l.outreach && l.outreach.replied_at) || RESP.has(String(l.stage || ''))));
+    23	export function contentEvents(before, after) {
+    24	  const b = before || {}; const ao = (after && after.outreach) || {}; const bo = b.outreach || {};
+    25	  const meta = ao.content; if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+    26	  const inc = {};
+    27	  if (!(bo.content && typeof bo.content === 'object' && !Array.isArray(bo.content))) inc.tagged = 1;
+    28	  const sentNow = !!ao.inbox_at, sentBefore = !!bo.inbox_at;
+    29	  if (sentNow && !sentBefore) inc.sent = 1;
+    30	  if (sentNow && isRep(after) && !(sentBefore && isRep(b))) inc.rep = 1;
+    31	  return Object.keys(inc).length ? { inc, meta } : null;
+    32	}
+    33	export function contentPatch(brand, ev) {
+    34	  const p = { brandCode: brand, atMs: Date.now(), all: {} };
+    35	  Object.keys(ev.inc).forEach(k => { p.all[k] = FieldValue.increment(ev.inc[k]); });
+    36	  C_DIMS.forEach(d => { const o = {}; ['sent', 'rep'].forEach(f => { if (ev.inc[f]) o[f] = FieldValue.increment(ev.inc[f]); }); if (Object.keys(o).length) p[d] = { [contentKey(d, ev.meta[d])]: o }; });
+    37	  return p;
+    38	}
+    39	/* LENH #40 (08/09/2026) — SLA theo ngưỡng riêng brand, cohort ngày phát hiện: slaN/slaOk ghi lên doc NGÀY PHÁT HIỆN. FE 25-agency v119-80 ưu tiên khi slaN > 0. */
+    40	export function slaInc(inc, fc, det, bad) { if (det && fc >= det) { const min = (fc - det) / 60000; if (min < 30 * 1440) { inc.slaN = (inc.slaN || 0) + 1; if (min <= (Number(bad) > 0 ? Number(bad) : 60)) inc.slaOk = (inc.slaOk || 0) + 1; } } }
+    41	const _slaCache = new Map(); let _cfgBad = { v: 0, t: 0 };
+    42	/* Ngưỡng quá hạn của brand (phút): brands/{code}.slaBadMin > config/app.slaBadMin > 60. Chỉ đọc khi CÓ sự kiện chăm lần đầu (đa số write không đọc gì); cache 5'. Lỗi đọc → 60. */
+    43	export async function slaBadOf(brand, before, after) {
+    44	  const fc = toMs(after && after.first_care_at); if (!fc || (before && toMs(before.first_care_at))) return 60;
+    45	  try { if (!getApps().length) initializeApp(); const db = getFirestore(); const now = Date.now();
+    46	    let c = _slaCache.get(brand); if (!c || now - c.t > 300e3) { const d = await db.collection('brands').doc(brand).get(); const v = d.exists ? Number((d.data() || {}).slaBadMin) : 0; c = { v: v > 0 ? Math.round(v) : 0, t: now }; _slaCache.set(brand, c); }
+    47	    if (c.v > 0) return c.v;
+    48	    if (now - _cfgBad.t > 300e3) { const a = await db.collection('config').doc('app').get(); const v = a.exists ? Number((a.data() || {}).slaBadMin) : 0; _cfgBad = { v: v > 0 ? Math.round(v) : 0, t: now }; }
+    49	    return _cfgBad.v > 0 ? _cfgBad.v : 60;
+    50	  } catch (e) { return 60; }
+    51	}
+    52	function careInc(inc, fc, det) {
+    53	  inc.contacted = (inc.contacted || 0) + 1;
+    54	  if (det && fc >= det) { const min = (fc - det) / 60000; if (min < 30 * 1440) { inc.careN = (inc.careN || 0) + 1; inc.careMinSum = (inc.careMinSum || 0) + Math.round(min * 10) / 10;
+    55	    if (min <= 15) inc.careLe15 = (inc.careLe15 || 0) + 1; if (min <= 30) inc.careLe30 = (inc.careLe30 || 0) + 1; if (min <= 60) inc.careLe60 = (inc.careLe60 || 0) + 1; if (min <= 120) inc.careLe120 = (inc.careLe120 || 0) + 1; } }
+    56	}
+    57	/* Sự kiện thống kê giữa 2 bản lead → [{day, inc}]. Thuần (không I/O) — dùng cho cả trigger (before/after) lẫn backfill (before=null, after=lead hiện tại:
+    58	   mọi mốc lấy từ field đã lưu detected_at/first_care_at/stage_at/closed_at/lost_at/dropped_at → xấp xỉ hợp lý). */
+    59	export function statsEvents(before, after, nowMs, opts) { // LENH #40: opts.slaBad = ngưỡng brand (phút)
+    60	  const out = []; const push = (day, inc) => { if (Object.keys(inc).length) out.push({ day, inc }); };
+    61	  const now = nowMs || Date.now(); const b = before || {}; const det = toMs(after.detected_at);
+    62	  /* LENH #41 (09/09/2026): "lead mới" = lần ĐẦU doc đủ điều kiện đếm (có brand + có temp/score) — trước chỉ đếm khi before==null nên lead ghi 2 bước
+    63	     (tạo doc rồi mới gán brand/chấm điểm) không bao giờ vào new/hot; doc chưa có điểm cũng không bị tính junk oan. Tạo 1 bước đủ dữ liệu: hành vi y như cũ. */
+    64	  /* LENH #42 (09/09/2026): người bán / chủ bài / tự bình luận dưới bài mình KHÔNG phải lead hợp lệ → không cộng new/hot; đã đếm rồi mới bị gắn vai → trừ lại đúng ngày phát hiện. */
+    65	  const roleBad = l => !!(l && (/^(seller|poster_self)$/.test(String(l.role || '')) || l.self_comment === true));
+    66	  const countable = l => !!(l && String(l.brand || '').trim() && (l.temp != null || l.score != null) && !roleBad(l));
+    67	  if (countable(after) && !countable(before)) { const inc = {}; const t = tempOf(after); if (t === 'junk') inc.junk = 1; else { inc.new = 1; inc[t] = 1; } push(vnDay(det || now), inc); }
+    68	  else if (!countable(after) && countable(before)) { const t = tempOf(before); const dB = toMs(before.detected_at) || det || now; if (t === 'junk') push(vnDay(dB), { junk: -1 }); else push(vnDay(dB), { new: -1, [t]: -1 }); }
+    69	  const fc = toMs(after.first_care_at);
+    70	  if (fc && !toMs(b.first_care_at)) { const inc = {}; careInc(inc, fc, det); push(vnDay(fc), inc); if (tempOf(after) !== 'junk') { const sl = {}; slaInc(sl, fc, det, opts && opts.slaBad); push(vnDay(det || fc), sl); } } // LENH #40: slaN/slaOk theo NGÀY PHÁT HIỆN
+    71	  const st = String(after.stage || ''), bst = String(b.stage || ''); const stAt = toMs(after.stage_at) || now;
+    72	  if (RESP.has(st) && !RESP.has(bst)) push(vnDay(stAt), { responded: 1 });
+    73	  if (BOOK.has(st) && !BOOK.has(bst)) push(vnDay(stAt), { booked: 1 });
+    74	  if (st === 'closed' && bst !== 'closed') { const inc = { closed: 1 }; const dv = Number(after.deal_value) || 0; if (dv > 0) inc.deal = dv; push(vnDay(toMs(after.closed_at) || stAt), inc); }
+    75	  else if (st === 'closed' && bst === 'closed') { const d = (Number(after.deal_value) || 0) - (Number(b.deal_value) || 0); if (d) push(vnDay(now), { deal: d }); }
+    76	  if (after.lost && !b.lost) push(vnDay(toMs(after.lost_at) || now), { lost: 1 });
+    77	  if (after.dropped && !b.dropped) push(vnDay(toMs(after.dropped_at) || now), { dropped: 1 });
+    78	  return out;
+    79	}
+    80	/* LENH #44 (11/09/2026) — R-1: NGƯỜI THẬT vào lead (chăm / liên hệ / đổi giai đoạn / chốt / không thành / loại) → tắt phễu máy đang chạy (step 'human')
+    81	   + huỷ task đang xếp hàng + hoàn van CÙNG NGÀY (clamp ≥ 0) + log. Máy tự ghi (stage responded kèm outreach_replied — funcWebhook/worker) KHÔNG tính là người thật.
+    82	   Hàm thuần humanTookOver(before, after) → harness dùng chung. Ghi chú (notes) không nằm trên doc lead nên không kích ở đây. */
+    83	export function humanTookOver(before, after) {
+    84	  const b = before, a = after || {}; if (!b) return '';
+    85	  if (toMs(a.first_care_at) && !toMs(b.first_care_at)) return 'sales đã chăm lead';
+    86	  if (toMs(a.last_touch_at) && toMs(a.last_touch_at) !== toMs(b.last_touch_at)) return 'sales vừa liên hệ';
+    87	  if (a.closed_at && !b.closed_at) return 'đã chốt'; if (a.lost && !b.lost) return 'không thành'; if (a.dropped && !b.dropped) return 'đã loại';
+    88	  const st = String(a.stage || ''), bst = String(b.stage || '');
+    89	  const byMachine = (!!a.outreach_replied && !b.outreach_replied) || (!!toMs(a.outreach_replied_at) && !toMs(b.outreach_replied_at));
+    90	  if (st !== bst && st && st !== 'new' && !byMachine) return 'đổi giai đoạn → ' + st;
+    91	  return '';
+    92	}
+    93	const KIND44 = { react: 'react', comment: 'comment', add_friend: 'friend', inbox: 'inbox' };
+    94	export async function stopMachine(db, leadId, why) {
+    95	  const id = String(leadId || ''); if (!id) return false;
+    96	  const tref = db.collection('outreach_threads').doc(id); const ts = await tref.get(); if (!ts.exists) return false; const t = ts.data() || {}; if (t.active !== true) return false;
+    97	  const now = Date.now();
+    98	  await tref.set({ active: false, step: 'human', taskStatus: 'cancelled', stoppedAt: now, stopReason: String(why || '').slice(0, 120) }, { merge: true });
+    99	  const taskRef = db.collection('outreach_tasks').doc(id + '__funnel');
+   100	  await db.runTransaction(async tx => { const s = await tx.get(taskRef); if (s.exists && s.data().status === 'queued') tx.set(taskRef, { status: 'cancelled', cancelledAt: now, cancelReason: why }, { merge: true }); }).catch(() => {});
+   101	  const day = vnDay(now); const rd = t.reservedDay ? String(t.reservedDay) : (toMs(t.createdAt) ? vnDay(toMs(t.createdAt)) : '');
+   102	  if (t.pid && rd === day && t.fpayload && Array.isArray(t.fpayload.steps)) {
+   103	    const done = new Set(Array.isArray(t.doneSteps) ? t.doneSteps : []); const kinds = t.fpayload.steps.filter(s => KIND44[s] && !done.has(s)).map(s => KIND44[s]);
+   104	    if (kinds.length) { const uref = db.collection('outreach_usage').doc(t.pid + '__' + day); await db.runTransaction(async tx => { const s = await tx.get(uref); if (!s.exists) return; const d = s.data() || {}; const p = {}; kinds.forEach(k => { p[k] = Math.max(0, (Number(d[k]) || 0) - 1); }); tx.set(uref, p, { merge: true }); }).catch(() => {}); }
+   105	  }
+   106	  await db.collection('outreach_log').add({ leadId: id, name: t.name || '', brand: t.brandName || t.brandCode || t.brand || '', brandCode: t.brandCode || t.brand || '', temp: t.temp || '', score: t.score || 0, pid: t.pid || '', action: '🙋 Người thật đã tiếp quản — dừng phễu tự động', text: String(why || ''), status: 'skip', at: FieldValue.serverTimestamp(), expireAt: new Date(now + 60 * 86400000) }).catch(() => {});
+   107	  return true;
+   108	}
+   109	export const statsOnLead = onDocumentWritten({ document: 'leads/{id}', region: REGION, memory: '256MiB', maxInstances: 10 }, async (ev) => {
+   110	  const after = ev.data && ev.data.after && ev.data.after.exists ? ev.data.after.data() : null;
+   111	  if (!after) return;
+   112	  const before = ev.data.before && ev.data.before.exists ? ev.data.before.data() : null;
+   113	  const brand = String(after.brand || '').trim(); if (!brand) return;
+   114	  const hum44 = humanTookOver(before, after); // LENH #44 (R-1)
+   115	  if (hum44) { try { if (!getApps().length) initializeApp(); await stopMachine(getFirestore(), (ev.params && ev.params.id) || (ev.data.after && ev.data.after.id) || '', hum44); } catch (e) { console.error('[LENH44] stopMachine', e && e.message); } }
+   116	  const slaBad = await slaBadOf(brand, before, after); // LENH #40
+   117	  const evs = statsEvents(before, after, Date.now(), { slaBad }); const cev = contentEvents(before, after); if (!evs.length && !cev) return; // LENH #36: + hiệu quả nội dung
+   118	  if (!getApps().length) initializeApp(); const db = getFirestore();
+   119	  const byDay = {}; evs.forEach(e => { const o = byDay[e.day] || (byDay[e.day] = {}); Object.keys(e.inc).forEach(k => { o[k] = (o[k] || 0) + e.inc[k]; }); });
+   120	  await Promise.all(Object.keys(byDay).map(day => { const patch = { brandCode: brand, day, atMs: Date.now() }; Object.keys(byDay[day]).forEach(k => { patch[k] = FieldValue.increment(byDay[day][k]); });
+   121	    return db.collection('daily_stats').doc(brand + '__' + day).set(patch, { merge: true }); }));
+   122	  if (cev) await db.collection('content_stats').doc(brand).set(contentPatch(brand, cev), { merge: true }); // LENH #36: set-merge + increment lồng → an toàn ghi đồng thời
+   123	});
+----- FILE push.js (74 dòng) -----
+     1	/* v119-43: PUSH FCM (web push qua service worker sw.js của app)
+     2	   (1) lead chuyển 'responded' (khách phản hồi) → người phụ trách, không có thì admin của brand
+     3	   (2) lead NÓNG mới tạo → admin của brand
+     4	   (3) mỗi 15' nhắc hẹn fu_at tới hạn → người phụ trách
+     5	   Gửi DATA-ONLY (không có "notification") để SW tự hiện → không bị double. Token chết tự dọn khỏi users.fcmTokens.
+     6	   Khởi tạo Admin SDK LƯỜI (bài học #10). */
+     7	import { onDocumentWritten } from '<che>';
+     8	import { onSchedule } from '<che>';
+     9	import { getApps, initializeApp } from 'firebase-admin/app';
+    10	import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+    11	import { getMessaging } from 'firebase-admin/messaging';
+    12	const REGION = 'asia-southeast1', SITE = '<che>';
+    13	function ensureApp() { if (!getApps().length) initializeApp(); }
+    14	const db = () => { ensureApp(); return getFirestore(); };
+    15	async function tokensFor(uids) {
+    16	  const out = [];
+    17	  for (const uid of [...new Set((uids || []).filter(Boolean))]) {
+    18	    const d = (await db().doc('users/' + uid).get()).data() || {};
+    19	    if (d.active === false) continue;
+    20	    (Array.isArray(d.fcmTokens) ? d.fcmTokens : []).forEach(t => out.push({ uid, t }));
+    21	  }
+    22	  return out;
+    23	}
+    24	async function superAdmins() {
+    25	  const q = await db().collection('users').where('role', '==', 'superadmin').get();
+    26	  return q.docs.filter(d => (d.data() || {}).active !== false).map(d => d.id);
+    27	}
+    28	async function brandAdmins(brand) {
+    29	  // admin của brand + MỌI Super Admin (v119-44: super nhận push mọi brand — tắt trên thiết bị nếu ồn)
+    30	  const ids = new Set(await superAdmins());
+    31	  if (brand) { const q = await db().collection('users').where('brand', '==', brand).get(); q.docs.forEach(d => { const x = d.data() || {}; if (x.role === 'admin' && x.active !== false) ids.add(d.id); }); }
+    32	  return [...ids];
+    33	}
+    34	async function send(recips, data) {
+    35	  if (!recips.length) return 0;
+    36	  ensureApp();
+    37	  const payload = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v == null ? '' : v)]));
+    38	  const res = await getMessaging().sendEachForMulticast({ tokens: recips.map(r => r.t), data: payload, webpush: { headers: { Urgency: 'high', TTL: '3600' } } });
+    39	  await Promise.all(res.responses.map(async (r, i) => {
+    40	    if (r.success) return;
+    41	    const code = String((r.error && r.error.code) || '');
+    42	    if (/registration-token-not-registered|invalid-registration-token|invalid-argument/.test(code)) {
+    43	      const rc = recips[i]; try { await db().doc('users/' + rc.uid).update({ fcmTokens: FieldValue.arrayRemove(rc.t) }); } catch (_) { }
+    44	    }
+    45	  }));
+    46	  return res.successCount;
+    47	}
+    48	export const pushOnLead = onDocumentWritten({ region: REGION, document: 'leads/{id}', retry: false }, async (ev) => {
+    49	  const before = ev.data && ev.data.before.exists ? ev.data.before.data() : null;
+    50	  const after = ev.data && ev.data.after.exists ? ev.data.after.data() : null;
+    51	  if (!after) return;
+    52	  const id = ev.params.id, name = after.name || 'Lead', brand = after.brand || '';
+    53	  if (!before || before.stage !== after.stage) console.log('pushOnLead stage', id, (before && before.stage) || '(new)', '→', after.stage, 'assignee_uid=', after.assignee_uid || '-');
+    54	  if (after.stage === 'responded' && (!before || before.stage !== 'responded')) {
+    55	    const uids = (after.assignee_uid ? [after.assignee_uid] : await brandAdmins(brand)).concat(await superAdmins()); // v119-44: super luôn nhận
+    56	    const n = await send(await tokensFor(uids), { title: '💬 Khách đã phản hồi: ' + name, body: String(after.need || after.intent || 'Mở Phản hồi khách để trả lời ngay').slice(0, 120), link: SITE + '#replies', tag: 'reply-' + id, require: '1', actionTitle: 'Mở lead' }); // v119-48: đứng lại tới khi bấm
+    57	    console.log('push reply', id, 'sent', n); return;
+    58	  }
+    59	  if (((!before && after.ai_scored !== false) || (before && before.ai_scored === false && after.ai_scored === true && !after.dropped)) && after.temp === 'hot') { // LENH #46: không push lead dự phòng (điểm tạm); AI chấm lại thành nóng → push
+    60	    const n = await send(await tokensFor(await brandAdmins(brand)), { title: '🔥 Lead nóng mới' + (after.score ? ' (' + after.score + 'đ)' : '') + ': ' + name, body: String(after.need || after.intent || '').slice(0, 120), link: SITE + '#feed', tag: 'hot-' + id });
+    61	    console.log('push hot', id, 'sent', n);
+    62	  }
+    63	});
+    64	export const pushDueFollowups = onSchedule({ region: REGION, schedule: 'every 15 minutes', timeZone: 'Asia/Ho_Chi_Minh', retryCount: 0 }, async () => {
+    65	  const now = Date.now(), from = now - 15 * 60000;
+    66	  const q = await db().collection('leads').where('fu_at', '>', from).where('fu_at', '<=', now).get();
+    67	  let sent = 0;
+    68	  for (const d of q.docs) {
+    69	    const l = d.data() || {};
+    70	    if (l.stage === 'closed' || l.lost || l.dropped || !l.assignee_uid) continue;
+    71	    sent += await send(await tokensFor([l.assignee_uid]), { title: '⏰ Đến giờ chăm: ' + (l.name || 'Lead'), body: String(l.fu_note || 'Hẹn chăm lead tới hạn').slice(0, 120), link: SITE + '#tasks', tag: 'fu-' + d.id, actionTitle: 'Mở việc' });
+    72	  }
+    73	  console.log('push due', q.size, 'sent', sent);
+    74	});
+--- lib/zaloCheck.js :: /enrichPhoneFromText/ từ dòng 84 (90 dòng) ---
+    84	export async function enrichPhoneFromText(text, { db, apiKey, doCheck = true, cacheDays = 90 } = {}) {
+    85	  const email = extractEmails(text)[0] || '';
+    86	  const phones = extractPhonesVN(text);
+    87	  const phone = phones[0] || '';
+    88	  if (!phone) return { phone: '', phone_has_zalo: null, email };
+    89	  if (!doCheck) return { phone, phone_has_zalo: null, email };
+    90	  const res = await checkZalo(phone, { db, apiKey, cacheDays });
+    91	  return { phone, phone_has_zalo: res.registered, email };
+    92	}
+11:  if (!/^[35789]\d{8}$/.test(d)) return '';
+== lib/scraper.js ==
+8:const BD = 'https://api.brightdata.com/datasets/v3';
+11:export function normalizePost(p, source) {
+26:export function normalizeComment(c, source, parentUrl) {
+60:const MOCK_POOL = [
+70:function mockPosts(source, n, opts = {}) {
+92:async function bdTrigger(urls, opts = {}) {
+95:    if (opts.numPosts) item.num_of_posts = opts.numPosts; // bỏ trống = không giới hạn
+98:    if (Array.isArray(opts.notInclude) && opts.notInclude.length) item.posts_to_not_include = opts.notInclude.slice(0, 200); // v17: loai bai da th
+109:async function bdWait(id, tries = 40, gap = 5000) {
+120:function __pendDb() { if (!__fsdb) __fsdb = __getFs(); return __fsdb; }
+121:async function bdStatus(id) {
+127:async function bdWaitSoft(id, tries = 18, gap = 5000) {
+129:    const st = await bdStatus(id);
+136:async function bdFetch(id) {
+147:export async function fetchPosts(source, opts = {}) {
+154:  // ==== v16 GIEO-GAT 09/08/2026 + v-sow 05/09/2026: gieo snapshot, gat o luot sau. opts.sow=true (quet theo LICH): KHONG cho trong luot ====
+155:  const pendRef = __pendDb().collection('pending_snapshots').doc('P_' + String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 470));
+163:      const st = await bdStatus(p.snapshot_id);
+172:      snap = await bdTrigger([source.url], trigOpts);
+178:    snap = await bdTrigger([source.url], trigOpts);
+179:    const ok = await bdWaitSoft(snap, backfill ? 40 : 18, backfill ? 6000 : 5000);
+186:  const raw = await bdFetch(snap);
+187:  try { if (!backfill) { const _ids = raw.map(r => String(r.post_id || r.id || '')).filter(Boolean); if (_ids.length) { const _prev = Array.isArra
+195:const MOCK_CMT_POOL = [
+204:function mockComments(postUrls, source, perPost = 3) {
+209:      out.push(normalizeComment({
+223:export async function fetchPostsAuth(source, account, opts = {}) {
+245:async function bdTriggerComments(postUrls, perPost) {
+257:export async function fetchComments(items, opts = {}) {
+271:  // ==== v-sowc 05/09/2026: quét theo LỊCH (opts.sow) → chỉ GIEO snapshot comment (pending_snapshots kind='comments' kèm bài cha) rồi 
+278:        const snap = await bdTriggerComments(batch, perPost);
+280:        const ref = __pendDb().collection('pending_snapshots').doc('C_' + String(snap).replace(/[^\w-]/g, '_').slice(0, 470));
+293:      const snap = await bdTriggerComments(batch, perPost);
+294:      await bdWait(snap, 85, 6000);
+295:      const raw0 = await bdFetch(snap);
+306:        out.push({ comment: normalizeComment(c, src, c.post_url || pu), source: src, parentUrl: c.post_url || pu });
+313:/** v-sowc 05/09/2026: GẶT các snapshot comment đã gieo (pending_snapshots kind='comments'). Không chờ: chưa chín → để lượt sau;
+316:export async function harvestComments(opts = {}) {
+320:  try { const qs = await __pendDb().collection('pending_snapshots').where('kind', '==', 'comments').get(); qs.forEach(d => docs.push({ ref: d.ref,
+325:    const st = await bdStatus(id);
+329:    try { raw0 = await bdFetch(id); } catch (e) { res.pending++; log.warn('harvestComments: fetch ' + id + ' loi ' + e.message); continue; }
+340:      res.items.push({ comment: normalizeComment(c, src, c.post_url || pu), source: src, parentUrl: c.post_url || pu, meta: m });
+352:function dedupeTxt(s){
+--- lib/scraper.js :: /async function fetchPosts\(/ từ dòng 147 (70 dòng) ---
+   147	export async function fetchPosts(source, opts = {}) {
+   148	  const backfill = !!(opts.startDate || opts.endDate);
+   149	  if (CFG.MOCK_MODE) return mockPosts(source, backfill ? (opts.numPosts || 24) : CFG.POSTS_PER_GROUP, opts);
+   150	  if (!CFG.BRIGHTDATA_TOKEN) { log.warn('Chưa có BRIGHTDATA_TOKEN — bật MOCK_MODE=true để chạy thử.'); return []; }
+   151	  const trigOpts = backfill
+   152	    ? { startDate: opts.startDate, endDate: opts.endDate, numPosts: opts.numPosts || undefined }
+   153	    : { numPosts: opts.numPosts || CFG.POSTS_PER_GROUP, notInclude: opts.notInclude }; // live: cho phép ghi đè (probe ít bài / sweep đủ bài)
+   154	  // ==== v16 GIEO-GAT 09/08/2026 + v-sow 05/09/2026: gieo snapshot, gat o luot sau. opts.sow=true (quet theo LICH): KHONG cho trong luot ====
+   155	  const pendRef = __pendDb().collection('pending_snapshots').doc('P_' + String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 470));
+   156	  const gsRef = __pendDb().collection('group_state').doc(String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 480));
+   157	  const mark = (arr, bd, extra) => { try { arr.bd = bd; if (extra) Object.assign(arr, extra); } catch (e) {} return arr; }; // arr.bd: 'ok' = da goi BrightData thanh cong, 'skip' = khong goi
+   158	  let snap = null, pendSweep = false;
+   159	  try {
+   160	    const pd = await pendRef.get();
+   161	    if (pd.exists) {
+   162	      const p = pd.data() || {};
+   163	      const st = await bdStatus(p.snapshot_id);
+   164	      if (st === 'ready') { snap = p.snapshot_id; pendSweep = !!p.sweep; try { await pendRef.delete(); } catch (e) {} log.info('GAT snapshot ' + p.snapshot_id + ' — ' + source.url); }
+   165	      else if (st === 'failed' || (Date.now() - (p.t || 0)) > 2 * 3600e3) { try { await pendRef.delete(); } catch (e) {} }
+   166	      else { log.info('snapshot ' + p.snapshot_id + ' chua chin (' + st + ') — cho luot sau: ' + source.url); return mark([], st === 'unknown' ? 'skip' : 'ok'); }
+   167	    }
+   168	  } catch (e) {}
+   169	  if (!snap) {
+   170	    if (opts.sow) {
+   171	      if (opts.sowDue === false) return mark([], 'skip'); // chua toi nhip gieo cua nguon nay
+   172	      snap = await bdTrigger([source.url], trigOpts);
+   173	      try { await pendRef.set({ snapshot_id: snap, url: source.url || '', backfill: false, sweep: !!opts.sweep, t: Date.now() }); } catch (e) {}
+   174	      try { await gsRef.set({ url: source.url || '', lastTriggerAt: Date.now() }, { merge: true }); } catch (e) {}
+   175	      log.info('GIEO snapshot ' + snap + (opts.sweep ? ' (sweep)' : '') + ' — gat luot sau: ' + source.url);
+   176	      return mark([], 'ok');
+   177	    }
+   178	    snap = await bdTrigger([source.url], trigOpts);
+   179	    const ok = await bdWaitSoft(snap, backfill ? 40 : 18, backfill ? 6000 : 5000);
+   180	    if (!ok) {
+   181	      try { await pendRef.set({ snapshot_id: snap, url: source.url || '', backfill: !!backfill, t: Date.now() }); } catch (e) {}
+   182	      log.info('GIEO snapshot ' + snap + ' (nguon cham) — se gat luot sau: ' + source.url);
+   183	      return mark([], 'ok');
+   184	    }
+   185	  }
+   186	  const raw = await bdFetch(snap);
+   187	  try { if (!backfill) { const _ids = raw.map(r => String(r.post_id || r.id || '')).filter(Boolean); if (_ids.length) { const _prev = Array.isArray(opts.notInclude) ? opts.notInclude : []; const _m = [...new Set([..._ids, ..._prev])].slice(0, 200); await __pendDb().collection('group_state').doc(String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 480)).set({ url: source.url || '', recentIds: _m, recentIdsAt: Date.now() }, { merge: true }); } } } catch (e) {}
+   188	  const _good = raw.filter(r => r && (r.post_id || r.id) && !r.error && !r.error_code && !r.warning && !r.warning_code);
+   189	  if (_good.length < raw.length) log.info('stub-filter: loai ' + (raw.length - _good.length) + ' record vo-rong/error (posts) — ' + (source.url || ''));
+   190	  return mark(_good.map(p => normalizePost(p, source)), 'ok', { sweep: pendSweep });
+   191	}
+   192	
+   193	/* ---- COMMENT: lấy bình luận của 1 loạt bài qua dataset comment riêng của Bright Data ----
+   194	   Input mỗi dòng: { url: <post_url>, limit_records?: N }. Trả mảng comment đã chuẩn hoá (kind:'comment'). */
+   195	const MOCK_CMT_POOL = [
+   196	  'Mình cũng đang cần dịch vụ này, ib giá giúp mình với ạ.',
+   197	  'Cho em xin báo giá gói chạy ads tháng với ạ.',
+   198	  'Bên bạn có nhận vận hành TikTok Shop không, shop mình cần gấp.',
+   199	  'Hóng review, mình cũng định thuê ngoài.',
+   200	  'Quan tâm nha, inbox em bảng giá nhé!',
+   201	  'Bài hay quá, cảm ơn bạn đã chia sẻ.',
+   202	  'Up cho bạn nào cần.'
+   203	];
+   204	function mockComments(postUrls, source, perPost = 3) {
+   205	  const out = [];
+   206	  for (const url of postUrls) {
+   207	    const k = 1 + Math.floor(Math.random() * Math.max(1, perPost));
+   208	    for (let i = 0; i < k; i++) {
+   209	      out.push(normalizeComment({
+   210	        comment_id: 'mockcmt_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+   211	        comment_url: url + '?comment_id=' + Math.floor(Math.random() * 1e9),
+   212	        user_name: 'Commenter' + Math.floor(Math.random() * 9999),
+   213	        comment_text: MOCK_CMT_POOL[Math.floor(Math.random() * MOCK_CMT_POOL.length)],
+   214	        date_created: new Date().toISOString()
+   215	      }, source, url));
+   216	    }
+--- lib/scraper.js :: /async function fetchComments\(/ từ dòng 257 (70 dòng) ---
+   257	export async function fetchComments(items, opts = {}) {
+   258	  const urls = [...new Set(items.map(i => i.url).filter(Boolean))];
+   259	  if (!urls.length) return [];
+   260	  const srcByUrl = new Map(items.map(i => [i.url, i.source]));
+   261	  const perPost = opts.perPost || CFG.COMMENTS_PER_POST || undefined;
+   262	  if (CFG.MOCK_MODE) {
+   263	    return urls.flatMap(u => mockComments([u], srcByUrl.get(u) || { name: '' }, perPost || 3)
+   264	      .map(c => ({ comment: c, source: srcByUrl.get(u) || { name: '' }, parentUrl: u })));
+   265	  }
+   266	  if (!CFG.BRIGHTDATA_TOKEN || !CFG.BRIGHTDATA_COMMENTS_DATASET_ID) {
+   267	    log.warn('Chưa cấu hình BRIGHTDATA_COMMENTS_DATASET_ID — bỏ qua quét comment.');
+   268	    return [];
+   269	  }
+   270	  const out = [];
+   271	  // ==== v-sowc 05/09/2026: quét theo LỊCH (opts.sow) → chỉ GIEO snapshot comment (pending_snapshots kind='comments' kèm bài cha) rồi trả về ngay;
+   272	  //      GẶT bằng harvestComments() ở lượt sau. Không sow (quét tay/backfill) → chờ trong lượt như cũ. ====
+   273	  if (opts.sow) {
+   274	    let sown = 0;
+   275	    for (let i = 0; i < urls.length; i += 50) {
+   276	      const batch = urls.slice(i, i + 50);
+   277	      try {
+   278	        const snap = await bdTriggerComments(batch, perPost);
+   279	        const meta = batch.map(u => { let m = null; try { m = typeof opts.metaOf === 'function' ? opts.metaOf(u) : null; } catch (e) {} const s = srcByUrl.get(u); return Object.assign({ url: u, srcUrl: String((s && s.url) || ''), parentUrl: u, parentAuthor: '', parentText: '' }, m || {}); });
+   280	        const ref = __pendDb().collection('pending_snapshots').doc('C_' + String(snap).replace(/[^\w-]/g, '_').slice(0, 470));
+   281	        const pdoc = { kind: 'comments', snapshot_id: snap, t: Date.now(), perPost: perPost || 0, n: batch.length, meta };
+   282	        try { await ref.set(pdoc); } catch (e) { await new Promise(s => setTimeout(s, 800)); await ref.set(pdoc); }
+   283	        sown++; log.info('GIEO snapshot comment ' + snap + ' (' + batch.length + ' bai) — gat luot sau');
+   284	      } catch (e) { log.warn('fetchComments gieo lo loi: ' + e.message); }
+   285	    }
+   286	    try { out.sown = sown; } catch (e) {}
+   287	    return out;
+   288	  }
+   289	  // chia lô URL để 1 snapshot không quá lớn (mỗi lô tối đa 50 bài)
+   290	  for (let i = 0; i < urls.length; i += 50) {
+   291	    const batch = urls.slice(i, i + 50);
+   292	    try {
+   293	      const snap = await bdTriggerComments(batch, perPost);
+   294	      await bdWait(snap, 85, 6000);
+   295	      const raw0 = await bdFetch(snap);
+   296	      // v-patch chi-phí 16/08: báo số record BrightData TÍNH TIỀN theo từng bài cha (trước stub-filter)
+   297	      // qua opts.billed (Map parentUrl → n). Không đổi hành vi cũ nếu không truyền.
+   298	      if (opts.billed instanceof Map) {
+   299	        for (const c of raw0) { const pu = (c && (c.post_url || c.post_id)) || batch[0]; opts.billed.set(pu, (opts.billed.get(pu) || 0) + 1); }
+   300	      }
+   301	      const raw = raw0.filter(c => c && !c.error && !c.error_code && !c.warning && (c.comment_id || c.comment_text || c.comment || c.text || c.content));
+   302	      if (raw.length < raw0.length) log.info('stub-filter: loai ' + (raw0.length - raw.length) + ' record vo-rong/error (comments)');
+   303	      for (const c of raw) {
+   304	        const pu = c.post_url || c.post_id || batch[0];
+   305	        const src = srcByUrl.get(c.post_url) || srcByUrl.get(pu) || srcByUrl.get(batch[0]) || { name: '' };
+   306	        out.push({ comment: normalizeComment(c, src, c.post_url || pu), source: src, parentUrl: c.post_url || pu });
+   307	      }
+   308	    } catch (e) { log.warn('fetchComments lô lỗi: ' + e.message); }
+   309	  }
+   310	  return out;
+   311	}
+   312	
+   313	/** v-sowc 05/09/2026: GẶT các snapshot comment đã gieo (pending_snapshots kind='comments'). Không chờ: chưa chín → để lượt sau; failed / quá 2h → xoá.
+   314	 *  opts: { billed?: Map(parentUrl → số record tính tiền), srcOf?: (srcUrl) => source | null }
+   315	 *  Trả { items: [{ comment, source, parentUrl, meta }], metas: [bài cha của các snapshot đã gặt], harvested, pending, failed }. */
+   316	export async function harvestComments(opts = {}) {
+   317	  const res = { items: [], metas: [], harvested: 0, pending: 0, failed: 0 };
+   318	  if (CFG.MOCK_MODE || !CFG.BRIGHTDATA_TOKEN) return res;
+   319	  const docs = [];
+   320	  try { const qs = await __pendDb().collection('pending_snapshots').where('kind', '==', 'comments').get(); qs.forEach(d => docs.push({ ref: d.ref, p: d.data() || {} })); }
+   321	  catch (e) { log.warn('harvestComments: doc pending loi ' + e.message); return res; }
+   322	  const uk = u => String(u || '').split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase();
+   323	  for (const { ref, p } of docs) {
+   324	    const id = p.snapshot_id; if (!id) { try { await ref.delete(); } catch (e) {} continue; }
+   325	    const st = await bdStatus(id);
+   326	    if (st === 'failed' || (Date.now() - (Number(p.t) || 0)) > 2 * 3600e3) { res.failed++; try { await ref.delete(); } catch (e) {} log.warn('snapshot comment ' + id + (st === 'failed' ? ' failed' : ' qua han') + ' — bo'); continue; }
+--- lib/scraper.js :: /async function harvestComments\(/ từ dòng 316 (70 dòng) ---
+   316	export async function harvestComments(opts = {}) {
+   317	  const res = { items: [], metas: [], harvested: 0, pending: 0, failed: 0 };
+   318	  if (CFG.MOCK_MODE || !CFG.BRIGHTDATA_TOKEN) return res;
+   319	  const docs = [];
+   320	  try { const qs = await __pendDb().collection('pending_snapshots').where('kind', '==', 'comments').get(); qs.forEach(d => docs.push({ ref: d.ref, p: d.data() || {} })); }
+   321	  catch (e) { log.warn('harvestComments: doc pending loi ' + e.message); return res; }
+   322	  const uk = u => String(u || '').split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase();
+   323	  for (const { ref, p } of docs) {
+   324	    const id = p.snapshot_id; if (!id) { try { await ref.delete(); } catch (e) {} continue; }
+   325	    const st = await bdStatus(id);
+   326	    if (st === 'failed' || (Date.now() - (Number(p.t) || 0)) > 2 * 3600e3) { res.failed++; try { await ref.delete(); } catch (e) {} log.warn('snapshot comment ' + id + (st === 'failed' ? ' failed' : ' qua han') + ' — bo'); continue; }
+   327	    if (st !== 'ready') { res.pending++; continue; }
+   328	    let raw0 = [];
+   329	    try { raw0 = await bdFetch(id); } catch (e) { res.pending++; log.warn('harvestComments: fetch ' + id + ' loi ' + e.message); continue; }
+   330	    const metas = Array.isArray(p.meta) ? p.meta.filter(m => m && m.url) : [];
+   331	    const byKey = new Map(); for (const m of metas) { byKey.set(uk(m.url), m); const k2 = uk(m.parentUrl); if (k2 && !byKey.has(k2)) byKey.set(k2, m); }
+   332	    const first = metas[0] || null;
+   333	    if (opts.billed instanceof Map) { for (const c of raw0) { const pu = (c && (c.post_url || c.post_id)) || (first && first.url) || ''; opts.billed.set(pu, (opts.billed.get(pu) || 0) + 1); } }
+   334	    const raw = raw0.filter(c => c && !c.error && !c.error_code && !c.warning && (c.comment_id || c.comment_text || c.comment || c.text || c.content));
+   335	    if (raw.length < raw0.length) log.info('stub-filter: loai ' + (raw0.length - raw.length) + ' record vo-rong/error (comments, gat)');
+   336	    for (const c of raw) {
+   337	      const pu = c.post_url || c.post_id || (first && first.url) || '';
+   338	      const m = byKey.get(uk(c.post_url)) || byKey.get(uk(pu)) || first;
+   339	      const src = (m && typeof opts.srcOf === 'function' && opts.srcOf(m.srcUrl)) || { name: '' };
+   340	      res.items.push({ comment: normalizeComment(c, src, c.post_url || pu), source: src, parentUrl: c.post_url || pu, meta: m });
+   341	    }
+   342	    res.metas.push(...metas); res.harvested++;
+   343	    try { await ref.delete(); } catch (e) {}
+   344	    log.info('GAT snapshot comment ' + id + ' — ' + raw.length + ' comment / ' + metas.length + ' bai');
+   345	  }
+   346	  return res;
+   347	}
+   348	
+   349	
+   350	/* v104 (v-dedup): Bright Data doi khi tra ve content bi LAP DOI (bai ngan: title == content).
+   351	   Chuan hoa tai cua vao: (1) chuoi = A + xuong dong + A -> giu mot A; (2) bo cac dong lien ke trung het nhau. */
+   352	function dedupeTxt(s){
+   353	  s=String(s||'').replace(/\r\n?/g,'\n').trim();
+   354	  if(!s) return s;
+   355	  var h=Math.floor(s.length/2);
+   356	  if(s.length%2===1 && s.charAt(h)==='\n' && s.slice(0,h)===s.slice(h+1)) return s.slice(0,h);
+   357	  var lines=s.split('\n'), out=[];
+   358	  for(var i=0;i<lines.length;i++){ if(!out.length || out[out.length-1].trim()!==lines[i].trim()) out.push(lines[i]); }
+   359	  return out.join('\n');
+   360	}
+--- lib/scraper.js :: /function normalizeComment\(|normalizeComment ?=/ từ dòng 26 (70 dòng) ---
+    26	export function normalizeComment(c, source, parentUrl) {
+    27	  const cid = c.comment_id || c.id || c.comment_url || c.url
+    28	    || ((parentUrl || '') + '#' + (c.user_url || c.commenter_id || Math.random()));
+    29	  return {
+    30	    post_id:    'cmt_' + String(cid),
+    31	    url:        c.comment_url || c.url || parentUrl || '',
+    32	    author:     c.user_name || c.commenter_name || c.author || c.profile_name || c.user_username_raw || 'Ẩn danh',
+    33	    user_url:  c.user_url || c.commenter_url || c.commenter_profile_url || '',
+    34	    text:       dedupeTxt(c.comment_text || c.comment || c.text || c.content || ''),
+    35	    time:       c.date_created || c.date || c.comment_date || c.time || new Date().toISOString(),
+    36	    source:     source.name,
+    37	    kind:       'comment',
+    38	    parent_url: parentUrl || c.post_url || '',
+    39	    comment_id: (() => {
+    40	      const raw = String(c.comment_id || c.id || '');
+    41	      if (/^\d+$/.test(raw)) return raw;
+    42	      try { const dm = Buffer.from(raw, 'base64').toString('utf8').match(/^comment:\d+_(\d+)$/); if (dm) return dm[1]; } catch (e) {}
+    43	      const m = String(c.comment_link || c.comment_url || c.url || '').match(/comment_id=(\d+)/);
+    44	      return m ? m[1] : '';
+    45	    })(),
+    46	    comment_url: (() => {
+    47	      const link = String(c.comment_link || '');
+    48	      if (/comment_id=\d+/.test(link)) return link;
+    49	      const raw = String(c.comment_id || c.id || '');
+    50	      let numId = /^\d+$/.test(raw) ? raw : '';
+    51	      if (!numId) { try { const dm = Buffer.from(raw, 'base64').toString('utf8').match(/^comment:\d+_(\d+)$/); if (dm) numId = dm[1]; } catch (e) {} }
+    52	      if (!numId) numId = (String(c.comment_link || c.comment_url || c.url || '').match(/comment_id=(\d+)/) || [])[1] || '';
+    53	      if (numId && parentUrl) return parentUrl.split('?')[0] + '?comment_id=' + numId;
+    54	      return c.comment_link || c.comment_url || c.url || '';
+    55	    })()
+    56	  };
+    57	}
+    58	
+    59	/* ---- MOCK: sinh bài giả để demo pipeline end-to-end ---- */
+    60	const MOCK_POOL = [
+    61	  'Có bên nào làm marketing trọn gói cho spa không ạ? Mình cần chạy lead gấp, budget ~30tr/tháng.',
+    62	  'Cần tìm team quay video TikTok cho quán cà phê mới khai trương khu Thảo Điền, bạn nào làm tốt review giúp.',
+    63	  'Shop em bán đồ nữ, TikTok Shop dạo này không ra đơn, có bên nào nhận vận hành trọn gói không ạ?',
+    64	  'Trung tâm du học bên mình cần tìm agency chạy lead du học Nhật mùa cao điểm, báo giá giúp mình.',
+    65	  'Mọi người ơi cho hỏi tự chạy ads cho shop mẹ&bé có khó không, có nên thuê ngoài không ạ?',
+    66	  'Em 2k8 đang tìm hiểu ngành TMĐT muốn nghe review thực tế, nên đi theo hướng nào ạ?',
+    67	  'Bên mình nhận đào tạo khoá học chạy ads 2tr/khoá, ai cần inbox nhé!!!',
+    68	  'Tiệm grooming thú cưng ở Gò Vấp đang vắng khách, có cách nào marketing địa phương hiệu quả không?'
+    69	];
+    70	function mockPosts(source, n, opts = {}) {
+    71	  const out = [];
+    72	  const backfill = !!(opts.startDate || opts.endDate);
+    73	  const k = backfill ? Math.min(n, 8 + Math.floor(Math.random() * 8)) // 8-15 bài khi quét quá khứ
+    74	                     : Math.min(n, 3 + Math.floor(Math.random() * 3)); // 3-5 bài mỗi lần thường
+    75	  const parseMDY = s => { const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s || ''); return m ? new Date(+m[3], +m[1] - 1, +m[2]).getTime() : Date.now(); };
+    76	  const t1 = parseMDY(opts.endDate), t0 = opts.startDate ? parseMDY(opts.startDate) : t1 - 86400e3;
+    77	  for (let i = 0; i < k; i++) {
+    78	    const text = MOCK_POOL[Math.floor(Math.random() * MOCK_POOL.length)];
+    79	    const when = backfill ? new Date(t0 + Math.random() * Math.max(1, t1 - t0)) : new Date();
+    80	    out.push(normalizePost({
+    81	      post_id: 'mock_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+    82	      url: source.url + '/posts/' + Math.floor(Math.random() * 1e9),
+    83	      author: 'User' + Math.floor(Math.random() * 9999),
+    84	      content: text, date_posted: when.toISOString()
+    85	    }, source));
+    86	  }
+    87	  return out;
+    88	}
+    89	
+    90	/* ---- Gọi Bright Data Dataset API (trigger → poll → fetch) ----
+    91	   opts: { numPosts?, startDate?, endDate? }  (start/end dạng MM-DD-YYYY — quét ngược quá khứ) */
+    92	async function bdTrigger(urls, opts = {}) {
+    93	  const body = urls.map(u => {
+    94	    const item = { url: u };
+    95	    if (opts.numPosts) item.num_of_posts = opts.numPosts; // bỏ trống = không giới hạn
+--- lib/scraper.js :: /async function bdTrigger\(/ từ dòng 92 (70 dòng) ---
+    92	async function bdTrigger(urls, opts = {}) {
+    93	  const body = urls.map(u => {
+    94	    const item = { url: u };
+    95	    if (opts.numPosts) item.num_of_posts = opts.numPosts; // bỏ trống = không giới hạn
+    96	    if (opts.startDate) item.start_date = opts.startDate;  // lọc bài từ ngày này (MM-DD-YYYY)
+    97	    if (opts.endDate) item.end_date = opts.endDate;        // đến ngày này (MM-DD-YYYY)
+    98	    if (Array.isArray(opts.notInclude) && opts.notInclude.length) item.posts_to_not_include = opts.notInclude.slice(0, 200); // v17: loai bai da thay - chi mua bai moi
+    99	    return item;
+   100	  });
+   101	  const r = await fetch(`${BD}/trigger?dataset_id=${CFG.BRIGHTDATA_DATASET_ID}&include_errors=true`, {
+   102	    method: 'POST',
+   103	    headers: { Authorization: `Bearer ${CFG.BRIGHTDATA_TOKEN}`, 'Content-Type': 'application/json' },
+   104	    body: JSON.stringify(body)
+   105	  });
+   106	  if (!r.ok) throw new Error(`trigger ${r.status}: ${await r.text()}`);
+   107	  return (await r.json()).snapshot_id;
+   108	}
+   109	async function bdWait(id, tries = 40, gap = 5000) {
+   110	  for (let i = 0; i < tries; i++) {
+   111	    const r = await fetch(`${BD}/progress/${id}`, { headers: { Authorization: `Bearer ${CFG.BRIGHTDATA_TOKEN}` } });
+   112	    const j = await r.json();
+   113	    if (j.status === 'ready') return;
+   114	    if (j.status === 'failed') throw new Error('snapshot failed');
+   115	    await new Promise(s => setTimeout(s, gap));
+   116	  }
+   117	  throw new Error('snapshot timeout');
+   118	}
+   119	let __fsdb = null;
+   120	function __pendDb() { if (!__fsdb) __fsdb = __getFs(); return __fsdb; }
+   121	async function bdStatus(id) {
+   122	  try {
+   123	    const r = await fetch(`${BD}/progress/${id}`, { headers: { Authorization: `Bearer ${CFG.BRIGHTDATA_TOKEN}` } });
+   124	    const j = await r.json(); return j.status || 'unknown';
+   125	  } catch (e) { return 'unknown'; }
+   126	}
+   127	async function bdWaitSoft(id, tries = 18, gap = 5000) {
+   128	  for (let i = 0; i < tries; i++) {
+   129	    const st = await bdStatus(id);
+   130	    if (st === 'ready') return true;
+   131	    if (st === 'failed') throw new Error('snapshot failed');
+   132	    await new Promise(s => setTimeout(s, gap));
+   133	  }
+   134	  return false;
+   135	}
+   136	async function bdFetch(id) {
+   137	  const r = await fetch(`${BD}/snapshot/${id}?format=json`, { headers: { Authorization: `Bearer ${CFG.BRIGHTDATA_TOKEN}` } });
+   138	  if (!r.ok) throw new Error(`snapshot fetch ${r.status}`);
+   139	  const j = await r.json();
+   140	  return Array.isArray(j) ? j : [];
+   141	}
+   142	
+   143	/** Lấy bài cho 1 nguồn. Trả về mảng post đã chuẩn hoá.
+   144	 *  opts: { startDate?, endDate?, numPosts? }
+   145	 *   - không có startDate/endDate → quét "mới nhất" (giới hạn POSTS_PER_GROUP) như cũ
+   146	 *   - có startDate/endDate (MM-DD-YYYY) → QUÉT NGƯỢC QUÁ KHỨ theo khoảng ngày */
+   147	export async function fetchPosts(source, opts = {}) {
+   148	  const backfill = !!(opts.startDate || opts.endDate);
+   149	  if (CFG.MOCK_MODE) return mockPosts(source, backfill ? (opts.numPosts || 24) : CFG.POSTS_PER_GROUP, opts);
+   150	  if (!CFG.BRIGHTDATA_TOKEN) { log.warn('Chưa có BRIGHTDATA_TOKEN — bật MOCK_MODE=true để chạy thử.'); return []; }
+   151	  const trigOpts = backfill
+   152	    ? { startDate: opts.startDate, endDate: opts.endDate, numPosts: opts.numPosts || undefined }
+   153	    : { numPosts: opts.numPosts || CFG.POSTS_PER_GROUP, notInclude: opts.notInclude }; // live: cho phép ghi đè (probe ít bài / sweep đủ bài)
+   154	  // ==== v16 GIEO-GAT 09/08/2026 + v-sow 05/09/2026: gieo snapshot, gat o luot sau. opts.sow=true (quet theo LICH): KHONG cho trong luot ====
+   155	  const pendRef = __pendDb().collection('pending_snapshots').doc('P_' + String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 470));
+   156	  const gsRef = __pendDb().collection('group_state').doc(String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 480));
+   157	  const mark = (arr, bd, extra) => { try { arr.bd = bd; if (extra) Object.assign(arr, extra); } catch (e) {} return arr; }; // arr.bd: 'ok' = da goi BrightData thanh cong, 'skip' = khong goi
+   158	  let snap = null, pendSweep = false;
+   159	  try {
+   160	    const pd = await pendRef.get();
+   161	    if (pd.exists) {
+--- lib/scraper.js :: /async function bdStatus\(|function bdStatus/ từ dòng 121 (70 dòng) ---
+   121	async function bdStatus(id) {
+   122	  try {
+   123	    const r = await fetch(`${BD}/progress/${id}`, { headers: { Authorization: `Bearer ${CFG.BRIGHTDATA_TOKEN}` } });
+   124	    const j = await r.json(); return j.status || 'unknown';
+   125	  } catch (e) { return 'unknown'; }
+   126	}
+   127	async function bdWaitSoft(id, tries = 18, gap = 5000) {
+   128	  for (let i = 0; i < tries; i++) {
+   129	    const st = await bdStatus(id);
+   130	    if (st === 'ready') return true;
+   131	    if (st === 'failed') throw new Error('snapshot failed');
+   132	    await new Promise(s => setTimeout(s, gap));
+   133	  }
+   134	  return false;
+   135	}
+   136	async function bdFetch(id) {
+   137	  const r = await fetch(`${BD}/snapshot/${id}?format=json`, { headers: { Authorization: `Bearer ${CFG.BRIGHTDATA_TOKEN}` } });
+   138	  if (!r.ok) throw new Error(`snapshot fetch ${r.status}`);
+   139	  const j = await r.json();
+   140	  return Array.isArray(j) ? j : [];
+   141	}
+   142	
+   143	/** Lấy bài cho 1 nguồn. Trả về mảng post đã chuẩn hoá.
+   144	 *  opts: { startDate?, endDate?, numPosts? }
+   145	 *   - không có startDate/endDate → quét "mới nhất" (giới hạn POSTS_PER_GROUP) như cũ
+   146	 *   - có startDate/endDate (MM-DD-YYYY) → QUÉT NGƯỢC QUÁ KHỨ theo khoảng ngày */
+   147	export async function fetchPosts(source, opts = {}) {
+   148	  const backfill = !!(opts.startDate || opts.endDate);
+   149	  if (CFG.MOCK_MODE) return mockPosts(source, backfill ? (opts.numPosts || 24) : CFG.POSTS_PER_GROUP, opts);
+   150	  if (!CFG.BRIGHTDATA_TOKEN) { log.warn('Chưa có BRIGHTDATA_TOKEN — bật MOCK_MODE=true để chạy thử.'); return []; }
+   151	  const trigOpts = backfill
+   152	    ? { startDate: opts.startDate, endDate: opts.endDate, numPosts: opts.numPosts || undefined }
+   153	    : { numPosts: opts.numPosts || CFG.POSTS_PER_GROUP, notInclude: opts.notInclude }; // live: cho phép ghi đè (probe ít bài / sweep đủ bài)
+   154	  // ==== v16 GIEO-GAT 09/08/2026 + v-sow 05/09/2026: gieo snapshot, gat o luot sau. opts.sow=true (quet theo LICH): KHONG cho trong luot ====
+   155	  const pendRef = __pendDb().collection('pending_snapshots').doc('P_' + String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 470));
+   156	  const gsRef = __pendDb().collection('group_state').doc(String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 480));
+   157	  const mark = (arr, bd, extra) => { try { arr.bd = bd; if (extra) Object.assign(arr, extra); } catch (e) {} return arr; }; // arr.bd: 'ok' = da goi BrightData thanh cong, 'skip' = khong goi
+   158	  let snap = null, pendSweep = false;
+   159	  try {
+   160	    const pd = await pendRef.get();
+   161	    if (pd.exists) {
+   162	      const p = pd.data() || {};
+   163	      const st = await bdStatus(p.snapshot_id);
+   164	      if (st === 'ready') { snap = p.snapshot_id; pendSweep = !!p.sweep; try { await pendRef.delete(); } catch (e) {} log.info('GAT snapshot ' + p.snapshot_id + ' — ' + source.url); }
+   165	      else if (st === 'failed' || (Date.now() - (p.t || 0)) > 2 * 3600e3) { try { await pendRef.delete(); } catch (e) {} }
+   166	      else { log.info('snapshot ' + p.snapshot_id + ' chua chin (' + st + ') — cho luot sau: ' + source.url); return mark([], st === 'unknown' ? 'skip' : 'ok'); }
+   167	    }
+   168	  } catch (e) {}
+   169	  if (!snap) {
+   170	    if (opts.sow) {
+   171	      if (opts.sowDue === false) return mark([], 'skip'); // chua toi nhip gieo cua nguon nay
+   172	      snap = await bdTrigger([source.url], trigOpts);
+   173	      try { await pendRef.set({ snapshot_id: snap, url: source.url || '', backfill: false, sweep: !!opts.sweep, t: Date.now() }); } catch (e) {}
+   174	      try { await gsRef.set({ url: source.url || '', lastTriggerAt: Date.now() }, { merge: true }); } catch (e) {}
+   175	      log.info('GIEO snapshot ' + snap + (opts.sweep ? ' (sweep)' : '') + ' — gat luot sau: ' + source.url);
+   176	      return mark([], 'ok');
+   177	    }
+   178	    snap = await bdTrigger([source.url], trigOpts);
+   179	    const ok = await bdWaitSoft(snap, backfill ? 40 : 18, backfill ? 6000 : 5000);
+   180	    if (!ok) {
+   181	      try { await pendRef.set({ snapshot_id: snap, url: source.url || '', backfill: !!backfill, t: Date.now() }); } catch (e) {}
+   182	      log.info('GIEO snapshot ' + snap + ' (nguon cham) — se gat luot sau: ' + source.url);
+   183	      return mark([], 'ok');
+   184	    }
+   185	  }
+   186	  const raw = await bdFetch(snap);
+   187	  try { if (!backfill) { const _ids = raw.map(r => String(r.post_id || r.id || '')).filter(Boolean); if (_ids.length) { const _prev = Array.isArray(opts.notInclude) ? opts.notInclude : []; const _m = [...new Set([..._ids, ..._prev])].slice(0, 200); await __pendDb().collection('group_state').doc(String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 480)).set({ url: source.url || '', recentIds: _m, recentIdsAt: Date.now() }, { merge: true }); } } } catch (e) {}
+   188	  const _good = raw.filter(r => r && (r.post_id || r.id) && !r.error && !r.error_code && !r.warning && !r.warning_code);
+   189	  if (_good.length < raw.length) log.info('stub-filter: loai ' + (raw.length - _good.length) + ' record vo-rong/error (posts) — ' + (source.url || ''));
+   190	  return mark(_good.map(p => normalizePost(p, source)), 'ok', { sweep: pendSweep });
+--- lib/scraper.js :: /async function bdFetch\(|function bdFetch/ từ dòng 136 (70 dòng) ---
+   136	async function bdFetch(id) {
+   137	  const r = await fetch(`${BD}/snapshot/${id}?format=json`, { headers: { Authorization: `Bearer ${CFG.BRIGHTDATA_TOKEN}` } });
+   138	  if (!r.ok) throw new Error(`snapshot fetch ${r.status}`);
+   139	  const j = await r.json();
+   140	  return Array.isArray(j) ? j : [];
+   141	}
+   142	
+   143	/** Lấy bài cho 1 nguồn. Trả về mảng post đã chuẩn hoá.
+   144	 *  opts: { startDate?, endDate?, numPosts? }
+   145	 *   - không có startDate/endDate → quét "mới nhất" (giới hạn POSTS_PER_GROUP) như cũ
+   146	 *   - có startDate/endDate (MM-DD-YYYY) → QUÉT NGƯỢC QUÁ KHỨ theo khoảng ngày */
+   147	export async function fetchPosts(source, opts = {}) {
+   148	  const backfill = !!(opts.startDate || opts.endDate);
+   149	  if (CFG.MOCK_MODE) return mockPosts(source, backfill ? (opts.numPosts || 24) : CFG.POSTS_PER_GROUP, opts);
+   150	  if (!CFG.BRIGHTDATA_TOKEN) { log.warn('Chưa có BRIGHTDATA_TOKEN — bật MOCK_MODE=true để chạy thử.'); return []; }
+   151	  const trigOpts = backfill
+   152	    ? { startDate: opts.startDate, endDate: opts.endDate, numPosts: opts.numPosts || undefined }
+   153	    : { numPosts: opts.numPosts || CFG.POSTS_PER_GROUP, notInclude: opts.notInclude }; // live: cho phép ghi đè (probe ít bài / sweep đủ bài)
+   154	  // ==== v16 GIEO-GAT 09/08/2026 + v-sow 05/09/2026: gieo snapshot, gat o luot sau. opts.sow=true (quet theo LICH): KHONG cho trong luot ====
+   155	  const pendRef = __pendDb().collection('pending_snapshots').doc('P_' + String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 470));
+   156	  const gsRef = __pendDb().collection('group_state').doc(String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 480));
+   157	  const mark = (arr, bd, extra) => { try { arr.bd = bd; if (extra) Object.assign(arr, extra); } catch (e) {} return arr; }; // arr.bd: 'ok' = da goi BrightData thanh cong, 'skip' = khong goi
+   158	  let snap = null, pendSweep = false;
+   159	  try {
+   160	    const pd = await pendRef.get();
+   161	    if (pd.exists) {
+   162	      const p = pd.data() || {};
+   163	      const st = await bdStatus(p.snapshot_id);
+   164	      if (st === 'ready') { snap = p.snapshot_id; pendSweep = !!p.sweep; try { await pendRef.delete(); } catch (e) {} log.info('GAT snapshot ' + p.snapshot_id + ' — ' + source.url); }
+   165	      else if (st === 'failed' || (Date.now() - (p.t || 0)) > 2 * 3600e3) { try { await pendRef.delete(); } catch (e) {} }
+   166	      else { log.info('snapshot ' + p.snapshot_id + ' chua chin (' + st + ') — cho luot sau: ' + source.url); return mark([], st === 'unknown' ? 'skip' : 'ok'); }
+   167	    }
+   168	  } catch (e) {}
+   169	  if (!snap) {
+   170	    if (opts.sow) {
+   171	      if (opts.sowDue === false) return mark([], 'skip'); // chua toi nhip gieo cua nguon nay
+   172	      snap = await bdTrigger([source.url], trigOpts);
+   173	      try { await pendRef.set({ snapshot_id: snap, url: source.url || '', backfill: false, sweep: !!opts.sweep, t: Date.now() }); } catch (e) {}
+   174	      try { await gsRef.set({ url: source.url || '', lastTriggerAt: Date.now() }, { merge: true }); } catch (e) {}
+   175	      log.info('GIEO snapshot ' + snap + (opts.sweep ? ' (sweep)' : '') + ' — gat luot sau: ' + source.url);
+   176	      return mark([], 'ok');
+   177	    }
+   178	    snap = await bdTrigger([source.url], trigOpts);
+   179	    const ok = await bdWaitSoft(snap, backfill ? 40 : 18, backfill ? 6000 : 5000);
+   180	    if (!ok) {
+   181	      try { await pendRef.set({ snapshot_id: snap, url: source.url || '', backfill: !!backfill, t: Date.now() }); } catch (e) {}
+   182	      log.info('GIEO snapshot ' + snap + ' (nguon cham) — se gat luot sau: ' + source.url);
+   183	      return mark([], 'ok');
+   184	    }
+   185	  }
+   186	  const raw = await bdFetch(snap);
+   187	  try { if (!backfill) { const _ids = raw.map(r => String(r.post_id || r.id || '')).filter(Boolean); if (_ids.length) { const _prev = Array.isArray(opts.notInclude) ? opts.notInclude : []; const _m = [...new Set([..._ids, ..._prev])].slice(0, 200); await __pendDb().collection('group_state').doc(String(source.url || '').replace(/[^\w-]/g, '_').slice(0, 480)).set({ url: source.url || '', recentIds: _m, recentIdsAt: Date.now() }, { merge: true }); } } } catch (e) {}
+   188	  const _good = raw.filter(r => r && (r.post_id || r.id) && !r.error && !r.error_code && !r.warning && !r.warning_code);
+   189	  if (_good.length < raw.length) log.info('stub-filter: loai ' + (raw.length - _good.length) + ' record vo-rong/error (posts) — ' + (source.url || ''));
+   190	  return mark(_good.map(p => normalizePost(p, source)), 'ok', { sweep: pendSweep });
+   191	}
+   192	
+   193	/* ---- COMMENT: lấy bình luận của 1 loạt bài qua dataset comment riêng của Bright Data ----
+   194	   Input mỗi dòng: { url: <post_url>, limit_records?: N }. Trả mảng comment đã chuẩn hoá (kind:'comment'). */
+   195	const MOCK_CMT_POOL = [
+   196	  'Mình cũng đang cần dịch vụ này, ib giá giúp mình với ạ.',
+   197	  'Cho em xin báo giá gói chạy ads tháng với ạ.',
+   198	  'Bên bạn có nhận vận hành TikTok Shop không, shop mình cần gấp.',
+   199	  'Hóng review, mình cũng định thuê ngoài.',
+   200	  'Quan tâm nha, inbox em bảng giá nhé!',
+   201	  'Bài hay quá, cảm ơn bạn đã chia sẻ.',
+   202	  'Up cho bạn nào cần.'
+   203	];
+   204	function mockComments(postUrls, source, perPost = 3) {
+   205	  const out = [];
+== lib/scorer.js: prompt + role + weights ==
+2:/* AI chấm điểm lead. Dùng LLM (tương thích OpenAI). Nếu không có key → heuristic dự phòng. */
+25:{"is_real_lead":bool,"hotness":0-100,"intent":string,"industry":string,"service":string,"reply":string,"role":"buyer|seller|poster_self|other","rol
+27:- Loại (is_real_lead=false, hotness thấp) các bài: bán dịch vụ ngược, tuyển dụng, bán khoá học, sinh viên hỏi định hư�
+31:- "role" = VAI của người viết so với brand: "buyer" = đang CẦN MUA / TÌM / THUÊ thứ brand cung cấp; "seller" = đang CHÀO BÁN /
+32:- Với BÌNH LUẬN: đọc BÀI GỐC để biết ai là người mua, ai là người bán. Bài gốc của NGƯỜI MUA (cần tìm / cần m
+33:- CHỈ role="buyer" mới được is_real_lead=true. "role_reason": 1 câu ngắn tiếng Việt giải thích vì sao xếp vai đó.`;
+38:const PRE_SYS = `Bạn là bộ SÀNG LỌC NHANH cho agency marketing tại Việt Nam.
+56:/* Dựng nội dung gửi LLM. Với BÌNH LUẬN: kèm ngữ cảnh BÀI GỐC để AI đánh giá đúng ý định người bình luận. */
+64:    return `Đây là BÌNH LUẬN dưới một bài đăng (hãy đánh giá theo Ý ĐỊNH và VAI của NGƯỜI BÌNH LUẬN trong ngữ cả
+69:export async function prefilterLead(post, brandAi) { /* v-brandai · LENH #46: llmChat46 (2 lần, fail-open) */
+72:    const r = await llmChat46({ model: CFG.LLM_PREFILTER_MODEL, response_format: { type: 'json_object' }, messages: [
+73:      { role: 'system', content: PRE_SYS + brandAiCtx(brandAi) },
+74:      { role: 'user', content: buildPostContent(post, 1200) }
+89:   Vì sao: LỆNH #45 đo OpenAI trả 500 server_error từng đợt trên gpt-5.6-sol (burst 3 → 2/3 lỗi trong 1,7 s); retry 1 lần/1,5 s c
+117:async function llmChat46(body, o) {
+152:function heuristicCapped46(post, source) {
+153:  const h = heuristic((post && post.text) || '', source || {});
+154:  h.hotness = Math.min(59, h.hotness); h.is_real_lead = h.hotness >= 40;
+158:function heuristic(text, source) {
+168:    is_real_lead: score >= 40,
+169:    hotness: score,
+179:/* Gợi ý trọng số chấm điểm (từ config/app.weights) → 1 dòng hướng dẫn cho LLM */
+180:function weightsHint(weights) {
+181:  if (!Array.isArray(weights) || !weights.length) return '';
+182:  const parts = weights
+188:export async function scoreLead(post, source, weights, brandAi, opts) { /* v-brandai · LENH #46: LLM hỏng → NÉM LỖI (index.js xếp hàng 
+190:  if (!CFG.LLM_API_KEY) return heuristic(post.text, source);          // không cấu hình LLM → heuristic như trước (cố ý)
+191:  if (opts.heuristicOnly) return heuristicCapped46(post, source);     // bài chờ AI quá hạn → dự phòng kẹp ≤ 59
+193:    const r = await llmChat46({ model: CFG.LLM_MODEL, response_format: { type: 'json_object' }, messages: [
+194:      { role: 'system', content: SYS + brandAiCtx(brandAi) },
+195:      { role: 'user', content: `Ngành ưu tiên: ${(brandAi && brandAi.nganh) || source.industry || 'đa ngành'}.${weightsHint(weights)}\nYêu c
+198:    // Bền vững nếu model trả hotness dạng chữ ('low'/'high'…) thay vì số
+200:    let h = obj.hotness;
+202:    obj.hotness = Math.max(0, Math.min(100, Number(h) || 0));
+204:    obj.role = normRole(obj.role); obj.role_reason = String(obj.role_reason || '').slice(0, 200); /* v-selfcmt */
+210:    log.warn('LLM lỗi (' + ((e && e.kind) || '?') + ') — KHÔNG dùng heuristic, bài sẽ xếp hàng chấm lại:', (e && e.message) || e);
+214:scoreLead.health46 = llmHealth46; scoreLead.heuristic46 = heuristicCapped46; scoreLead.llmChat46 = llmChat46; scoreLead.sanitize46 = sanitize46; s
+--- lib/scorer.js :: /function buildPostContent|buildPostContent ?=/ từ dòng 57 (40 dòng) ---
+    57	function buildPostContent(post, maxLen) {
+    58	  const body = String(post.text || '').slice(0, maxLen);
+    59	  if (post.kind === 'comment' && post.parent_text) {
+    60	    const ctx = String(post.parent_text).slice(0, 500);
+    61	    const anon = s => /ẩn danh|anonymous|người tham gia|facebook user/i.test(s);
+    62	    const pa = String(post.parent_author || '').trim().slice(0, 80), ca = String(post.author || '').trim().slice(0, 80);
+    63	    const same = post.self_comment ? 'CÓ — người bình luận CHÍNH LÀ tác giả bài gốc' : ((pa && ca && !anon(pa) && !anon(ca)) ? 'KHÔNG (tên khác nhau)' : 'không rõ');
+    64	    return `Đây là BÌNH LUẬN dưới một bài đăng (hãy đánh giá theo Ý ĐỊNH và VAI của NGƯỜI BÌNH LUẬN trong ngữ cảnh bài gốc).\nTÁC GIẢ BÀI GỐC: ${pa || '(không rõ)'}\nBÀI GỐC: """${ctx}"""\nNGƯỜI BÌNH LUẬN: ${ca || '(không rõ)'}\nCÙNG MỘT NGƯỜI VỚI TÁC GIẢ BÀI GỐC? ${same}\nBÌNH LUẬN: """${body}"""`;
+    65	  }
+    66	  return `Bài: """${body}"""`;
+    67	}
+    68	
+    69	export async function prefilterLead(post, brandAi) { /* v-brandai · LENH #46: llmChat46 (2 lần, fail-open) */
+    70	  if (!CFG.LLM_API_KEY) return { maybe: true, _usage: { prompt: 0, completion: 0, total: 0 }, _llm: false };
+    71	  try {
+    72	    const r = await llmChat46({ model: CFG.LLM_PREFILTER_MODEL, response_format: { type: 'json_object' }, messages: [
+    73	      { role: 'system', content: PRE_SYS + brandAiCtx(brandAi) },
+    74	      { role: 'user', content: buildPostContent(post, 1200) }
+    75	    ] }, { tries: 2 });
+    76	    llmHealth46.preOk++;
+    77	    return { maybe: !!r.obj.maybe, _llm: true, _usage: usage46(r.usage) };
+    78	  } catch (e) {
+    79	    llmHealth46.preFail++; llmHealth46.preLast = String((e && e.message) || e).slice(0, 200);
+    80	    log.warn('prefilter lỗi (' + ((e && e.kind) || '?') + '), cho qua tầng 2:', (e && e.message) || e);
+    81	    return { maybe: true, _usage: { prompt: 0, completion: 0, total: 0 }, _llm: false, _err: (e && e.kind) || 'unknown' };
+    82	  }
+    83	}
+    84	
+    85	/* Heuristic dự phòng khi không cấu hình LLM */
+    86	/* ===== LENH #46 (11/09/2026) — gọi LLM BỀN: sanitize surrogate lẻ (emoji bị slice cắt đôi → OpenAI 400 "Invalid body") · timeout 60 s ·
+    87	   thử lại 4 lần giãn 2/5/12 s (+jitter, tôn trọng Retry-After ≤ 30 s) cho 429/5xx/mạng/JSON hỏng · KHÔNG thử lại auth/quota/model/400 ·
+    88	   API từ chối response_format → gửi lại không json mode · lỗi mang e.kind (auth|quota|rate|model|badreq|server|net|format) · bộ đếm scoreLead.health46 (index.js giám sát [LLM-DOWN]).
+    89	   Vì sao: LỆNH #45 đo OpenAI trả 500 server_error từng đợt trên gpt-5.6-sol (burst 3 → 2/3 lỗi trong 1,7 s); retry 1 lần/1,5 s cũ không đủ → heuristic → lead rác 90 điểm NÓNG. */
+    90	const LLM46 = { tries: Math.max(1, Number(process.env.LLM_TRIES) || 4), waits: [2000, 5000, 12000], timeoutMs: Math.max(5000, Number(process.env.LLM_TIMEOUT_MS) || 60000), maxWaitMs: 30000 };
+    91	const RETRY46 = { rate: 1, server: 1, net: 1, http: 1, format: 1 };
+    92	const llmHealth46 = { ok: 0, fail: 0, attempts: 0, attemptsFail: 0, last: '', lastKind: '', lastAt: 0, lastOkAt: 0, preOk: 0, preFail: 0, preLast: '' };
+    93	function sanitize46(s) {
+    94	  return String(s == null ? '' : s)
+    95	    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, m => m.length === 2 ? m : '')   // giữ cặp surrogate hợp lệ, bỏ surrogate lẻ
+    96	    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');                           // ký tự điều khiển (giữ \n \t)
+--- lib/scorer.js :: /async function scoreLead\(/ từ dòng 188 (80 dòng) ---
+   188	export async function scoreLead(post, source, weights, brandAi, opts) { /* v-brandai · LENH #46: LLM hỏng → NÉM LỖI (index.js xếp hàng chấm lại), không còn heuristic ngầm */
+   189	  opts = opts || {};
+   190	  if (!CFG.LLM_API_KEY) return heuristic(post.text, source);          // không cấu hình LLM → heuristic như trước (cố ý)
+   191	  if (opts.heuristicOnly) return heuristicCapped46(post, source);     // bài chờ AI quá hạn → dự phòng kẹp ≤ 59
+   192	  try {
+   193	    const r = await llmChat46({ model: CFG.LLM_MODEL, response_format: { type: 'json_object' }, messages: [
+   194	      { role: 'system', content: SYS + brandAiCtx(brandAi) },
+   195	      { role: 'user', content: `Ngành ưu tiên: ${(brandAi && brandAi.nganh) || source.industry || 'đa ngành'}.${weightsHint(weights)}\nYêu cầu bổ sung về JSON: THÊM field "need" = tóm tắt NHU CẦU của khách (khách đang cần gì — 1 câu ngắn tiếng Việt); còn field "intent" = NHẬN ĐỊNH Ý ĐỊNH MUA (mức độ sẵn sàng chi tiền, độ gấp, mức chủ động, tín hiệu ngân sách/hẹn gặp — 1 câu tiếng Việt, KHÔNG lặp lại nội dung của "need").\n${buildPostContent(post, 1500)}` }
+   196	    ] }, { tries: opts.tries || LLM46.tries });
+   197	    const obj = r.obj;
+   198	    // Bền vững nếu model trả hotness dạng chữ ('low'/'high'…) thay vì số
+   199	    const HMAP = { low:30, medium:60, high:85, hot:90, warm:65, cold:35, none:0 };
+   200	    let h = obj.hotness;
+   201	    if (typeof h === 'string') { const k=h.toLowerCase().trim(); h = (k in HMAP) ? HMAP[k] : Number(h); }
+   202	    obj.hotness = Math.max(0, Math.min(100, Number(h) || 0));
+   203	    if (!obj.industry) obj.industry = source.industry || '';
+   204	    obj.role = normRole(obj.role); obj.role_reason = String(obj.role_reason || '').slice(0, 200); /* v-selfcmt */
+   205	    obj._llm = true; obj._usage = usage46(r.usage); obj._model = r.model || '';
+   206	    llmHealth46.ok++; llmHealth46.lastOkAt = Date.now();
+   207	    return obj;
+   208	  } catch (e) {
+   209	    llmHealth46.fail++; llmHealth46.last = String((e && e.message) || e).slice(0, 200); llmHealth46.lastKind = (e && e.kind) || 'unknown'; llmHealth46.lastAt = Date.now();
+   210	    log.warn('LLM lỗi (' + ((e && e.kind) || '?') + ') — KHÔNG dùng heuristic, bài sẽ xếp hàng chấm lại:', (e && e.message) || e);
+   211	    throw e;
+   212	  }
+   213	}
+   214	scoreLead.health46 = llmHealth46; scoreLead.heuristic46 = heuristicCapped46; scoreLead.llmChat46 = llmChat46; scoreLead.sanitize46 = sanitize46; scoreLead.parseJson46 = parseJson46; scoreLead.cfg46 = LLM46; /* LENH #46 */
+--- lib/scorer.js :: /async function prefilterLead\(/ từ dòng 69 (50 dòng) ---
+    69	export async function prefilterLead(post, brandAi) { /* v-brandai · LENH #46: llmChat46 (2 lần, fail-open) */
+    70	  if (!CFG.LLM_API_KEY) return { maybe: true, _usage: { prompt: 0, completion: 0, total: 0 }, _llm: false };
+    71	  try {
+    72	    const r = await llmChat46({ model: CFG.LLM_PREFILTER_MODEL, response_format: { type: 'json_object' }, messages: [
+    73	      { role: 'system', content: PRE_SYS + brandAiCtx(brandAi) },
+    74	      { role: 'user', content: buildPostContent(post, 1200) }
+    75	    ] }, { tries: 2 });
+    76	    llmHealth46.preOk++;
+    77	    return { maybe: !!r.obj.maybe, _llm: true, _usage: usage46(r.usage) };
+    78	  } catch (e) {
+    79	    llmHealth46.preFail++; llmHealth46.preLast = String((e && e.message) || e).slice(0, 200);
+    80	    log.warn('prefilter lỗi (' + ((e && e.kind) || '?') + '), cho qua tầng 2:', (e && e.message) || e);
+    81	    return { maybe: true, _usage: { prompt: 0, completion: 0, total: 0 }, _llm: false, _err: (e && e.kind) || 'unknown' };
+    82	  }
+    83	}
+    84	
+    85	/* Heuristic dự phòng khi không cấu hình LLM */
+    86	/* ===== LENH #46 (11/09/2026) — gọi LLM BỀN: sanitize surrogate lẻ (emoji bị slice cắt đôi → OpenAI 400 "Invalid body") · timeout 60 s ·
+    87	   thử lại 4 lần giãn 2/5/12 s (+jitter, tôn trọng Retry-After ≤ 30 s) cho 429/5xx/mạng/JSON hỏng · KHÔNG thử lại auth/quota/model/400 ·
+    88	   API từ chối response_format → gửi lại không json mode · lỗi mang e.kind (auth|quota|rate|model|badreq|server|net|format) · bộ đếm scoreLead.health46 (index.js giám sát [LLM-DOWN]).
+    89	   Vì sao: LỆNH #45 đo OpenAI trả 500 server_error từng đợt trên gpt-5.6-sol (burst 3 → 2/3 lỗi trong 1,7 s); retry 1 lần/1,5 s cũ không đủ → heuristic → lead rác 90 điểm NÓNG. */
+    90	const LLM46 = { tries: Math.max(1, Number(process.env.LLM_TRIES) || 4), waits: [2000, 5000, 12000], timeoutMs: Math.max(5000, Number(process.env.LLM_TIMEOUT_MS) || 60000), maxWaitMs: 30000 };
+    91	const RETRY46 = { rate: 1, server: 1, net: 1, http: 1, format: 1 };
+    92	const llmHealth46 = { ok: 0, fail: 0, attempts: 0, attemptsFail: 0, last: '', lastKind: '', lastAt: 0, lastOkAt: 0, preOk: 0, preFail: 0, preLast: '' };
+    93	function sanitize46(s) {
+    94	  return String(s == null ? '' : s)
+    95	    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, m => m.length === 2 ? m : '')   // giữ cặp surrogate hợp lệ, bỏ surrogate lẻ
+    96	    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');                           // ký tự điều khiển (giữ \n \t)
+    97	}
+    98	function kindOf46(status, code, type, msg) {
+    99	  const s = Number(status) || 0, all = String(code || '') + ' ' + String(type || '') + ' ' + String(msg || '');
+   100	  if (/insufficient_quota|credit_balance|billing_not_active|exceeded your current quota/i.test(all)) return 'quota';
+   101	  if (s === 401 || s === 403 || /invalid_api_key|incorrect api key|authentication/i.test(all)) return 'auth';
+   102	  if (s === 429) return 'rate';
+   103	  if (s === 404 || /model_not_found|does not exist|no such model/i.test(all)) return 'model';
+   104	  if (s === 400 || s === 422) return 'badreq';
+   105	  if (s >= 500) return 'server';
+   106	  return s ? 'http' : 'net';
+   107	}
+   108	function mkErr46(kind, status, msg) { const e = new Error(msg); e.kind = kind; e.status = status; e.retryable = !!RETRY46[kind]; return e; }
+   109	function parseJson46(content) {
+   110	  const c = String(content || '').trim(); if (!c) return null;
+   111	  const tryP = t => { try { const o = JSON.parse(t); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : null; } catch (_) { return null; } };
+   112	  let o = tryP(c); if (o) return o;
+   113	  const f = c.match(/```(?:json)?\s*([\s\S]*?)```/i); if (f) { o = tryP(f[1].trim()); if (o) return o; }
+   114	  const g = c.match(/\{[\s\S]*\}/); if (g) { o = tryP(g[0]); if (o) return o; }
+   115	  return null;
+   116	}
+   117	async function llmChat46(body, o) {
+   118	  o = o || {}; const tries = Math.max(1, o.tries || LLM46.tries); const base = String(CFG.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+== lib/config.js: tên key + mặc định (che giá trị dài) ==
+8:  MOCK_MODE: bool(env.MOCK_MODE, false),     // true = dùng dữ liệu giả để chạy thử (không cần token)
+9:  PORT:      num(env.PORT, 8787),
+10:  POLL_MINUTES: num(env.POLL_MINUTES, 3),
+11:  POSTS_PER_GROUP: num(env.POSTS_PER_GROUP, 20),
+13:  BD_SOW_MODE: bool(env.BD_SOW_MODE, true),
+14:  SCAN_SOURCE_INTERVAL_MIN: num(env.SCAN_SOURCE_INTERVAL_MIN, 10),
+15:  PROBE_POSTS: num(env.PROBE_POSTS, 5),          // số bài dò mỗi nhịp (mặc định cũ trong code = 5)
+16:  FULLSWEEP_HOURS: num(env.FULLSWEEP_HOURS, 2),  // nhịp quét đủ POSTS_PER_GROUP (mặc định cũ = 2h)
+18:  SCANNED_TTL_DAYS: num(env.SCANNED_TTL_DAYS, 3),
+20:  BROWSER_SVC_URL: env.BROWSER_SVC_URL || '',
+21:  BROWSER_SVC_SECRET: env.BROWSER_SVC_SECRET || '',
+22:  HOT_THRESHOLD: num(env.HOT_THRESHOLD, 80),
+23:  MIN_KEEP_SCORE: num(env.MIN_KEEP_SCORE, 40), // dưới mức này không lưu làm lead
+26:  BRIGHTDATA_TOKEN: env.BRIGHTDATA_TOKEN || '',
+27:  BRIGHTDATA_DATASET_ID: env.BRIGHTDATA_DATASET_ID || 'gd_lz11l67o2cb3r0lkj3',
+29:  BRIGHTDATA_COMMENTS_DATASET_ID: env.BRIGHTDATA_COMMENTS_DATASET_ID || 'gd_lkay758p1eanlolqw8',
+30:  SCAN_COMMENTS: bool(env.SCAN_COMMENTS, false),
+31:  COMMENTS_PER_POST: num(env.COMMENTS_PER_POST, 30), // tran chong bai viral no records
+35:  LLM_API_KEY: env.LLM_API_KEY || '',
+36:  LLM_BASE_URL: env.LLM_BASE_URL || 'https://api.openai.com/v1',
+37:  LLM_MODEL: env.LLM_MODEL || 'gpt-4o-mini',
+38:  LLM_PREFILTER_MODEL: env.LLM_PREFILTER_MODEL || 'gpt-5-nano',
+40:  LLM_PRICE_IN:  num(env.LLM_PRICE_IN, 0.15),
+41:  LLM_PRICE_OUT: num(env.LLM_PRICE_OUT, 0.60),
+42:  LLM_PREFILTER_PRICE_IN: num(env.LLM_PREFILTER_PRICE_IN, 0.05),
+43:  LLM_PREFILTER_PRICE_OUT: num(env.LLM_PREFILTER_PRICE_OUT, 0.40),
+45:  SCORE_CONCURRENCY: num(env.SCORE_CONCURRENCY, 6),
+48:  TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN || '',
+49:  TELEGRAM_CHAT_ID:   env.TELEGRAM_CHAT_ID || '',
+51:  RESEND_API_KEY: env.RESEND_API_KEY || '',     // gửi email qua HTTP API (không cần SMTP)
+52:  EMAIL_FROM: env.EMAIL_FROM || 'SmartLead <onboarding@resend.dev>',
+53:  EMAIL_TO:   env.EMAIL_TO || '',
+55:  SHEET_WEBHOOK_URL: env.SHEET_WEBHOOK_URL || '', // Google Apps Script web app (append row)
+56:  CUSTOM_WEBHOOK_URL: env.CUSTOM_WEBHOOK_URL || '', // n8n / CRM / cầu nối tuỳ ý
+58:  ZALO_OA_TOKEN: env.ZALO_OA_TOKEN || '',
+59:  ZALO_USER_ID:  env.ZALO_USER_ID || '',          // user đã follow OA (chỉ gửi được cho người đã tư�
+62:  VPS_URL: env.VPS_URL || '',  // v-ttl-vps 05/09/2026: địa chỉ VPS CHỈ ở .env (không để trong code)
+63:  VPS_SECRET: env.VPS_SECRET || '',
+66:  API_TOKEN: env.API_TOKEN || ''
+== firestore.rules ==
+file: ../firestore.rules
+3:  match /databases/{database}/documents {
+5:    match /worker_config/{wid} {
+10:    match /workers/{wid} {
+15:    match /system_status/{sid} {
+23:    match /outreach_stats/{id} {
+31:    match /content_stats/{id} {
+38:    match /daily_stats/{id} {
+46:    match /outreach_log/{id} {
+113:    match /brand_sales/{id} {
+146:    match /leads/{lid}/notes/{nid} {
+155:    match /{path=**}/notes/{nid} {
+165:match /leads/{id} {
+186:    match /lead_counters/{id} {
+191:    match /sources/{id} {
+204:    match /config/{id} {
+213:    match /brands/{id} {
+221:    match /engagement_drafts/{id} {
+235:    match /scans/{id} {
+240:    match /bd_month/{ym} {
+244:    match /scan_jobs/{id} {
+248:    match /system_alerts/{id} { // v89 canh bao he thong (het credit eKYC...) — chi super admin doc, backend ghi
+252:    match /scanned_posts/{id} {
+256:    match /auto_send_logs/{id} {
+260:    match /seen/{id} {
+266:    match /fb_accounts/{id} {
+271:    match /fb_account_secrets/{id} {
+288:    match /users/{uid} {
+317:    match /audit_log/{id} {
+--- rules sources từ dòng 191 ---
+   191	    match /sources/{id} {
+   192	      allow read: if canReadBrand(resource.data.get('brand',''));
+   193	      allow create: if isActiveUser()
+   194	        && userData().role in ['superadmin','admin']
+   195	        && ( isSuperAdmin() || request.resource.data.get('brand','') == myBrand() );
+   196	      allow update, delete: if isActiveUser()
+   197	        && userData().role in ['superadmin','admin']
+   198	        && ( isSuperAdmin() || resource.data.get('brand','') == myBrand() );
+   199	    }
+   200	
+   201	    // ====================== CONFIG (Phương án A: DÙNG CHUNG) ======================
+   202	    // Đọc: user đã duyệt (frontend cần để render). Ghi: chỉ super admin.
+   203	    // GIỮ NGUYÊN để KHÔNG ảnh hưởng pipeline tự động hoá đang đọc config/app.
+   204	    match /config/{id} {
+   205	      allow read: if (isActiveUser()) && id != 'private' || isSuperAdmin(); // v119-42: config/private chỉ Super Admin
+--- rules scanned_posts từ dòng 252 ---
+   252	    match /scanned_posts/{id} {
+   253	      allow read:  if canReadBrand(resource.data.get('brand','')); // v87 mo brand doc scanned_posts
+   254	      allow write: if false;
+   255	    }
+   256	    match /auto_send_logs/{id} {
+   257	      allow read:  if isSuperAdmin();
+   258	      allow write: if false;
+   259	    }
+   260	    match /seen/{id} {
+   261	      allow read, write: if false;      // chỉ admin SDK
+   262	    }
+   263	
+   264	    // ====================== FB ACCOUNTS ======================
+   265	    // Metadata: chỉ super admin đọc/ghi (trước đây mọi active user đọc được → siết lại).
+   266	    match /fb_accounts/{id} {
+--- rules scan_jobs từ dòng 244 ---
+   244	    match /scan_jobs/{id} {
+   245	      allow read:  if isSuperAdmin();
+   246	      allow write: if false;
+   247	    }
+   248	    match /system_alerts/{id} { // v89 canh bao he thong (het credit eKYC...) — chi super admin doc, backend ghi
+   249	      allow read: if isSuperAdmin();
+   250	      allow write: if false;
+   251	    }
+   252	    match /scanned_posts/{id} {
+   253	      allow read:  if canReadBrand(resource.data.get('brand','')); // v87 mo brand doc scanned_posts
+   254	      allow write: if false;
+   255	    }
+   256	    match /auto_send_logs/{id} {
+   257	      allow read:  if isSuperAdmin();
+   258	      allow write: if false;
+--- rules backfill_done: KHONG CO BLOCK
+--- rules config từ dòng 204 ---
+   204	    match /config/{id} {
+   205	      allow read: if (isActiveUser()) && id != 'private' || isSuperAdmin(); // v119-42: config/private chỉ Super Admin
+   206	      allow write: if isSuperAdmin();
+   207	    }
+   208	
+   209	    // ====================== BRANDS (danh mục brand) ======================
+   210	    // Mỗi doc: id = mã brand (vd 'z15'), data.name = tên hiển thị.
+   211	    // Đọc: super admin xem tất cả (để chọn gán); user thường CHỈ đọc brand của mình.
+   212	    // Ghi: chỉ super admin (tạo/sửa/xoá brand).
+   213	    match /brands/{id} {
+   214	      allow read:  if isSuperAdmin() || ( isActiveUser() && id == myBrand() );
+   215	      allow write: if isSuperAdmin();
+   216	    }
+   217	
+   218	    // ====================== ENGAGEMENT DRAFTS ======================
+--- rules system_alerts từ dòng 248 ---
+   248	    match /system_alerts/{id} { // v89 canh bao he thong (het credit eKYC...) — chi super admin doc, backend ghi
+   249	      allow read: if isSuperAdmin();
+   250	      allow write: if false;
+   251	    }
+   252	    match /scanned_posts/{id} {
+   253	      allow read:  if canReadBrand(resource.data.get('brand','')); // v87 mo brand doc scanned_posts
+   254	      allow write: if false;
+   255	    }
+   256	    match /auto_send_logs/{id} {
+   257	      allow read:  if isSuperAdmin();
+   258	      allow write: if false;
+   259	    }
+   260	    match /seen/{id} {
+   261	      allow read, write: if false;      // chỉ admin SDK
+   262	    }
+--- rules system_status từ dòng 15 ---
+    15	    match /system_status/{sid} {
+    16	      allow read: if isSuperAdmin();
+    17	      allow write: if false;
+    18	    }
+    19	
+    20	
+    21	    // Log Tiếp cận (Outreach): super đọc hết; user thường chỉ đọc log brand mình. Engine ghi bằng Admin SDK (bỏ qua Rules).
+    22	
+    23	    match /outreach_stats/{id} {
+    24	      allow read: if request.auth != null && (
+    25	        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin' ||
+    26	        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.brand == resource.data.brandCode
+    27	      );
+    28	      allow write: if false;
+    29	    }
+--- rules seen từ dòng 260 ---
+   260	    match /seen/{id} {
+   261	      allow read, write: if false;      // chỉ admin SDK
+   262	    }
+   263	
+   264	    // ====================== FB ACCOUNTS ======================
+   265	    // Metadata: chỉ super admin đọc/ghi (trước đây mọi active user đọc được → siết lại).
+   266	    match /fb_accounts/{id} {
+   267	      allow read:  if isSuperAdmin();
+   268	      allow write: if isSuperAdmin();
+   269	    }
+   270	    // Secrets (cookie/proxy/profileId): CHỈ super admin.
+   271	    match /fb_account_secrets/{id} {
+   272	      allow read:  if isSuperAdmin();
+   273	      allow write: if isSuperAdmin();
+   274	    }
+--- rules group_state: KHONG CO BLOCK
+--- rules score_retry: KHONG CO BLOCK
+--- rules cmt_scrape: KHONG CO BLOCK
+--- rules brands từ dòng 213 ---
+   213	    match /brands/{id} {
+   214	      allow read:  if isSuperAdmin() || ( isActiveUser() && id == myBrand() );
+   215	      allow write: if isSuperAdmin();
+   216	    }
+   217	
+   218	    // ====================== ENGAGEMENT DRAFTS ======================
+   219	    // Đọc: brand mình. Sửa: brand mình + chỉ các thao tác hợp lệ (reject / sửa nội dung khi pending).
+   220	    // Tạo/xoá: chỉ Cloud Functions (admin SDK).
+   221	    match /engagement_drafts/{id} {
+   222	      allow read: if canReadBrand(resource.data.get('brand',''));
+   223	      allow update: if canWriteBrand(resource.data.get('brand',''))
+   224	        && (
+   225	          ( request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','rejectedAt'])
+   226	            && request.resource.data.status == 'rejected' )
+   227	          || ( resource.data.status == 'pending'
+--- rules users từ dòng 288 ---
+   288	    match /users/{uid} {
+   289	      // v119 CRM: admin brand duoc doc thanh vien cung brand (giao lead)
+   290	      allow read: if userExists() && userData().role == 'admin'
+   291	        && hasBrand() && resource.data.get('brand','') == myBrand();
+   292	
+   293	      allow read: if signedIn() && ( request.auth.uid == uid || isSuperAdmin() );
+   294	
+   295	      allow create: if signedIn() && request.auth.uid == uid
+   296	        && (
+   297	          isSuperEmail()
+   298	          || (
+   299	            request.resource.data.role == 'pending'
+   300	            && request.resource.data.active == false
+   301	            && !request.resource.data.keys().hasAny(['brand','leadFrom','leadTo','leadFromAt','leadToAt'])
+   302	          )
+--- rules leads: dòng hasOnly ---
+177:        && (isSuperAdmin() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stage', 'stage_at', 'first_care_at', 'first_care_by', 'fu_at', 'fu_note', 'assignee', 'assignee_uid', 'assignee_email', 'assigned_at', 'assigned_by', 'dropped', 'dropped_at', 'dropped_by', 'lost', 'lost_reason', 'lost_at', 'lost_by', 'restored_at', 'restored_by', 'closed_at', 'closed_by', 'deal_val
+225:          ( request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','rejectedAt'])
+228:            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentDraft','inboxDraft']) )
+77:    function isSuperAdmin() {
+81:    function isActiveUser() {
+88:    function myBrand() {
+99:    function canWriteBrand(b) {
+122:    function leadWinFrom() {
+127:    function leadWinTo() {
+
+== LỆNH #47 R2 — hạ tầng ==
+-- manualScan: 540	20	512Mi	2026-09-11T10:10:51.245105407Z	manualscan-00076-nuj
+-- scheduledScan: 1800	1	512Mi	2026-09-11T10:10:55.732167716Z	scheduledscan-00071-xed
+-- statsOnLead: 60	10	256Mi	2026-09-11T04:10:34.892075030Z	statsonlead-00006-yif
+-- pushOnLead: 60	20	256Mi	2026-09-11T10:10:56.413962670Z	pushonlead-00005-zar
+-- outreachTick: 300	1	512Mi	2026-09-11T10:10:50.242952503Z	outreachtick-00031-hok
+-- scheduler:
+every 3 minutes	Asia/Ho_Chi_Minh	1800s	ENABLED		
+-- functions list (clean/cleanup/scan/stats/push):
+NAME: bootstrapZaloTokens
+NAME: cleanupScannedPosts
+NAME: genContent
+NAME: generateDrafts
+NAME: manualScan
+NAME: notifyBrandZalo
+NAME: outreachTick
+NAME: pushDueFollowups
+NAME: pushOnLead
+NAME: refreshZaloToken
+NAME: scanStatsOnRun
+NAME: scheduledScan
+NAME: sendZaloZBS
+NAME: statsOnLead
+NAME: tagLeadBrand
+-- index composite (leads/scanned_posts/cmt_scrape/score_retry/seen/outreach_log/notes):
+notes · COLLECTION_GROUP · brand:ASCENDING, at:DESCENDING, __name__:DESCENDING · READY
+leads · COLLECTION · temp:ASCENDING, detected_at:DESCENDING, __name__:DESCENDING · READY
+leads · COLLECTION · identityKey:ASCENDING, last_seen_ms:DESCENDING, __name__:DESCENDING · READY
+outreach_log · COLLECTION · brandCode:ASCENDING, at:DESCENDING, __name__:DESCENDING · READY
+leads · COLLECTION · stage:ASCENDING, detected_at:DESCENDING, __name__:DESCENDING · READY
+leads · COLLECTION · brand:ASCENDING, detected_at:DESCENDING, __name__:DESCENDING · READY
+notes · COLLECTION_GROUP · brand:ASCENDING, vis:ASCENDING, at:DESCENDING, __name__:DESCENDING · READY
+notes · COLLECTION_GROUP · brand:ASCENDING, vis:ASCENDING, __name__:ASCENDING · READY
+outreach_log · COLLECTION · status:ASCENDING, at:DESCENDING, __name__:DESCENDING · READY
+scanned_posts · COLLECTION · brand:ASCENDING, createdAt:DESCENDING, __name__:DESCENDING · READY
+leads · COLLECTION · brand:ASCENDING, phone:ASCENDING, detected_at:DESCENDING, __name__:DESCENDING · READY
+notes · COLLECTION_GROUP · by_uid:ASCENDING, at:DESCENDING, __name__:DESCENDING · READY
+-- TTL policies:
+outreach_log/fields/expireAt	ACTIVE
+-- .env (whitelist, không secret):
+   LLM_MODEL=gpt-5.6-sol
+   LLM_PREFILTER_MODEL=gpt-5-nano
+   LLM_PRICE_IN=5
+   LLM_PRICE_OUT=30
+   LLM_PREFILTER_PRICE_IN=0.05
+   LLM_PREFILTER_PRICE_OUT=0.40
+   SCAN_COMMENTS=true
+   COMMENTS_PER_POST=30
+   POSTS_PER_GROUP=20
+   MIN_KEEP_SCORE=40
+   HOT_THRESHOLD=80
+   SCANNED_TTL_DAYS=3
+   MOCK_MODE=false
+-- .env: tên key còn lại (chỉ tên + độ dài):
+   BRIGHTDATA_DATASET_ID (dài 21)
+   BRIGHTDATA_TOKEN (dài 36)
+   LLM_BASE_URL (dài 25)
+   LLM_API_KEY (dài 164)
+   BRIGHTDATA_COMMENTS_DATASET_ID (dài 21)
+   SCANNED_TTL_DAYS (dài 1)
+   BROWSER_SVC_URL (dài 24)
+   BROWSER_SVC_SECRET (dài 48)
+   LLM_PREFILTER_PRICE_IN (dài 4)
+   LLM_PREFILTER_PRICE_OUT (dài 4)
+   POLL_MINUTES (dài 1)
+   EKYCPRO_API_KEY (dài 60)
+   FUNC_WEBHOOK_SECRET (dài 48)
+   VPS_URL (dài 24)
+-- log 7 ngày: BrightData 429/rate-limit + [SCAN]/[BRIGHTDATA]/[LLM] + 5xx:
+2026-09-11T12:21:08.024233Z	[12:21:08 11/9/2026] GAT snapshot sd_mtwx9jj429jjkdrz7u — https://www.facebook.com/groups/chuyennhaban
+	
+2026-09-11T12:18:08.229855Z	[12:18:08 11/9/2026] GIEO snapshot sd_mtwx9jj429jjkdrz7u — gat luot sau: https://www.facebook.com/groups/chuyennhaban
+	
+2026-09-11T11:48:05.086215Z	[LLM-RESCORE] chấm lại 8/8 lead điểm tạm · loại 8
+	
+2026-09-11T11:44:47.897013Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 12
+	
+2026-09-11T11:41:51.601320Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T11:38:42.731426Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T11:35:59.750226Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T11:32:03.287022Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T11:28:48.315992Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T11:25:08.981725Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T11:21:09.876424Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 12
+	
+2026-09-11T11:17:20.431344Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 10
+	
+2026-09-11T11:13:37.031152Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 10
+	
+2026-09-11T11:09:10.585996Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 9
+	
+2026-09-11T11:05:06.476342Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T11:01:18.392616Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 12
+	
+2026-09-11T10:57:00.942323Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T10:53:28.209662Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 10
+	
+2026-09-11T10:49:06.581715Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T10:45:03.974847Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T10:41:55.994021Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 12
+	
+2026-09-11T10:38:14.309301Z	[LLM-RESCORE] chấm lại 2/12 lead điểm tạm · loại 2 · DỪNG sớm vì LLM lỗi
+	
+2026-09-11T10:34:52.520321Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 12
+	
+2026-09-11T10:30:34.955375Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T10:26:14.314872Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 10
+	
+2026-09-11T10:22:35.779279Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T10:18:39.357395Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 12
+	
+2026-09-11T10:14:20.925406Z	[LLM-RESCORE] chấm lại 12/12 lead điểm tạm · loại 11
+	
+2026-09-11T04:05:06.092241Z	[04:05:06 11/9/2026] GAT snapshot sd_mtwfjnkx1k429ix5x0 — https://www.facebook.com/groups/tuyenthuctapmarketing/
+	
+2026-09-11T04:02:07.038817Z	[04:02:07 11/9/2026] GIEO snapshot sd_mtwfjnkx1k429ix5x0 — gat luot sau: https://www.facebook.com/groups/tuyenthuctapmarketing/
+	
+2026-09-10T21:42:07.688015Z	[21:42:07 10/9/2026] GAT snapshot sd_mtw1v5fzuoxe0j429 — https://www.facebook.com/groups/cakhocacloaigiasi/
+	
+2026-09-10T21:39:08.684378Z	[21:39:08 10/9/2026] GIEO snapshot sd_mtw1v5fzuoxe0j429 — gat luot sau: https://www.facebook.com/groups/cakhocacloaigiasi/
+	
+2026-09-10T13:29:06.462528Z	[13:29:06 10/9/2026] GAT snapshot sd_mtvk59r429y563yd9s — https://www.facebook.com/groups/801123344673978/
+	
+2026-09-10T13:26:06.741385Z	[13:26:06 10/9/2026] snapshot sd_mtvk59r429y563yd9s chua chin (running) — cho luot sau: https://www.facebook.com/groups/801123344673978/
+	
+2026-09-10T13:23:07.766634Z	[13:23:07 10/9/2026] GIEO snapshot sd_mtvk59r429y563yd9s — gat luot sau: https://www.facebook.com/groups/801123344673978/
+	
+2026-09-10T10:31:09.889330Z	[BRIGHTDATA-UP] BrightData hoạt động lại	
+2026-09-10T10:28:07.566828Z	[BRIGHTDATA-DOWN] 9/23 nguồn lỗi BrightData, 0 nguồn OK (từ 2026-09-10 17:28 VN): trigger 502: <html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx</cent	
+2026-09-10T09:20:08.162408Z	[09:20:08 10/9/2026] GAT snapshot sd_mtvbcvoxu429xj8zn — https://www.facebook.com/groups/431687893534467/
+	
+2026-09-10T09:17:06.225954Z	[09:17:06 10/9/2026] GIEO snapshot sd_mtvbcvoxu429xj8zn — gat luot sau: https://www.facebook.com/groups/431687893534467/
+	
+2026-09-08T21:09:08.694216Z	[21:09:08 8/9/2026] GAT snapshot sd_mtt5t1j429x996jgy9 — https://www.facebook.com/groups/tuyenthuctapmarketing/
+	
+
+== LỆNH #47 R3–R6 + B + T — số liệu (node _l47_data.mjs) ==
+== LỆNH #47 dữ liệu — 2026-09-12 10:40 VN ==
+
+=== N. sources (nguồn quét) + config/app ===
+  nguồn 32 · đang bật 23 · brand: test-agency 8 · z15mrc-tts-1 6 · z15mrc-tuyendung1 5 · hscl-01 4
+  field gặp: active, aiMode, authAccountId, brand, commentMode, disabledAt, disabledReason, exclude, groupId, id, industry, keywords, name, url
+  doc id == group id: 7/32 · id có "__": 0 · có field gid/groupId: 0
+  B1. group có >1 nguồn: 0
+  B2. TÊN nguồn trùng (bỏ dấu): 0
+  B0. dạng URL nguồn: {"số":17,"slug":12,"không-group":3} · có query/#: 0 · thiếu "/" cuối: 11 · có sharedAt: 0  ← H1: slug ↔ số cùng group?
+  authAccountId còn: 5 (bật 0) · aiMode riêng: {"(chung)":32} · commentMode: {"full":23,"(full)":9}
+  keywords/nguồn: trung vị 0 max 4 · exclude/nguồn: trung vị 0 max 3
+  exclude gộp mọi nguồn (5): tuyển dụng giáo viên | tự học | chia sẻ kinh nghiệm | tuyn dng full-time | share kinh nghim
+  config/app field: announcementTicker, autoScanEnabled, channels, globalAutoSend, profileDatasetId, profileScanEnabled, profileScanMax, roi, scanComments, scanMethod, weights
+  keywords toàn cục: 0 · exclude toàn cục: 0 · scanIntervalMin undefined · aiMode undefined · scanComments true · scanMethod brightdata · autoScanEnabled true · profileScanEnabled true/5 · adaptiveScan undefined
+
+=== G. group_state · pending_snapshots · cmt_scrape · seen · score_retry ===
+  group_state: 26 doc · field: lastSweepAt, lastTriggerAt, recentIds, recentIdsAt, url
+  lastTriggerAt tuổi (phút): trung vị 4 · max 10 · lastSweepAt tuổi (giờ): trung vị 0.8 · recentIds: trung vị 200 · đầy 200: 16/26
+  pending_snapshots: bài P_ 5 (tuổi phút: 1,1,1,1,1) · comment C_ 1 (tuổi: 1) · >120′: 0
+  cmt_scrape (3000 mới nhất): gieo lại ≥2 lần (lastAt−firstAt>1h) 0/3000 (0%) · qualified 184 · khoảng cách trung vị —  ← Q-3: bình luận có bao giờ được quét lần 2?
+  seen: 54663 doc (vĩnh viễn, không TTL)
+  score_retry: 0 · kind {} · tries {}
+  scan_jobs 50 gần nhất: status {} · running >30′ (kẹt): 0 · trigger {}
+
+=== R3/T. scans 7 ngày (nhật ký lượt quét) ===
+  ✗ scans: 4 DEADLINE_EXCEEDED: Deadline exceeded after 300.003s,metadata filters: 0.002s,time to current attempt start: 0.001s,LB pick: 0.001s,remote_addr=<ip>:443
+
+=== R4/B. leads 30 ngày ===
+  ✗ leads: 4 DEADLINE_EXCEEDED: Deadline exceeded after 299.999s,remote_addr=<ip>:443
+
+=== R5. scanned_posts 3 ngày ===
+  ✗ scanned_posts: 4 DEADLINE_EXCEEDED: Deadline exceeded after 300.002s,metadata filters: 0.001s,remote_addr=<ip>:443
+
+=== R6/B. automation ↔ lead · push ===
+  thread active 0 · task queued/running 0 · lead liên quan 0
+  R6a: máy đang chạm lead: điểm tạm 0 · junk 0 · AI đã loại 0 · vai bán/chủ bài 0 · có người thật 0
+  R6d: log 7 ngày 385 · comment-lead skip/fail: 105 · lý do: không thấy ô Bình luận (đúng nhãn) 65 · không thấy nút Trả lời/Phản hồi của bình luận 30 · không thấy ô trả lời TRONG khung bình luận mục tiêu (bỏ để a 6 · không thấy ô trả lời xuất hiện sau khi bấm Phản hồi (bỏ để a 4
+  outreach_map có doc: có · outreach_locks (thiết kế B) tồn tại: chưa
+  R6b: log pushOnLead 7 ngày 300 dòng · "push hot" 85 · sent>0: 85 · sent=0: 0 · mẫu: push hot zTCtyyAlYsTZUCpj5yzk sent 1
+  daily_stats 3 ngày: 16 doc · field: atMs, brandCode, careMinSum, careN, cold, contacted, day, dropped, hot, junk, new, responded, scanAtMs, scanRuns, scanned, scannedComments, slaN, slaOk, warm
+
+== XONG — file: /home/xuanvinhsc68_work/scan-data-0912.txt (dán nguyên output vào chat, hoặc cloudshell download) ==

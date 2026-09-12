@@ -1,0 +1,414 @@
+== LỆNH #47b · 2026-09-12T04:21Z ==
+-- lib/alerts/:
+total 32
+drwxrwxr-x 2 xuanvinhsc68_work xuanvinhsc68_work 4096 Aug  9 09:41 .
+drwxrwxr-x 3 xuanvinhsc68_work xuanvinhsc68_work 4096 Sep 11 10:09 ..
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work 1323 Jun 28 05:36 email.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  810 Jun 28 05:36 googleSheet.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work 1386 Jun 28 05:36 index.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  928 Jun 28 05:36 telegram.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  447 Jun 28 05:36 webhook.js
+-rwx------ 1 xuanvinhsc68_work xuanvinhsc68_work  956 Jun 28 05:36 zalo.js
+----- FILE lib/alerts/email.js (25 dòng) -----
+     1	import { CFG } from '../config.js';
+     2	export const id = 'email';
+     3	export const enabled = () => !!(CFG.RESEND_API_KEY && CFG.EMAIL_TO);
+     4	/* Gửi email qua Resend HTTP API (không cần SMTP). Đăng ký free tại resend.com */
+     5	export async function send(lead) {
+     6	  const html =
+     7	`<div style="font-family:Arial,sans-serif">
+     8	  <h2 style="color:#ef4444">🔥 Lead ${lead.score}/100 — ${lead.industry || ''}</h2>
+     9	  <p><b>Nhu cầu:</b> ${lead.need || lead.intent || '-'}</p>
+    10	  <p><b>Nguồn:</b> ${lead.source}</p>
+    11	  <p><b>Dịch vụ gợi ý:</b> ${lead.service || '-'}</p>
+    12	  <p><b>Nội dung bài:</b><br>${(lead.text || '').replace(/</g, '&lt;')}</p>
+    13	  ${lead.post_url ? `<p><a href="${lead.post_url}">Mở bài viết</a></p>` : ''}
+    14	  ${lead.reply ? `<p style="background:#eef;padding:10px;border-radius:8px"><b>Gợi ý phản hồi:</b> ${lead.reply}</p>` : ''}
+    15	</div>`;
+    16	  const r = await fetch('<che>', {
+    17	    method: 'POST',
+    18	    headers: { Authorization: `Bearer ${CFG.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    19	    body: JSON.stringify({
+    20	      from: CFG.EMAIL_FROM, to: CFG.EMAIL_TO.split(',').map(s => s.trim()),
+    21	      subject: `[SmartLead] Lead ${lead.score}/100 — ${lead.industry || ''}`, html
+    22	    })
+    23	  });
+    24	  if (!r.ok) throw new Error(`email ${r.status}: ${await r.text()}`);
+    25	}
+----- FILE lib/alerts/googleSheet.js (18 dòng) -----
+     1	import { CFG } from '../config.js';
+     2	export const id = 'sheet';
+     3	export const enabled = () => !!CFG.SHEET_WEBHOOK_URL;
+     4	/* Ghi 1 dòng vào Google Sheet qua Apps Script Web App (không cần OAuth).
+     5	   Tạo Web App: Extensions → Apps Script → doPost(e){ append e.postData }.
+     6	   Hướng dẫn chi tiết trong README. */
+     7	export async function send(lead) {
+     8	  const row = {
+     9	    time: new Date().toISOString(),
+    10	    score: lead.score, industry: lead.industry, need: lead.need || lead.intent,
+    11	    source: lead.source, service: lead.service, author: lead.name,
+    12	    post_url: lead.post_url, text: lead.text
+    13	  };
+    14	  const r = await fetch(CFG.SHEET_WEBHOOK_URL, {
+    15	    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row)
+    16	  });
+    17	  if (!r.ok) throw new Error(`sheet ${r.status}`);
+    18	}
+----- FILE lib/alerts/index.js (29 dòng) -----
+     1	/* Điều phối cảnh báo tới mọi kênh đang bật. Lỗi 1 kênh không chặn kênh khác. */
+     2	import { log } from '../logger.js';
+     3	import * as telegram from './telegram.js';
+     4	import * as email from './email.js';
+     5	import * as webhook from './webhook.js';
+     6	import * as sheet from './googleSheet.js';
+     7	import * as zalo from './zalo.js';
+     8	
+     9	const CHANNELS = [telegram, email, webhook, sheet, zalo];
+    10	
+    11	/** Gửi cảnh báo cho 1 lead. Trả về danh sách kênh đã gửi.
+    12	 *  enabledChannels: object {telegram:true,...} từ config/app.channels.
+    13	 *  Kênh chỉ gửi khi (a) có token cấu hình (ch.enabled()) VÀ (b) dashboard không tắt nó. */
+    14	export async function dispatch(lead, enabledChannels) {
+    15	  const allowed = id => !enabledChannels || typeof enabledChannels[id] === 'undefined' || enabledChannels[id] !== false;
+    16	  const sent = [];
+    17	  await Promise.all(CHANNELS.map(async ch => {
+    18	    if (!ch.enabled() || !allowed(ch.id)) return;
+    19	    try { await ch.send(lead); sent.push(ch.id); }
+    20	    catch (e) { log.warn(`Kênh ${ch.id} lỗi:`, e.message); }
+    21	  }));
+    22	  if (sent.length) log.ok(`Đã cảnh báo lead ${lead.id} qua: ${sent.join(', ')}`);
+    23	  else log.info(`Lead ${lead.id}: chưa cấu hình kênh cảnh báo nào (chỉ lưu vào dashboard).`);
+    24	  return sent;
+    25	}
+    26	
+    27	export function channelStatus() {
+    28	  return CHANNELS.map(ch => ({ id: ch.id, enabled: ch.enabled() }));
+    29	}
+----- FILE lib/alerts/telegram.js (19 dòng) -----
+     1	import { CFG } from '../config.js';
+     2	export const id = 'telegram';
+     3	export const enabled = () => !!(CFG.TELEGRAM_BOT_TOKEN && CFG.TELEGRAM_CHAT_ID);
+     4	export async function send(lead) {
+     5	  const text =
+     6	`🔥 *LEAD ${lead.score >= CFG.HOT_THRESHOLD ? 'NÓNG' : 'MỚI'} – SMARTLEAD*
+     7	*Ngành:* ${lead.industry || '-'}
+     8	*Nhu cầu:* ${lead.need || lead.intent || '-'}
+     9	*Nguồn:* ${lead.source}
+    10	*Điểm:* ${lead.score}/100
+    11	*Dịch vụ gợi ý:* ${lead.service || '-'}
+    12	*Link:* ${lead.post_url || '-'}
+    13	${lead.reply ? '\n*Gợi ý phản hồi:* ' + lead.reply : ''}`;
+    14	  const r = await fetch(`https://api.telegram.org/bot${CFG.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    15	    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    16	    body: JSON.stringify({ chat_id: CFG.TELEGRAM_CHAT_ID, text, parse_mode: 'Markdown', disable_web_page_preview: true })
+    17	  });
+    18	  if (!r.ok) throw new Error(`telegram ${r.status}: ${await r.text()}`);
+    19	}
+----- FILE lib/alerts/webhook.js (11 dòng) -----
+     1	import { CFG } from '../config.js';
+     2	export const id = 'webhook';
+     3	export const enabled = () => !!CFG.CUSTOM_WEBHOOK_URL;
+     4	/* POST JSON tới n8n / CRM / cầu nối tuỳ ý */
+     5	export async function send(lead) {
+     6	  const r = await fetch(CFG.CUSTOM_WEBHOOK_URL, {
+     7	    method: 'POST', headers: { 'Content-Type': 'application/json' },
+     8	    body: JSON.stringify({ event: 'hot_lead', ...lead })
+     9	  });
+    10	  if (!r.ok) throw new Error(`webhook ${r.status}`);
+    11	}
+----- FILE lib/alerts/zalo.js (14 dòng) -----
+     1	import { CFG } from '../config.js';
+     2	export const id = 'zalo';
+     3	export const enabled = () => !!(CFG.ZALO_OA_TOKEN && CFG.ZALO_USER_ID);
+     4	/* Gửi tin qua Zalo OA. LƯU Ý: Zalo chỉ cho gửi tới user đã quan tâm/tương tác với OA
+     5	   (giống chính sách Messenger). Dùng để báo cho nhân sự nội bộ đã follow OA, KHÔNG cold-message. */
+     6	export async function send(lead) {
+     7	  const message = `🔥 Lead ${lead.score}/100 — ${lead.industry || ''}\nNhu cầu: ${lead.need || lead.intent || '-'}\nNguồn: ${lead.source}\nDV gợi ý: ${lead.service || '-'}\n${lead.post_url || ''}`;
+     8	  const r = await fetch('<che>', {
+     9	    method: 'POST',
+    10	    headers: { access_token: CFG.ZALO_OA_TOKEN, 'Content-Type': 'application/json' },
+    11	    body: JSON.stringify({ recipient: { user_id: CFG.ZALO_USER_ID }, message: { text: message } })
+    12	  });
+    13	  if (!r.ok) throw new Error(`zalo ${r.status}: ${await r.text()}`);
+    14	}
+----- FILE scanstats.js (35 dòng) -----
+     1	/* scanstats.js — v119-78 (08/09/2026): counter "bài đã quét" THEO BRAND cho user brand (họ không đọc được nhật ký `scans`).
+     2	   Trigger onDocumentCreated scans/{id} → đọc bySource[] của lượt quét → nguồn → brand (sources.url → sources.brand)
+     3	   → FieldValue.increment lên daily_stats/{brand}__{YYYY-MM-DD giờ VN}: scanned (bài lấy về), scannedComments (bình luận), scanRuns (lượt có chạm brand).
+     4	   Khởi tạo Admin SDK LƯỜI trong handler (bài học LỆNH #10). Hàm thuần scanEvents() dùng chung cho trigger + backfill + harness. */
+     5	import { onDocumentCreated } from '<che>';
+     6	import { initializeApp, getApps } from 'firebase-admin/app';
+     7	import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+     8	
+     9	const REGION = 'asia-southeast1', OFF = 7 * 3600e3;
+    10	export const vnDay = ms => new Date((Number(ms) || Date.now()) + OFF).toISOString().slice(0, 10);
+    11	export const toMs = v => { if (!v) return 0; if (typeof v === 'number') return v; if (typeof v.toMillis === 'function') return v.toMillis(); if (v.seconds) return v.seconds * 1000; const d = new Date(v); return isNaN(d) ? 0 : d.getTime(); };
+    12	/* Chuẩn hoá URL nguồn để so khớp (bỏ scheme/www/query/dấu / cuối, thường hoá) */
+    13	export const normUrl = u => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/^m\.facebook\.com/, 'facebook.com').replace(/[?#].*$/, '').replace(/\/+$/, '');
+    14	export function brandMapOf(sourcesDocs) { const m = new Map(); (sourcesDocs || []).forEach(s => { const u = normUrl(s.url); const b = String(s.brand || '').trim(); if (u && b) m.set(u, b); }); return m; }
+    15	/* Sự kiện đếm của 1 lượt quét → [{brand, day, inc}]. Thuần (không I/O). posts = bài lấy về của nguồn trong lượt (khớp postsFetched cấp lượt);
+    16	   thiếu posts mà có bdPosts → dùng bdPosts. scanRuns +1 khi lượt có chạm brand (gọi BrightData ok hoặc có bài). */
+    17	export function scanEvents(scan, brandMap) {
+    18	  const at = toMs(scan && scan.at) || Date.now(); const day = vnDay(at);
+    19	  const bs = scan && scan.bySource; const rows = Array.isArray(bs) ? bs : (bs && typeof bs === 'object' ? Object.values(bs) : []);
+    20	  const agg = {};
+    21	  for (const r of rows) { if (!r || typeof r !== 'object') continue; const brand = brandMap.get(normUrl(r.url)); if (!brand) continue;
+    22	    const posts = Number(r.posts) || Number(r.bdPosts) || 0, cm = Number(r.bdComments) || 0;
+    23	    const o = agg[brand] || (agg[brand] = { scanned: 0, scannedComments: 0, touched: false });
+    24	    o.scanned += posts; o.scannedComments += cm; if (posts > 0 || r.bd === 'ok') o.touched = true; }
+    25	  return Object.keys(agg).map(b => ({ brand: b, day, inc: { scanned: agg[b].scanned, scannedComments: agg[b].scannedComments, scanRuns: agg[b].touched ? 1 : 0 } }))
+    26	    .filter(e => e.inc.scanned || e.inc.scannedComments || e.inc.scanRuns);
+    27	}
+    28	export const scanStatsOnRun = onDocumentCreated({ document: 'scans/{id}', region: REGION, memory: '256MiB', maxInstances: 5 }, async (ev) => {
+    29	  const scan = ev.data && ev.data.exists ? ev.data.data() : null; if (!scan) return;
+    30	  if (!getApps().length) initializeApp(); const db = getFirestore();
+    31	  const srcSnap = await db.collection('sources').get(); const brandMap = brandMapOf(srcSnap.docs.map(d => d.data()));
+    32	  const evs = scanEvents(scan, brandMap); if (!evs.length) return;
+    33	  await Promise.all(evs.map(e => { const patch = { brandCode: e.brand, day: e.day, scanAtMs: Date.now() }; Object.keys(e.inc).forEach(k => { if (e.inc[k]) patch[k] = FieldValue.increment(e.inc[k]); });
+    34	    return db.collection('daily_stats').doc(e.brand + '__' + e.day).set(patch, { merge: true }); }));
+    35	});
+----- FILE cfgpriv.js (13 dòng) -----
+     1	/* v119-42: tham số nội bộ (assistantKb, assistantLeadLimit, bdBudget, bdFx, openaiCredit) chuyển sang config/private
+     2	   (Rules: chỉ Super Admin). Đọc private TRƯỚC, rơi về config/app (giá trị cũ) nếu private chưa có. Cache 60s/instance. */
+     3	import { getFirestore } from 'firebase-admin/firestore';
+     4	let _c = null, _at = 0;
+     5	export async function cfgPrivate() {
+     6	  if (_c && Date.now() - _at < 60000) return _c;
+     7	  try { const s = await getFirestore().doc('config/private').get(); _c = s.exists ? (s.data() || {}) : {}; } catch (e) { _c = _c || {}; }
+     8	  _at = Date.now(); return _c;
+     9	}
+    10	export async function cfgVal(key, appSnap) {
+    11	  const p = await cfgPrivate(); if (p[key] !== undefined) return p[key];
+    12	  const a = (appSnap && appSnap.exists) ? (appSnap.data() || {}) : {}; return a[key];
+    13	}
+----- FILE lib/needsynth.js (68 dòng) -----
+     1	// lib/needsynth.js — SmartLead (Session 17) — BƯỚC B: AI tổng hợp "Hồ sơ nhu cầu" cho lead multi-touch.
+     2	// Nhận 1 lead đã gộp (>=2 nhóm, có mảng touches) -> 1 lần gọi LLM -> 5 trường insight tiếng Việt.
+     3	// Dùng LẠI đúng plumbing của scorer.js (CFG.LLM_BASE_URL / LLM_API_KEY / LLM_MODEL, response_format json_object).
+     4	// Fail-safe: không key / thiếu dữ liệu / lỗi -> trả null (caller giữ insight_stale, KHÔNG chặn gì).
+     5	// ESM, đặt trong lib/ cạnh scorer.js.
+     6	import { CFG } from './config.js';
+     7	import { log } from './logger.js';
+     8	import { brandAiCtx } from './scorer.js'; /* v-brandai */
+     9	
+    10	const SYNTH_SYS = `Bạn là trợ lý sales cho một agency marketing tại Việt Nam.
+    11	Bạn nhận NHIỀU lần "chạm" của CÙNG MỘT khách hàng tiềm năng, xuất hiện ở nhiều nhóm Facebook khác nhau trong thời gian ngắn.
+    12	Hãy tổng hợp thành 1 "bức tranh nhu cầu" để sales hiểu nhanh và chốt. Trả về DUY NHẤT một JSON:
+    13	{"need":string,"readiness":string,"budget":string,"note":string,"approach":string}
+    14	- need: 1 câu tóm tắt NHU CẦU TỔNG HỢP của khách (họ đang thực sự cần gì).
+    15	- readiness: mức độ SẴN SÀNG MUA và vì sao (bám vào việc họ hỏi ở nhiều nhóm / tần suất / lời lẽ gấp gáp).
+    16	- budget: tín hiệu NGÂN SÁCH hoặc quy mô nếu có; không rõ thì ghi "Chưa rõ".
+    17	- note: ĐIỂM CẦN LƯU Ý cho sales (đang so sánh nhiều bên? cần gấp? đã hỏi ai chưa?).
+    18	- approach: 1 GỢI Ý TIẾP CẬN cụ thể, ngắn gọn, làm được ngay.
+    19	Tất cả bằng tiếng Việt, mỗi field 1-2 câu ngắn, KHÔNG lặp lại y hệt nội dung giữa các field.`;
+    20	
+    21	// Ghép các lần chạm thành prompt cho LLM.
+    22	function buildSynthPrompt(lead){
+    23	  const T = Array.isArray(lead.touches) ? lead.touches : [];
+    24	  const lines = T.map((t, i) =>
+    25	    `(${i + 1}) [${t.source || 'nhóm ?'}${t.kind ? (' · ' + t.kind) : ''}${t.time ? (' · ' + t.time) : ''}] "${String(t.snippet || '').slice(0, 240)}"`
+    26	  ).join('\n');
+    27	  const head = `Khách${lead.name ? (' "' + lead.name + '"') : ''} đã xuất hiện ở ${lead.group_count || T.length} nhóm${lead.window_label ? (' trong ' + lead.window_label) : ''}.`;
+    28	  return `${head}\nCác lần chạm (mới nhất ở cuối):\n${lines}`;
+    29	}
+    30	
+    31	// Tổng hợp hồ sơ nhu cầu. Trả object insight {need,readiness,budget,note,approach,_usage} hoặc null nếu không làm được.
+    32	export async function synthNeeds(lead, brandAi){ /* v-brandai */
+    33	  if (!CFG.LLM_API_KEY) return null;                              // không có key -> để nguyên, BƯỚC B bỏ qua
+    34	  const T = Array.isArray(lead && lead.touches) ? lead.touches : [];
+    35	  if (T.length < 2) return null;                                  // chưa đủ dữ kiện để "tổng hợp"
+    36	  try {
+    37	    const r = await fetch(`${CFG.LLM_BASE_URL}/chat/completions`, {
+    38	      method: 'POST',
+    39	      headers: { Authorization: `Bearer ${CFG.LLM_API_KEY}`, 'Content-Type': 'application/json' },
+    40	      body: JSON.stringify({
+    41	        model: CFG.LLM_SYNTH_MODEL || CFG.LLM_MODEL || CFG.LLM_PREFILTER_MODEL,
+    42	        response_format: { type: 'json_object' },
+    43	        messages: [
+    44	          { role: 'system', content: SYNTH_SYS + brandAiCtx(brandAi) },
+    45	          { role: 'user', content: buildSynthPrompt(lead) }
+    46	        ]
+    47	      })
+    48	    });
+    49	    if (!r.ok) throw new Error(`synth ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    50	    const j = await r.json();
+    51	    const obj = JSON.parse(j.choices[0].message.content);
+    52	    const pick = v => (typeof v === 'string' ? v.trim().slice(0, 400) : '');
+    53	    const insight = {
+    54	      need: pick(obj.need),
+    55	      readiness: pick(obj.readiness),
+    56	      budget: pick(obj.budget),
+    57	      note: pick(obj.note),
+    58	      approach: pick(obj.approach)
+    59	    };
+    60	    if (!insight.need) return null;                               // model không cho "need" -> coi như thất bại
+    61	    const u = j.usage || {};
+    62	    insight._usage = { prompt: Number(u.prompt_tokens) || 0, completion: Number(u.completion_tokens) || 0, total: Number(u.total_tokens) || 0 };
+    63	    return insight;
+    64	  } catch (e) {
+    65	    log.warn('[needsynth] loi:', e && e.message);
+    66	    return null;
+    67	  }
+    68	}
+-- index.js onLeadCreated + synthNeedsOnUpdate:
+--- export const onLeadCreated từ dòng 877 ---
+   877	export const onLeadCreated = onDocumentCreated('leads/{id}', async (event) => {
+   878	  const lead = event.data?.data(); if (!lead) return;
+   879	  if ((lead.score || 0) < CFG.HOT_THRESHOLD) return;
+   880	  const config = await loadConfig();
+   881	  await dispatch({ id: event.params.id, ...lead }, config.channels);
+   882	});
+   883	
+   884	/* 3) Quét thủ công từ dashboard (nút "Quét ngay") */
+   885	export const manualScan = onRequest({ cors: true }, async (req, res) => {
+   886	  const b = (req.body && typeof req.body === 'object') ? req.body : {};
+   887	  // Phân quyền: chấp nhận API_TOKEN (server-to-server) HOẶC Firebase ID token có vai trò được phép chạy quét.
+   888	  const tokenOK = CFG.API_TOKEN && req.get('X-API-Token') === CFG.API_TOKEN;
+   889	  if (!tokenOK) {
+   890	    const caller = await verifyCaller(req);
+   891	    if (!caller || caller.role !== 'superadmin') {
+   892	      res.status(403).json({ error: 'forbidden', message: 'Tài khoản không có quyền chạy quét.' });
+   893	      return;
+   894	    }
+   895	  }
+   896	  const jobId = (typeof b.jobId === 'string' && b.jobId) ? b.jobId : null; // theo dõi tiến độ realtime
+   897	  // QUÉT QUÁ KHỨ: { mode:'backfill', range:'24h|3d|7d|30d|90d|custom', start_date?, end_date?, sourceUrl?, jobId? }
+   898	  if (b.mode === 'backfill') {
+   899	    const { start, end } = computeRange(b.range, b.start_date, b.end_date);
+   900	    const opts = { startDate: start, endDate: end, rangeLabel: b.range || 'custom',
+   901	                   sourceUrl: b.sourceUrl || null, numPosts: b.numPosts || undefined, jobId, force: !!b.force };
+   902	    const sum = await scanAll('backfill', opts);
+   903	    res.json({ ok: true, mode: 'backfill', range: { label: opts.rangeLabel, start, end }, summary: sum });
+   904	    return;
+   905	  }
+   906	  const sum = await scanAll('manual', { jobId, force: !!b.force });
+   907	  res.json({ ok: true, summary: sum });
+--- export const synthNeedsOnUpdate từ dòng 112 ---
+   112	export const synthNeedsOnUpdate = onDocumentUpdated('leads/{id}', async (event) => {
+   113	  /* [leadNo v1 22/08/2026] Cap SO THU TU CO DINH theo brand — gan 1 lan khi lead co brand, khong bao gio tinh lai */
+   114	  try {
+   115	    const _a = event.data && event.data.after ? event.data.after.data() : null;
+   116	    if (_a && _a.brand && !_a.leadNo) {
+   117	      const _ctr = db.collection('lead_counters').doc(String(_a.brand).replace(/[^\w-]/g, '_').slice(0, 100));
+   118	      const _lref = event.data.after.ref;
+   119	      await db.runTransaction(async (tx) => {
+   120	        const _cs = await tx.get(_ctr);
+   121	        const _ls = await tx.get(_lref);
+   122	        const _cur = _ls.exists ? _ls.data() : null;
+   123	        if (!_cur || _cur.leadNo || _cur.brand !== _a.brand) return;
+   124	        const _next = (Number(_cs.exists ? (_cs.data() || {}).n : 0) || 0) + 1;
+   125	        tx.set(_ctr, { n: _next, brand: _a.brand, updated_at: FieldValue.serverTimestamp() }, { merge: true });
+   126	        tx.update(_lref, { leadNo: _next, leadNo_at: FieldValue.serverTimestamp() });
+   127	      });
+   128	    }
+   129	  } catch (e) { console.error('[leadNo] cap so loi:', e && e.message); }
+   130	
+   131	  try {
+   132	    const after = event.data && event.data.after ? event.data.after.data() : null;
+   133	    if (!after) return;
+   134	    if (after.insight_stale !== true) return;
+   135	    if ((after.group_count || 0) < 2) return;
+   136	    const ref = event.data.after.ref;
+   137	    if ((after.synth_count || 0) >= 6) { await ref.update({ insight_stale: false }); return; }
+   138	    const insight = await synthNeeds(after, await __brandAiOf({ brand: after && after.brand })); /* v-brandai */
+   139	    if (!insight) return;
+   140	    await ref.update({ insight, insight_stale: false, synth_count: (after.synth_count || 0) + 1, insight_at_ms: Date.now() });
+   141	  } catch (e) { console.error('[needsynth] trigger loi:', e && e.message); }
+   142	});
+--- export const cleanupScannedPosts từ dòng 912 ---
+   912	export const cleanupScannedPosts = onSchedule(
+   913	  { schedule: 'every 24 hours', timeZone: 'Asia/Ho_Chi_Minh' },
+   914	  async () => {
+   915	    const now = new Date();
+   916	    let total = 0;
+   917	    for (let i = 0; i < 50; i++) { // tối đa 50 lô × 400 = 20k bài mỗi lần chạy
+   918	      let snap;
+   919	      try { snap = await db.collection('scanned_posts').where('expireAt', '<=', now).limit(400).get(); }
+   920	      catch (e) { console.error('cleanupScannedPosts query lỗi:', e.message); break; }
+   921	      if (snap.empty) break;
+   922	      const wb = db.batch();
+   923	      snap.forEach(d => wb.delete(d.ref));
+   924	      try { await wb.commit(); } catch (e) { console.error('cleanupScannedPosts commit lỗi:', e.message); break; }
+   925	      total += snap.size;
+   926	      if (snap.size < 400) break;
+   927	    }
+   928	    console.log(`cleanupScannedPosts: đã xoá ${total} bài hết hạn`);
+   929	  }
+   930	);
+   931	
+   932	/* 5) Số dư & chi tiêu Bright Data (CHỈ Super Admin) — cho dashboard giám sát ngân sách realtime.
+   933	   Gọi API Bright Data bằng token phía server (không lộ token ra frontend). */
+   934	export const brightdataUsage = onRequest({ cors: true }, async (req, res) => {
+   935	  const caller = await verifyCaller(req);
+   936	  if (!caller || caller.role !== 'superadmin') {
+   937	    res.status(403).json({ error: 'forbidden', message: 'Chỉ Super Admin xem được số dư Bright Data.' });
+   938	    return;
+   939	  }
+   940	  const TOK = CFG.BRIGHTDATA_TOKEN;
+   941	  if (!TOK) { res.status(400).json({ error: 'no_token', message: 'Chưa cấu hình BRIGHTDATA_TOKEN.' }); return; }
+   942	  const H = { Authorization: 'Bearer ' + TOK, 'Content-Type': 'application/json' };
+-- Gateway ZBS (~/smartlead-zalo-fn): file có justTagged/brand_tagged/brand_pending/zalo_notified:
+/home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js
+----- FILE /home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js (348 dòng) — 60 dòng quanh mốc đầu -----
+   265	  { secrets: [ZALO_APP_ID, ZALO_SECRET_KEY] },
+   266	  async (request) => {
+   267	    const cfg = await getConfig();
+   268	    if (!isAdmin(request.auth, cfg)) {
+   269	      throw new HttpsError('permission-denied', 'not allowed');
+   270	    }
+   271	    const { phone, template_id, template_data, message_type } = request.data || {};
+   272	    return sendZns({
+   273	      phone, templateId: template_id, templateData: template_data,
+   274	      messageType: message_type, appId: ZALO_APP_ID.value(), secretKey: ZALO_SECRET_KEY.value(),
+   275	    });
+   276	  }
+   277	);
+   278	
+   279	/* MAIN: fire when a lead gets its brand stamped (by tagLeadBrand) and
+   280	 * meets the score threshold. Notifies brand sales staff and/or the lead. */
+   281	exports.notifyBrandZalo = onDocumentUpdated(
+   282	  { document: 'leads/{leadId}', secrets: [ZALO_APP_ID, ZALO_SECRET_KEY] },
+   283	  async (event) => {
+   284	    const before = event.data.before.data() || {};
+   285	    const after = event.data.after.data() || {};
+   286	    const leadId = event.params.leadId;
+   287	
+   288	    const brand = after.brand && String(after.brand).trim();
+   289	    if (!brand) return;                       // no brand yet
+   290	    if (after.zalo_notified) return;          // already notified (dedupe)
+   291	
+   292	    const cfg = await getConfig();
+   293	    if (!cfg.enabled) return;
+   294	
+   295	    // only act on the brand-just-set transition (or first time threshold met)
+   296	    const brandBefore = before.brand && String(before.brand).trim();
+   297	    const justTagged = !brandBefore && !!brand;
+   298	    if (!justTagged && before.score === after.score) return;
+   299	
+   300	    // score gate
+   301	    const scoreField = cfg.score_field || 'score';
+   302	    const threshold = (cfg.score_threshold != null) ? Number(cfg.score_threshold) : 0;
+   303	    const score = Number(after[scoreField]);
+   304	    if (!isNaN(score) && score < threshold) return;
+   305	
+   306	    const appId = ZALO_APP_ID.value();
+   307	    const secretKey = ZALO_SECRET_KEY.value();
+   308	    const messageType = cfg.message_type || 'promotion';
+   309	    const results = [];
+   310	
+   311	    // Notify ONLY the sales staff of this brand (internal alert — never the lead).
+   312	    // Recipients are managed by the superadmin in the web app (collection
+   313	    // `brand_sales`), read dynamically here — nothing is hardcoded in config.
+   314	    if (cfg.notify_sales !== false && cfg.template_id_sales) {
+   315	      const recipients = await getBrandSales(brand);
+   316	      const baseTdata = buildTemplateData(cfg.sales_param_map || {}, after);
+   317	
+   318	      // auto-stamp the lead-detection moment into the template (no manual input):
+   319	      // the time the lead was detected / brand-tagged IS the notification time.
+   320	      const timeParam = cfg.sales_time_param || 'created_time';
+   321	      const detectedAt = after.detected_at || after.brand_tagged_at || after.detectedAt;
+   322	      baseTdata[timeParam] = formatVNTime(detectedAt);
+   323	
+   324	      // optional per-recipient greeting personalisation: cfg.sales_name_param
+   325	      // names the template param holding the salutation (e.g. "customer_name").
+/home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js:281:exports.notifyBrandZalo = onDocumentUpdated(

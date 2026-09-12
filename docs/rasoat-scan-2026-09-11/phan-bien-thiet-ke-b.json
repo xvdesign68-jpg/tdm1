@@ -1,0 +1,468 @@
+[
+ {
+  "lens": "engine",
+  "r": {
+   "summary": "Lens ENGINE & DỮ LIỆU: thiết kế B đúng ở phần \"BrightData 1 lần/group + fan-out sau gặt\" và tenancy FE, nhưng còn 4 lỗ Cao do đụng các nhánh code khoá theo TÊN/URL/post_id mà thiết kế chưa vô hiệu: (1) v-fixgrp `srcByGroup[gid]` + birthstamp `brandBySource[lead.source]` sẽ ĐỔI lead của brand X sang brand Y (lộ brand chéo, sai brand); (2) `score_retry/{R_<post_id>}` và `seen` legacy không có map `brands` → mất bài của 1 brand hoặc chấm đôi/lead trùng cho brand chủ khi backfill; (3) scanstats #39 nối brand theo `normUrl(url)` → `daily_stats.scanned` của group dùng chung dồn hết về 1 brand (refute câu \"row 1 dòng/source doc → daily_stats.scanned theo brand đúng\"); (4) multitouch được gọi TRƯỚC khi `brand` có trên object lead → bộ lọc `where brand==` vô hiệu. Ngoài ra: bd_month.src key theo URL đè nhau (tiền BrightData rơi khỏi sổ), đường \"Quét thử nguồn này\" cho brand vào sau dùng chung `pending_snapshots P_<url>`/`backfill_done` với lịch nên không đảm bảo bù bài, khoá automation không có đường nhả, lượt có thể chồng khi Scheduler 1′ + gặt-trong-lượt (Cloud Run concurrency 80, Suy luận). Không có chỗ nào nhân đôi tiền BrightData; AI nhân theo brand đúng như nêu nhưng thêm nhánh chấm đôi legacy nếu không migrate `seen`.",
+   "holes": [
+    {
+     "id": "H1",
+     "sev": "Cao",
+     "title": "§3 commitLeadNow: v-fixgrp `srcByGroup[gid]` + birthstamp `brandBySource[lead.source]` đổi lead brand X thành brand Y",
+     "why": "Thiết kế §3 chỉ nói \"brand vào set\" nhưng KHÔNG vô hiệu 2 nhánh khoá theo tên còn nằm ngay trong commitLeadNow. `srcByGroup` là object 1 gid → 1 tên (index.js:30 `srcByGroup[m[1]] = s.name` — nguồn ghi sau đè); với 2 nguồn cùng gid, lead của brand X có `lead.source` = tên nguồn X ≠ `srcByGroup[gid]` (= tên nguồn Y) → :362–365 ghi đè `lead.source` = tên Y (kể cả touches). Sau đó :395 `ref.update({ brand: brandBySource[lead.source] })` = brand Y → lead sinh từ Hồ sơ AI của X (điểm/reply của X) mang brand Y; brand X mất lead, brand Y nhận lead chấm bằng hồ sơ brand khác = lộ chéo + sai dữ liệu. Nếu `brand` đã đặt ở `ref.set` thì update :395 vẫn đè lại. Cùng lúc `brandBySource[s.name]` (:29) đụng khi 2 brand đặt trùng tên nguồn — §2.1 cho phép trùng tên khác brand.",
+     "evidence": "index.js:30 `srcByGroup[m[1]] = s.name`; :362–365 `if (_gm && srcByGroup[_gm[1]] && lead.source !== srcByGroup[_gm[1]]) { … lead.source = srcByGroup[_gm[1]] }`; :395 `ref.update({ brand: _b … })` với `_b = brandBySource[lead.source]`.",
+     "fix": "Bỏ hẳn v-fixgrp khi lead đã mang `source_id`/`gid`+`brand` từ ứng viên fan-out (chỉ giữ cho ứng viên thiếu source_id); birthstamp :395 lấy `lead.brand` (đã có trong object) chứ không tra `brandBySource[lead.source]`; `brandBySource`/`srcByGroup` chuyển khoá sang `source_id` (doc id) và chỉ dùng cho fallback. Thêm harness: 2 nguồn cùng gid, tên khác nhau → 2 lead đúng brand."
+    },
+    {
+     "id": "H2",
+     "sev": "Cao",
+     "title": "§3 score_retry #46 khoá `R_<post_id>` (không có brand) → fan-out 2 brand đụng doc, 1 brand mất bài; sweeper/nạp lại chỉ trả 1 brand",
+     "why": "Thiết kế §3 chỉ sửa `sources.find(s => s.name === l.source)` trong sweeper nhưng không đụng khoá score_retry. Khi LLM hỏng đúng lúc 2 ứng viên (X, Y) cùng post_id → `deferPost46` ghi `score_retry/R_<post_id>` với `src` ĐƠN (name/url/brand) → bản ghi sau đè bản trước; lượt sau nạp lại 1 doc → chỉ chấm cho brand ghi sau; brand kia đã ghi `seen.brands[X]='pending'` (hoặc decision `ai_wait`) và không bao giờ được chấm → mất lead im lặng. Nạp lại cũng dùng `sources.find(s => s.url === r.src.url)` → với 2 nguồn cùng URL luôn trả nguồn đầu → có thể chấm bằng Hồ sơ AI sai brand.",
+     "evidence": "docs/lenh-2026-09-11-46-patch.cjs:189 `const ref = db.collection('score_retry').doc('R_' + key)` với `key` = post_id; :190 `src: { name, url, industry, brand }` đơn; :199 `sources.find(s => s.url === (r.src && r.src.url))`.",
+     "fix": "Khoá `R_<post_id>__<brand>` (hoặc `__<source_id>`), nạp lại tìm nguồn theo `r.src.id`/(gid+brand); `deferredDoc`/`ai_wait` ghi theo brand; harness LLM hỏng trên group 2 brand → 2 doc score_retry, 2 lần chấm lại."
+    },
+    {
+     "id": "H3",
+     "sev": "Cao",
+     "title": "§3 Pha 1 / §2.3: `daily_stats.scanned` (scanstats #39) nối brand theo `normUrl(url)` → 2 nguồn cùng URL dồn hết về 1 brand",
+     "why": "Thiết kế nói giữ `row` 1 dòng/source doc \"để daily_stats.scanned theo brand đúng\". Nhưng trigger `scanStatsOnRun` dựng `brandMapOf` = Map `normUrl(s.url) → brand` (Map.set → nguồn ghi sau thắng), rồi mỗi row `bySource` tra brand theo `normUrl(r.url)`. Với row_X và row_Y cùng URL → CẢ 2 row cộng cho brand ghi sau: brand đó nhận `scanned` gấp đôi + `scanRuns`, brand kia = 0 → ô KPI \"Bài đã quét\" của user brand (v119-78) sai cho cả 2 brand. Không có dòng nào trong thiết kế sửa scanstats.",
+     "evidence": "docs/lenh-2026-09-08-39-scanstats.js:14 `brandMapOf … m.set(u, b)` khoá `normUrl(s.url)`; :21 `const brand = brandMap.get(normUrl(r.url))`.",
+     "fix": "`bySource` row ghi thêm `brand` + `source_id`; scanstats ưu tiên `r.brand`/`r.source_id`, fallback URL chỉ khi URL không dùng chung; harness scanEvents với 2 row cùng URL khác brand → 2 bản ghi riêng."
+    },
+    {
+     "id": "H4",
+     "sev": "Cao",
+     "title": "§2.3: doc `seen` cũ chỉ có `{at}` (không map `brands`) → mọi lần bài cũ quay lại (backfill \"Quét thử nguồn này\", sweep khi >200 recentIds, force) brand CHỦ bị chấm lại → lead trùng + AI ×2",
+     "why": "Quy tắc §2.3 \"đã xử lý cho brand X = brands[X] khác pending\" áp cho ~40k doc `seen` legacy → `brands[X]` = undefined = \"chưa xử lý\". Chính đường bù mà thiết kế khuyên cho brand vào sau (backfill 7 ngày, không probe cắt vì `liveProbe=false`) gặt qua nguồn chủ rồi fan-out cho CẢ brand X → X được tầng 1 + tầng 2 lại + `commitLeadNow` id ngẫu nhiên → lead thứ 2 cho X trên cùng bài (sales gọi 2 lần, KPI/daily_stats.new cộng thêm), tiền AI của X nhân đôi trên 7 ngày bài. Sweep 20 bài với `recentIds` kẹp 200 (N1-9) cũng trả bài cũ ngoài 200 id → cùng hệ quả.",
+     "evidence": "index.js:320 `wb.set(seenDoc(x.post.post_id), { at: … })` — doc hiện chỉ có `at`; :317 `if (wasSeen && !force) { skippedSeen++; return; }` là cổng duy nhất; :389 `ref = db.collection('leads').doc()` (id ngẫu nhiên, không chống trùng); backfill :204 `liveProbe = !isBackfill && !force` → không cắt theo seen.",
+     "fix": "Quy ước migrate: doc `seen` không có `brands` → coi mọi brand đang có nguồn tại thời điểm doc.at (thực tế = brand chủ) là đã xử lý (`brands[primary]='legacy'`), chỉ brand có `sharedAt > seen.at` mới được chấm; hoặc backfill 1 lần đóng dấu. Kèm PB-2 lead id tất định `<post_id>__<brand>` để chặn lead trùng dù cổng seen hỏng."
+    },
+    {
+     "id": "H5",
+     "sev": "Vừa",
+     "title": "§2.5 multitouch: `tryMergeTouch` được gọi TRƯỚC khi `brand` có trên object lead → \"so khớp trong cùng brand\" vô hiệu hoặc ném lỗi tắt multitouch",
+     "why": "commitLeadNow gọi `tryMergeTouch(db, lead, …)` ở :371, còn brand chỉ được gắn ở :395 qua `ref.update` sau khi set. Thiết kế nói \"brand ghi ngay trong ref.set\" nhưng không nói đặt `lead.brand` TRƯỚC :371. Nếu multitouch thêm `where('brand','==',lead.brand)` với `lead.brand` undefined → Admin SDK ném lỗi → catch :372 \"tạo lead thường\" → multitouch tắt im lặng cho mọi lead (mất gộp 48h). Nếu không thêm filter (chờ dump) → touch của Y bị gộp vào lead của X (`return true` :371) → brand Y không có lead = mất lead. Chưa có `lib/multitouch.js` để đặt mốc — Suy luận về hình dạng query.",
+     "evidence": "index.js:371 `if (await tryMergeTouch(db, lead, { windowH: 48, hotThreshold: _mtHot })) return true;` trước :395 `ref.update({ brand: _b … })`; object lead ở :439–454 không có field `brand`.",
+     "fix": "Gắn `brand`, `source_id`, `gid` vào object lead ngay ở Pha 3b (:439) trước commitLeadNow; dump `lib/multitouch.js` (LỆNH R1) để chốt điểm chèn `where brand==`; harness 2 brand cùng author_url trong 48h → 2 lead, mỗi brand 1 touch."
+    },
+    {
+     "id": "H6",
+     "sev": "Vừa",
+     "title": "§3 bd_month.src: khoá `s_<url>` → row_X và row_Y (cùng URL) đè nhau trong `srcMap` → record BrightData của group rơi khỏi sổ tháng",
+     "why": "Thiết kế cho `bdPosts` chỉ vào row primary, còn row brand khác `posts>0, bdPosts=0`. `srcMap[k] = {...}` với `k = 's_' + url` là object JS: row ghi SAU thắng → nếu row non-primary đứng sau (thứ tự mapPool/push), increment `bdPosts` của primary bị thay bằng `inc(0)` → chi phí BrightData của group đó không được cộng vào `bd_month` (ROI/chi phí theo nguồn thiếu tiền thật), `sharedWith` cũng không có chỗ ghi.",
+     "evidence": "index.js:521 `const k = 's_' + String(r.url || r.name || '?')…`; :522 `srcMap[k] = { … bdPosts: inc(r.bdPosts || 0) … }` (gán đè, không cộng dồn).",
+     "fix": "Khoá `s_<source_id>` (doc id nguồn) hoặc gộp row cùng URL trước khi dựng srcMap (cộng posts/leads, bdPosts lấy primary, thêm `sharedWith`); FE ROI đọc theo key mới với fallback key cũ."
+    },
+    {
+     "id": "H7",
+     "sev": "Vừa",
+     "title": "§2.3 đường bù cho brand vào sau (\"Quét thử nguồn này\") dùng chung `pending_snapshots/P_<url>` + `backfill_done/bf_<url|start|end>` với lịch và với brand chủ → thường không bù được",
+     "why": "fetchPosts (backfill, không sow) đọc `pendRef` P_<url> trước bất kể backfill: nếu lịch vừa gieo probe 5 bài cho group đó (mỗi ~10′), \"Quét thử 7 ngày\" của brand Y sẽ GẶT snapshot probe (5 bài, không theo khoảng ngày), xoá pending, rồi ghi `backfill_done` cho khoảng đó → Y nhận 5 bài, bấm lại cùng ngày bị :170 \"đã backfill khoảng này — bỏ qua\" (N3-9 giờ chặn cả brand khác vì key theo URL). Chưa chín thì trả [] (N3-2). Thiết kế nêu backfill như cách bù chính nhưng không sửa khoá pending/backfill_done theo (url, trigger/brand).",
+     "evidence": "scraper.js:155 `pendRef = … doc('P_' + url)`; :160–166 `if (pd.exists) { … if (st === 'ready') { snap = p.snapshot_id … } else … return mark([], …) }` không kiểm `p.backfill`; index.js:170 `backfill_done` key `bfKey(src.url)`; :223 ghi backfill_done ngay cả khi posts lấy từ snapshot probe.",
+     "fix": "Backfill dùng pending riêng `P_bf_<gid>_<range>`, không đụng pending theo lịch; `backfill_done` khoá theo `(gid, range, brand)` và chỉ ghi khi snapshot backfill thật đã gặt; hoặc cho brand vào sau 1 nút \"Bù bài 7 ngày\" chạy trigger `start_date` riêng, fan-out chỉ cho brand đó."
+    },
+    {
+     "id": "H8",
+     "sev": "Vừa",
+     "title": "§2.7 `outreach_locks` không có đường NHẢ khi thread bị đóng (expired 72h / human / cancelled / skipped_role) → brand kia bị chặn 14 ngày dù chưa ai chạm bài",
+     "why": "Lock tạo trong transaction ở `apEnqueueFunnel` (trước khi worker làm gì) với `expireAt +14 ngày`. Engine hiện đóng thread mà không chạm bài ở nhiều nhánh: sweep44 `expired` (nick chết >72h), `orphanAt`, R-1 `stopMachine`/preflight `onHuman` → `cancelled`, `skipLeadRole`. Thiết kế không ghi nhả lock ở các nhánh này → bài/người bị \"khoá chết\" cho brand Y suốt 14 ngày trong khi X chưa react/comment/inbox; ngược lại, thread `human` của X (sales X gọi tay) vẫn giữ lock → Y không được máy chăm dù thiết kế nói \"brand còn lại chăm tay\" chỉ khi máy X đã chạm.",
+     "evidence": "outreach.js:211 `set({ active: false, step: 'expired', taskStatus: 'cancelled' … })`; :229 `orphanAt`; thiết kế §2.7 chỉ nói tạo lock + kiểm lock, không có bước xoá.",
+     "fix": "Lock ghi `state: reserved|touched`; worker chuyển `touched` sau bước đầu thành công; mọi nhánh đóng thread khi `state=reserved` → xoá lock (sweep44/onHuman/skip); expireAt lock `reserved` ngắn (≤ lease thread 30′+)."
+    },
+    {
+     "id": "H9",
+     "sev": "Vừa",
+     "title": "§7.2.3/§7.3 \"không chồng vì maxInstances 1\" — Cloud Run concurrency 80 + Scheduler 1′ + gặt-trong-lượt ≤90 s → 2 lượt cùng gặt 1 snapshot / cùng ghi `seen` → lead đôi (Suy luận)",
+     "why": "`maxInstances:1` giới hạn số instance, không giới hạn request đồng thời trên 1 instance (#19 (b): `containerConcurrency 80`, không có khoá lượt trong index.js — #20 (b)). Cloud Scheduler không \"bỏ tick\" khi lượt trước chưa xong. Với tick 1′ và lượt kéo tới 90 s (gặt trong lượt) → tick kế chạy song song: cả 2 đọc `pendRef` ready → cùng `bdFetch` cùng snapshot (pendRef.delete không phải transaction) → cùng fan-out → Pha 2 `getAll(seen)` cả 2 thấy chưa seen → 2 ứng viên/brand → 2 lead cùng bài cùng brand. Hiện tượng \"Scheduler chờ lượt xong\" quan sát ở #19 là retry sau 504, không phải cơ chế single-flight.",
+     "evidence": "CLAUDE.md #19 (b) `containerConcurrency 80`, #20 (b) \"index.js KHÔNG có khoá lượt\"; scraper.js:164 `snap = p.snapshot_id; … pendRef.delete()` không transaction; index.js:316–320 kiểm/ghi seen theo lô không transaction. Suy luận (chưa có log tick 1′).",
+     "fix": "Trước khi hạ tick 1′: khoá lượt `system_status/scan_lock` (transaction, TTL = trần mềm) hoặc đặt Cloud Run `concurrency 1` cho scheduledScan; gặt pending bằng transaction (đọc-xoá nguyên tử); giữ tick 3′ nếu gặt-trong-lượt đã đưa post→lead ≈2–4′."
+    },
+    {
+     "id": "H10",
+     "sev": "Vừa",
+     "title": "§2.3 \"force không cần\" nhưng ô \"quét lại từ đầu\" (`#bfForce`) vẫn có trên modal Quét thử → force trên group dùng chung: lead id `L_<post_url>` chung 2 brand → 1 brand mất lead, brand kia chấm lại toàn bộ",
+     "why": "Với `force`, commitLeadNow dùng id tất định `leadKey(post_url)` không có brand: ứng viên X commit trước → ứng viên Y `s.exists → return false` (không lead cho Y, dù AI đã chấm = tốn tiền vô ích); đồng thời `force` bỏ cổng seen cho CẢ 2 brand → X chấm lại mọi bài trong khoảng (AI ×2, lead trùng theo H4 nếu X trước đó không force). Thiết kế không vô hiệu/cảnh báo ô này.",
+     "evidence": "70-shell-tools.js:802 `<input type=\"checkbox\" id=\"bfForce\"`; :843–844 `if(forceRescan) body.force=true`; index.js:385–387 `ref = db.collection('leads').doc(leadKey(lead.post_url)); … if (s.exists) return false;`.",
+     "fix": "`leadKey` thêm brand (`L_<post_url>__<brand>`) — cũng là bước đầu cho PB-2 id tất định; force chỉ áp cho brand đang bấm (bỏ qua fan-out brand khác) hoặc ẩn ô force với nguồn `sharedAt`."
+    },
+    {
+     "id": "H11",
+     "sev": "Thấp",
+     "title": "§3 `row_X.posts++` cho mọi brand nhưng `scanned`/`postsFetched`/`bd_month.posts`/`conversion`/`sourcesCount` không nói rõ → số cấp lượt nhân theo số brand",
+     "why": "`scanned += usePosts.length` (:220) và `bd_month.posts` (:524) cộng từ row; nếu row nhân theo brand thì \"Bài đã quét\" của super (kpi.scanned = totalPosts), chart Lịch sử quét, `conversion = kept/scanned` đều đổi nghĩa; `sourcesCount = sources.length` vẫn đếm doc → super thấy \"25 nguồn\" trong khi 23 group. Không sai brand nhưng số lượt không còn so sánh được với 60 ngày trước.",
+     "evidence": "index.js:220 `row.posts = usePosts.length; scanned += usePosts.length;`; :475 `conversion: scanned ? …`; :524 `posts: inc(r.posts || 0)`.",
+     "fix": "Tách `posts` (theo group, đếm 1 lần) và `postsByBrand` (row); `sourcesCount` + `groupsCount`; FE nhãn rõ."
+    },
+    {
+     "id": "H12",
+     "sev": "Thấp",
+     "title": "§2.7 ưu tiên `brands.outreach.priority` \"sắp nick due rồi mới pace\" vô hiệu vì outreachTick chạy CONC 25 song song; \"chủ nguồn thắng\" không có cơ chế",
+     "why": "Due list được chia cho 25 runner đồng thời (`Promise.all(… runOne)`) → thứ tự mảng không quyết định ai tới transaction lock trước; `apEnqueueFunnel` của 2 brand có thể chạy cùng ms. \"Chủ nguồn thắng\" cần transaction đọc `sources.sharedAt` để từ chối brand không chủ khi lock chưa có — thiết kế không mô tả.",
+     "evidence": "outreach.js:301–312 `const CONC = 25; … await Promise.all(Array.from({ length: Math.min(CONC, due.length) }, runOne));`.",
+     "fix": "Ưu tiên thực hiện trong transaction lock: lock ghi `priority`; brand priority thấp hơn chỉ được tạo lock nếu brand ưu tiên hơn không có thread/lead cho post đó, hoặc trì hoãn brand thấp 1 tick (nextFreeAt +5′) khi group `sharedAt` và chưa có lock."
+    },
+    {
+     "id": "H13",
+     "sev": "Thấp",
+     "title": "§3 \"prefilterLead cache theo (post_id, brand)\" là tối ưu chết; §6 ước tính AI thiếu miss-reply ×3 và eKYC/profile theo lead",
+     "why": "Cùng brand + cùng gid bị chặn (§2.1) nên trong 1 lượt không bao giờ có 2 ứng viên cùng (post_id, brand) → cache không bao giờ hit. Tầng 2 lead của Y thêm tới 2 lượt `scoreLead` miss-reply (:424–431) và `enrichPhoneFromText` (cache 90 ngày theo SĐT → ít tốn) — ước tính \"cùng ngành ≈ ×2\" là sàn, không phải trần.",
+     "evidence": "index.js:424–431 vòng `for (let __rt = 0; __rt < 2; __rt++) … scoreLead(...)`; §2.1 chặn cùng brand+gid.",
+     "fix": "Bỏ cache; nếu muốn tiết kiệm thật: cache tầng 1 theo (post_id, hash Hồ sơ AI) — 2 brand cùng hồ sơ trống dùng chung kết quả."
+    },
+    {
+     "id": "H14",
+     "sev": "Thấp",
+     "title": "§2.7 lock theo `post_<post_id>` chặn luôn 2 comment-lead KHÁC NGƯỜI dưới cùng bài của 2 brand; lock người khoá theo `author_url` còn worker giải mã uid sau → 1 người 2 khoá",
+     "why": "Comment-lead có `post_url` = URL bài cha (parsePost → post_id bài) → brand Y có comment-lead của người B dưới bài mà brand X đang tiếp cận người A → Y bị `skipped_shared` dù không đụng người A (reply comment B là thao tác riêng). `person_<authorKey>` từ `author_url` (username/pfbid) còn `outreach_map/{uid}` theo uid số worker giải mã ở bước kết bạn → cùng người có thể không khớp khoá.",
+     "evidence": "outreach.js:292 `if (!parsePost(lead.post_url).post_id) continue;`; CLAUDE.md worker 2026-09-05 `resolveProfileUid` ghi uid sau; lead có `comment_id` (index.js:450).",
+     "fix": "Khoá theo mục tiêu thao tác: post-lead → `post_<id>`, comment-lead → `comment_<cid>` + `person`; khoá người chuẩn hoá `__slProfileKey31`-style (id: / u:) và worker ghi thêm khoá uid khi giải mã."
+    }
+   ],
+   "refuted": [
+    {
+     "claim": "§3 Pha 1: \"row (bySource) vẫn 1 dòng / source doc (để daily_stats.scanned theo brand và attribution đúng)\"",
+     "why": "scanstats #39 nối brand theo `normUrl(r.url)` với Map url→brand (nguồn ghi sau thắng) — 2 row cùng URL đều đổ về 1 brand (docs/lenh-2026-09-08-39-scanstats.js:14,21). Giữ 1 row/source doc KHÔNG đủ; phải đổi khoá nối sang source_id/brand trong row."
+    },
+    {
+     "claim": "§7.3: \"không chồng vì maxInstances 1; scheduler 1′ sẽ bỏ tick khi lượt trước chưa xong\"",
+     "why": "maxInstances chỉ giới hạn số instance; Cloud Run của scheduledScan có `containerConcurrency 80` (#19 (b)) và index.js không có khoá lượt (#20 (b)) → 1 instance nhận 2 request song song; Cloud Scheduler không bỏ tick. Suy luận từ cấu hình đã dump, chưa có log tick 1′."
+    },
+    {
+     "claim": "§1.4/§2.7: \"Không bao giờ 2 nick cùng react/comment/inbox 1 bài\" — chặn bằng lock ở `apEnqueueFunnel` + worker preflight",
+     "why": "outreachTick vẫn dispatch nick func qua `stepNick` (outreach.js:306 `acct.engine === 'adspower' ? stepNickAdspower : stepNick`) và stepNick (:42) gọi func trực tiếp, không qua apEnqueueFunnel/worker → nick func của brand Y không bị lock chặn. Hiện nick func không chạy nên chỉ là lỗ tiềm ẩn, nhưng câu \"không bao giờ\" sai so với code."
+    },
+    {
+     "claim": "§2.3: \"Brand mới tham gia sau … muốn bù thì bấm 'Quét thử nguồn này' (backfill 7 ngày, force không cần vì seen.brands[X] trống → được chấm)\"",
+     "why": "Đường backfill dùng chung `pending_snapshots/P_<url>` với lịch (scraper.js:160–166 gặt nhầm snapshot probe 5 bài) và `backfill_done/bf_<url|range>` theo URL (index.js:170) → có thể trả 5 bài rồi khoá cả ngày; ngoài ra doc `seen` legacy không có `brands` nên brand chủ cũng bị chấm lại (H4). \"Được chấm\" đúng cho brand mới nhưng không đảm bảo đủ bài và không vô hại cho brand chủ."
+    }
+   ],
+   "keep": [
+    "§1.1 BrightData 1 gieo/group là khả thi: `pending_snapshots/P_<url>` và `group_state/<url>` (recentIds, lastTriggerAt) đã khoá theo URL (scraper.js:155–156,174,187) — gieo/gặt qua nguồn chủ không nhân record.",
+    "§2.3 probe `leadingNew` không bị phá: chỉ kiểm `seen` doc tồn tại (index.js:213), thêm map `brands` không đổi kết quả.",
+    "§3 `self_comment` tính 1 lần đúng: `__slIsSelfComment31` chỉ so author/parent_author/profile (index.js:103–108), độc lập brand.",
+    "§3 recordPost gắn `brand: x.src.brand` + clone post object đóng đúng N3-7/PB-12(2) (hiện :123 tra `brandBySource[x.post.source]`).",
+    "§1.3 tenancy FE giữ được: brand user subscribe `sources where brand==` (live.js:944) và `scanned_posts where brand==` — doc id `<gid>__<brand>` không ảnh hưởng.",
+    "§2.5 `daily_stats.new/hot` theo brand đúng vì `statsOnLead` đếm từng lead doc (mỗi brand 1 lead) — không cần sửa stats.js cho phần lead.",
+    "Pha 1b comment BrightData không nhân đôi: `cmt_scrape/{urlKey}` và lô `fetchComments` khử trùng theo URL (index.js:236–241, scraper.js:258) — chỉ cần clone comment object khi fan-out.",
+    "`outreach_map/{uid}` 1 người → 1 leadId vẫn đúng vì lock người đảm bảo chỉ 1 brand inbox → funcWebhook/checkReplies trả về đúng lead."
+   ],
+   "questions": [
+    "`lib/multitouch.js` (chưa dump): `tryMergeTouch` query `leads` theo `identityKey` như thế nào (collection group? có `where source==`?) — quyết định điểm chèn `where brand==` và có cần index composite (identityKey, brand, last_seen_ms)?",
+    "`__bdProfCollect` (ngoài fixture) nối kết quả profile về lead bằng khoá gì (`profile_snapshot` → query lead limit 1?) — nếu cache 1 sid/uid/lượt thì lead của brand thứ 2 có nhận được hồ sơ không?",
+    "Cloud Run `scheduledscan`: concurrency hiện là 80 hay đã đặt 1? Cloud Scheduler job có retry khi 429/timeout không (ảnh hưởng quyết định tick 1′)?",
+    "Có bao nhiêu doc `seen` legacy (không `brands`) và có chấp nhận backfill 1 lần đóng dấu `brands[primary]='legacy'` (hoặc quy ước theo `seen.at` < `sources.sharedAt`) trước khi bật fan-out?",
+    "Rules `sources` create/update hiện chỉ super hay admin brand cũng ghi được (cần R1) — nếu admin brand ghi được thì `sourceOnWrite` phải là nơi kiểm gid trùng cùng brand, FE không đủ.",
+    "Gói BrightData có giới hạn snapshot đồng thời/giờ không (R2) — nếu có, gặt-trong-lượt + tick 1′ ở group đông có làm trigger bị từ chối cho group khác?"
+   ]
+  }
+ },
+ {
+  "lens": "automation-tenancy-fe",
+  "r": {
+   "summary": "Thiết kế B đúng hướng ở tầng gieo/gặt 1 lần + fan-out theo brand, nhưng CHƯA đóng được 5 lỗ mức Cao ở chính các mục thuộc lens này: (1) lead chéo brand vì §3 không gỡ v-fixgrp `srcByGroup` + birthstamp `brandBySource` chạy SAU `ref.set` (index.js:362–365, :394); (2) `score_retry/R_<post_id>` 1 doc/post + lookup nguồn theo URL (patch #46 :189, :200) → fan-out 2 brand đè nhau, bài chờ AI mất hoặc chấm bằng Hồ sơ AI sai brand; (3) lock §2.7 chỉ đặt ở `apEnqueueFunnel` (AdsPower) — func-path `stepNick` (outreach.js:71–100, dispatch :301) không lock → 2 nick vẫn chạm 1 bài; (4) `siblings`/`shared_note` nằm trên doc lead của brand user → lộ mã brand khác (ngược §1.3); (5) luồng thêm nguồn tính id client + `setSource = setDoc merge` (live.js:557) → id `<gid>` trùng doc primary brand khác → merge đè `brand`/`name`/`keywords` = chiếm nguồn, `sourceOnWrite` chạy sau không đảo được. 8 lỗ Vừa: gid slug↔số không gộp (mất lead do `seen` toàn cục), lock person vô hiệu với author_url nhiều dạng + uid chỉ có sau worker (nên dùng `outreach_map/{uid}` đã có), lock post quá thô với comment-lead, lock đặt sau `tryConsume`+`genForLead` (đốt van + AI khi thua), lock 14 ngày không nhả khi thread expired/human/cancelled, priority không thực thi được với tick song song CONC 25 + nextFreeAt, `group_state`/`pending_snapshots` khoá theo chuỗi `source.url` chứ không theo gid, backfill \"Quét thử\" cho brand tham gia sau bị `backfill_done` chặn chéo brand + `force` dùng `L_<post_url>` toàn cục. 1 Thấp: Hộp việc super không có loại việc phi-lead. 3 câu sai sự thật so với code (vị trí buildData; `group_state` \"theo urlKey dùng chung\"; siblings \"chỉ super đọc được\"). Rules `sources` chưa từng dump → §4 luồng admin brand + §6 \"không cần Rules mới\" đều là giả định.",
+   "holes": [
+    {
+     "id": "H1",
+     "sev": "Cao",
+     "title": "§3/§2.5 — lead brand A bị đổi nguồn + đóng dấu brand B bởi v-fixgrp `srcByGroup` và birthstamp chạy SAU `ref.set`",
+     "why": "Thiết kế nói `brand` ghi ngay trong `ref.set` và fan-out post clone với `x.post.source` = tên nguồn của brand đó, nhưng KHÔNG gỡ 2 khối trong `commitLeadNow`: (a) v-fixgrp: `srcByGroup[gid] = s.name` là map gid→1 TÊN (nguồn cuối thắng, index.js:30) rồi `if (srcByGroup[_gm[1]] && lead.source !== srcByGroup[_gm[1]]) lead.source = srcByGroup[_gm[1]]` (index.js:362–365) → lead fan-out cho brand A bị đổi `source` sang tên nguồn của brand B; (b) birthstamp `const _b = brandBySource[lead.source]; if (_b) ref.update({brand:_b…}) else ref.update({brand_pending:true…})` (index.js:394–397) chạy SAU `ref.set` → đè `brand` bằng brand B (hoặc đặt `brand_pending` xoá brand đã ghi). Hệ quả: lead chéo brand, brand B thấy lead của A, brand A mất lead; push/daily_stats/outreach theo brand sai. Bằng chứng: `docs/lenh-2026-09-11-46-fixture/index.js:30, :362–365, :394–397`.",
+     "fix": "Trong LỆNH B0: `srcByGroup` → Map gid→[sources]; chỉ sửa `lead.source` khi nguồn đích cùng `lead.brand` (hoặc bỏ v-fixgrp khi lead đã có `source_id`); bỏ hẳn khối birthstamp update khi `lead.brand` đã có trong set (giữ chỉ cho lead cũ không brand). Harness 2 brand/1 group phải assert `leads[A].brand==='A' && source_id==='<gid>__A'` sau commit.",
+     "evidence": "index.js:362–365 (`lead.source = srcByGroup[_gm[1]]`), :394 (`brandBySource[lead.source]` → `ref.update({brand:_b})`), :30 (`srcByGroup[m[1]] = s.name` nguồn cuối thắng)"
+    },
+    {
+     "id": "H2",
+     "sev": "Cao",
+     "title": "§2.3/§3 — `score_retry/R_<post_id>` 1 doc/post + nạp lại theo `s.url` → fan-out 2 brand đè nhau: bài chờ AI mất hoặc chấm bằng Hồ sơ AI của brand khác",
+     "why": "Patch #46 ghi `db.collection('score_retry').doc('R_' + key)` với key = post_id (patch :189) và `src: {name,url,industry,brand}`; khi 2 ứng viên (post, brand A) và (post, brand B) cùng lỗi LLM thì doc thứ 2 `set` đè doc thứ 1 → brand A mất bài (không lead, không dự phòng, `seen.brands[A]='pending'` kẹt vĩnh viễn). Khi nạp lại: `const src = sources.find(s => s.url === (r.src && r.src.url))` (patch :200) → 2 source doc cùng URL luôn trả nguồn đầu (primary) → bài của brand B chấm bằng `__brandAiOf(effSrc)` của A và `recordPost/commitLeadNow` gắn brand A. Thiết kế §3 chỉ sửa sweeper `sources.find(s=>s.name===l.source)` mà bỏ sót đường score_retry (cùng vùng #46).",
+     "fix": "Doc id `R_<post_id>__<brand>`; lưu `source_id` (và `brand`) trong doc; nạp lại tìm `sources.find(s => s._id === r.source_id)` (fallback gid+brand). Harness: 2 brand cùng post cùng lỗi LLM → 2 doc, mỗi doc chấm đúng effSrc của brand mình.",
+     "evidence": "docs/lenh-2026-09-11-46-patch.cjs:189 `doc('R_' + key)`; :200 `sources.find(s => s.url === (r.src && r.src.url))`"
+    },
+    {
+     "id": "H3",
+     "sev": "Cao",
+     "title": "§2.7 — lock chỉ đặt trong `apEnqueueFunnel`; func-path `stepNick` không lock → nick func và nick AdsPower của 2 brand vẫn cùng chạm 1 bài",
+     "why": "Tick dispatch `acct.engine==='adspower' ? stepNickAdspower : stepNick` (outreach.js:301). `stepNick` tự tạo thread `tref.set({… step:'react' …})` rồi `drive()` gọi `doReact/doComment/doInbox` trực tiếp qua func (outreach.js:93–99, :62–64), không đi qua `apEnqueueFunnel` → không có transaction lock và cũng không kiểm lock của brand khác. Ngược lại nick AdsPower brand A không thấy lock nào từ func → 2 chiều đều hở. Thiết kế §2.7 chỉ nêu `apEnqueueFunnel` + worker preflight. Nick func hiện ít dùng nhưng còn active (`fb_accounts` t1 engine func, LỆNH #44 KHỐI 2) và LỆNH #37 vừa gate func-path theo ma trận → đường này vẫn sống.",
+     "fix": "Tách `acquireLocks(lead, brand, pid)` (transaction post+person) thành helper dùng chung, gọi TRƯỚC `tref.set` ở cả `stepNick` (:93) lẫn `apEnqueueFunnel`; thua lock → `skipLeadRole`-style `skipped_shared` ở cả 2 path. Harness: brand A func + brand B AdsPower cùng post → đúng 1 thread active.",
+     "evidence": "outreach.js:301 dispatch; :71–100 stepNick tạo thread + drive không lock; §2.7 chỉ nhắc apEnqueueFunnel"
+    },
+    {
+     "id": "H4",
+     "sev": "Cao",
+     "title": "§2.5 — `siblings: {'<brand>': leadId}` + `shared_note` ghi lên doc lead của brand user → lộ mã brand khác (ngược §1.3)",
+     "why": "Brand user subscribe `leads where brand==byBrand` (live.js:1090–1096) và nhận NGUYÊN doc (Rules read theo brand==myBrand; whitelist #8 chỉ áp cho update). Key của map `siblings` là mã brand kia (vd `tts-1`) → hiện trong DevTools/console và mọi nơi FE dump lead (`l.__q` fold toàn field text — 20-feed:434 không gồm siblings nhưng object vẫn tới client). Thiết kế tự nhận 'brand user KHÔNG đọc được lead brand khác nên chỉ super dùng' — nhầm: họ không đọc lead kia nhưng đọc được KEY trên lead của mình.",
+     "fix": "Không ghi mã brand lên lead: trên lead chỉ `shared_post:true`; bản đồ liên kết để ở collection super-only `lead_links/{post_id}` = {brands:{A:leadId,B:leadId}} (Rules read super, write false) hoặc trong `system_status/sources`. Modal super đọc `lead_links`.",
+     "evidence": "live.js:1090–1096 (brand user nhận full doc lead theo brand); §2.5 câu 'brand user KHÔNG đọc được lead brand khác nên chỉ super dùng'"
+    },
+    {
+     "id": "H5",
+     "sev": "Cao",
+     "title": "§4/§5 — thêm nguồn tính id ở client + `setSource = setDoc(merge:true)` → id `<gid>` trùng doc primary của brand khác = MERGE ĐÈ brand/name/keywords (chiếm nguồn); `sourceOnWrite` chạy sau không đảo được",
+     "why": "`setSource: (id,data)=>guard(setDoc(doc(db,'sources',id),data,{merge:true}))` (live.js:557). Form: `id = s.id || (gid||name)…` + dup check chỉ trên `D.sources` (50-config-views:130–132); wizard `wzParseSources` dup theo `D.sources` (87:167). Admin brand chỉ có `sources where brand==` (live.js:944) → không thấy nguồn primary của brand khác → tính id `<gid>` → setDoc merge đè `brand:'B', name, keywords, exclude, active:true` lên doc của brand A → toàn bộ lead từ group đó từ giờ gắn brand B, brand A mất nguồn im lặng. Super cũng dính khi snapshot `sources` chưa về/stale hoặc 2 tab. CF `sourceOnWrite` (§5.2) chỉ chạy SAU write, không có before-state để phục hồi. Thêm: §6 'không cần Rules mới nếu Rules sources chỉ super' là giả định — Rules `sources` chưa từng được dump (LỆNH #38 chỉ dump users/leads/outreach_log/outreach_stats/workers/scans/config); nếu Rules đã cho admin ghi thì lỗ này mở NGAY, nếu chưa thì luồng admin brand §4 là chết cho tới khi có Rules.",
+     "fix": "(1) Mọi nguồn TẠO MỚI dùng id `<gid>__<brand>` (kể cả khi chưa ai có gid; 23 nguồn cũ giữ id) → không bao giờ đụng doc brand khác; (2) tạo mới đi qua CF `createSource` (Admin SDK kiểm gid+brand+tên) hoặc Rules `sources`: `create: request.resource.data.brand == myBrand()`, `update: resource.data.brand == request.resource.data.brand` (không cho đổi brand ngoài super); (3) FE bỏ merge khi tạo mới (`setDoc` không merge + kiểm `exists`).",
+     "evidence": "live.js:557 (`setDoc … {merge:true}`), :944 (`sources where brand==byBrand`); 50-config-views.js:130–132 (id = gid, dup theo D.sources); 87-brand-wizard.js:167"
+    },
+    {
+     "id": "H6",
+     "sev": "Vừa",
+     "title": "§2.1 — 'gid chuẩn hoá' không giải quyết slug ↔ số: cùng group nhập bằng slug ở brand A và số ở brand B → không gộp, BrightData ×2 và brand sau MẤT LEAD vì `seen` toàn cục",
+     "why": "Regex gid ở 3 chỗ `/\\/groups\\/([^/?#]+)/` (50-config:130, wizard:163, index.js:30) nhận cả slug (`spaclinicvn`) lẫn số; FB cho phép cả 2 dạng URL cho 1 group. `byGid` §3 sẽ coi là 2 group → gieo 2 snapshot (ngược §1.1) và Pha 2 `seen/{post_id}` vẫn toàn cục `if (wasSeen && !force) { skippedSeen++; return; }` (index.js:315–320) → nguồn chạy sau trong `mapPool` bị coi 'đã thấy' → không có `seen.brands[B]` vì bài không đi qua fan-out → mất lead cho brand B — đúng lỗi thiết kế B định sửa.",
+     "fix": "Chuẩn hoá gid theo SỐ từ record BrightData lúc gặt (record `url`/`post_url` chứa `/groups/<số>/` — xem normalizePost) → ghi `sources.gid` (và `group_state.gid`) lần đầu gặt; `byGid` gộp theo gid số; nguồn slug chưa gặt lần nào coi như 'chưa biết gid' và không được coi là primary. Pha 2: bài `wasSeen` nhưng `brands[myBrand]` trống → vẫn fan-out cho brand đó (đúng §2.3 quy tắc 'đã xử lý cho brand X').",
+     "evidence": "index.js:30 regex; :315–320 seen toàn cục; 50-config-views.js:130; 87-brand-wizard.js:163"
+    },
+    {
+     "id": "H7",
+     "sev": "Vừa",
+     "title": "§2.7 — lock person theo `authorKey` từ `author_url` thô gần như vô hiệu: cùng người nhiều dạng URL, uid chỉ có SAU khi worker mở profile; `outreach_map/{uid}` đã có nhưng thiết kế không dùng",
+     "why": "`uidFromAuthor` chỉ nhận `profile.php?id=` (outreach.js:24) → tại thời điểm enqueue uid ≈ null; `author_url` cùng người có thể là `/people/Tên/123/`, `profile.php?id=123`, `/username`, `pfbid…` → 2 brand tạo 2 `person_<key>` khác nhau → cả 2 nick kết bạn + inbox 1 người. uid thật chỉ có khi worker `ensureUid()` đứng trên profile ở bước Kết bạn (docs/lenh-2026-09-05-worker-uid.md:8) và đã ghi `outreach_map/{uid} = {leadId, brand, pid}` — đây mới là khoá người tin cậy. 69 % lead không author_url thì không có bước inbox nên không sao; lỗ nằm ở 31 % có author_url dạng khác nhau.",
+     "fix": "Engine: authorKey = uid số nếu có, else username fold (bỏ `www.`, query, `/` cuối), pfbid giữ nguyên. Worker: sau `ensureUid` kiểm `outreach_map/{uid}` — nếu brand khác đã có → dừng trước add_friend/inbox, thread `skipped_shared`, hoàn van friend/inbox (`refundQuota`), log ⏭. Cập nhật `outreach_locks/person_<uid>` lúc đó.",
+     "evidence": "outreach.js:24 `uidFromAuthor` chỉ `profile.php?id=`; docs/lenh-2026-09-05-worker-uid.md:8 (`outreach_map/{uid}` ghi tại bước Kết bạn)"
+    },
+    {
+     "id": "H8",
+     "sev": "Vừa",
+     "title": "§2.7 — lock `post_<post_id>` quá thô với comment-lead: `parsePost(lead.post_url)` = bài cha → brand A trả lời bình luận của X dưới bài P khoá luôn bài P của Y → brand B có lead là bài P (người khác) bị 'máy nhường' oan; 2 comment-lead khác người cùng bài cũng chặn nhau",
+     "why": "Comment-lead có `post_url` = bài cha (payload `kind:'comment'`, `comment_id`, outreach.js:129–130) và `parsePost` lấy `/posts/(\\d+)/` → cùng post_id với lead-bài. Nguyên tắc §1.4 là '1 bài / 1 người chỉ 1 brand chạm' nhưng khoá theo post_id gộp cả bài lẫn mọi bình luận dưới bài → mất automation cho brand B dù đối tượng khác (tác giả bài ≠ người bình luận). Với hscl-01 44 % lead là comment-lead (LỆNH #31a) nên tần suất không nhỏ.",
+     "fix": "Khoá theo mục tiêu thao tác: lead-bài → `post_<pid>`; comment-lead → `cmt_<cid>` (tym+reply comment) + `person_` khi có; chỉ lock `post_` chặn lead-bài, `cmt_` chặn comment-lead cùng comment. Ghi rõ trong §2.7.",
+     "evidence": "outreach.js:21 parsePost; :129–130 payload comment-lead vẫn dùng `lead.post_url`"
+    },
+    {
+     "id": "H9",
+     "sev": "Vừa",
+     "title": "§2.7 — vị trí transaction lock trong `apEnqueueFunnel` sau `tryConsume`×4 và `genForLead` (AI 14–16 s) → thua lock = đã đốt van ngày + tiền AI; thiết kế không nói hoàn van",
+     "why": "`apEnqueueFunnel` reserve van từng bước `tryConsume(pid,'react'|'comment'|'friend'|'inbox')` (outreach.js:121–124) rồi `genForLead(brand, lead)` (:127, gpt-5.6-sol 14–16 s) trước khi ghi task/thread (:132–133). Nếu lock đặt 'trong apEnqueueFunnel' như §2.7 mà không nói trước/sau, khả năng cao là chèn gần `tref.set` → thua lock thì van đã trừ (E-5 tái diễn: usage lệch, nick 'cạn ngày' oan) và AI đã tốn.",
+     "fix": "Thứ tự: humanBusy → roleBlock → **acquireLocks (transaction)** → tryConsume → genForLead → task/thread. Thua lock → return false trước khi đụng van; nếu vẫn phải refund thì dùng `refund44(pid, dayKey(), got)`.",
+     "evidence": "outreach.js:121–124 tryConsume; :127 genForLead; :132–133 ghi task/thread"
+    },
+    {
+     "id": "H10",
+     "sev": "Vừa",
+     "title": "§2.7 — lock `expireAt +14 ngày` không có đường nhả khi thread brand A kết thúc KHÔNG thành công (expired 72 h, human, cancelled, moved, skipped_role) → brand B mất automation 14 ngày vô ích; lead B đã `skipped_shared` không bao giờ được xét lại",
+     "why": "sweep44 đóng thread quá 72 h (`step:'expired'`, outreach.js:210–216), worker `onHuman` đặt `step:'human'`, `cancelQueued44` huỷ task, `skipLeadRole` tắt thread — thiết kế không nói nhả `outreach_locks`. Đồng thời lead brand B đã ghi thread `active:false, step:'skipped_shared'` → `stepNickAdspower` `if ((await tref.get()).exists) continue` (:267) → không bao giờ enqueue lại kể cả khi lock đã hết.",
+     "fix": "Nhả lock (delete hoặc `released:true`) ở: sweep44 expired, onHuman, skipLeadRole, cancelQueued44, và khi thread `done` mà chưa inbox (tuỳ chọn). Thread `skipped_shared` mang `retryAt = lock.expireAt` và engine xét lại thread `skipped_shared` tới hạn như thread retry (mở rộng query `retry` :243 hoặc sweeper riêng).",
+     "evidence": "outreach.js:210–216 expired; :267 `tref.exists → continue`; docs/worker-2026-09-11-patch.cjs:387 onHuman; §2.7 chỉ nói expireAt +14 ngày"
+    },
+    {
+     "id": "H11",
+     "sev": "Vừa",
+     "title": "§2.7 — `priority` brand không thực thi được: tick chạy nick due SONG SONG (CONC 25) và chỉ nick `nextFreeAt<=now` mới vào batch → 'chủ nguồn/priority thắng' thực chất là first-come; xung đột với pace/E-16",
+     "why": "`outreachTick`: `dueSnap … where nextFreeAt<=now orderBy nextFreeAt limit 800` (:283–285) → `due` → `Promise.all(CONC=25 runOne)` (:293–307). Sắp `due` theo priority chỉ đổi thứ tự BẮT ĐẦU trong cùng tick; 2 nick chạy đồng thời thì lock do transaction quyết định (ai commit trước). Brand ưu tiên có nick chưa tới hạn (gap 3–8′ có việc, 20–40′ rảnh, E-16 +1 h khi cờ) → brand kia enqueue trước ở tick này. Lead của 2 brand cùng bài còn xuất hiện ở 2 lượt quét khác nhau (score_retry) → thứ tự do lúc lead ra đời. Thiết kế hứa 'ưu tiên khi 2 brand cùng tới hạn 1 tick' — trường hợp gần như không xảy ra theo cơ chế trên.",
+     "fix": "Ghi rõ trong thiết kế: mặc định first-come; nếu cần ưu tiên thật thì lock 'giữ chỗ': khi brand không ưu tiên gặp bài chưa lock, ghi lock tạm `holdFor:<brand ưu tiên>, holdUntil: now+N′` và bỏ qua; brand ưu tiên tới trong N′ thì lấy, quá hạn thì brand kia lấy ở tick sau. Hoặc bỏ mục priority khỏi Đợt 1.",
+     "evidence": "outreach.js:283–285 query due theo nextFreeAt; :293–307 Promise.all CONC 25; :303 gap 3–8′/20–40′; :289 E-16 +1 h"
+    },
+    {
+     "id": "H12",
+     "sev": "Vừa",
+     "title": "§2.2/§3 — `group_state` và `pending_snapshots/P_` khoá theo CHUỖI `source.url` (không phải gid, không phải urlKey) → đổi primary (tắt/xoá nguồn chủ) = mất recentIds/lastTriggerAt/snapshot đang chờ, gieo lại 20 bài tốn record",
+     "why": "scraper.js:155–156: `pendRef = pending_snapshots.doc('P_' + String(source.url).replace(/[^\\w-]/g,'_'))`, `gsRef = group_state.doc(String(source.url).replace(…))`; index.js:22 `groupStateDoc(url)` tương tự. 2 source doc cùng gid thường có URL khác chuỗi (form 50-config lưu URL gõ tay có/không `www.`, `/` cuối, query; wizard chuẩn hoá `https://www.facebook.com/groups/<gid>/`). §3 Pha 0 chọn `primary` chỉ trong nguồn `active` → primary tắt → primary mới có URL khác → `recentIds` (posts_to_not_include) rỗng → trigger trả ~20 bài cũ (tốn record, dù `seen` chặn lead trùng) + snapshot đang pending của URL cũ không ai gặt (mất 1 nhịp bài, hoặc bị xoá sau 2 h).",
+     "fix": "Khoá `group_state/{gid}` và `pending_snapshots/P_<gid>` (migration: copy doc URL cũ sang gid ở lượt đầu `v-shared`); `harvestComments`/`srcOf` theo gid. Nếu giữ theo URL thì primary phải là nguồn CỐ ĐỊNH (`group_state.primaryUrl`) không đổi khi tắt.",
+     "evidence": "scraper.js:155–156; index.js:22; §2.2 câu 'dùng chung theo group, không đổi'"
+    },
+    {
+     "id": "H13",
+     "sev": "Vừa",
+     "title": "§2.3 — 'brand tham gia sau bấm Quét thử nguồn này' bị `backfill_done` khoá CHÉO brand theo URL+khoảng, và nếu tick `force` thì lead id `L_<post_url>` toàn cục → brand sau luôn thua",
+     "why": "Backfill: `db.collection('backfill_done').doc(bfKey(src.url)).get(); if (bd.exists) { row.error='đã backfill khoảng này — bỏ qua' … return; }` (index.js:171) và ghi `backfill_done` theo URL (index.js:224) → brand A đã 'Quét thử 7 ngày' hôm nay thì brand B bấm cùng group (cùng URL) = bỏ qua im lặng (N3-9 nay thành chặn chéo brand). Modal Quét quá khứ có ô `#bfForce` (70-shell-tools:843 `if(forceRescan) body.force=true`) → super dễ tick 'quét lại từ đầu' để bù → `commitLeadNow` với force dùng `ref = leads.doc(leadKey(lead.post_url))`, `if (s.exists) return false` (index.js:386–389) → 1 doc/post TOÀN CỤC → lead brand B trùng id lead brand A → bị bỏ. Thiết kế nói 'force không cần' nhưng không chặn.",
+     "fix": "`backfill_done` key = bfKey(url)+'__'+brand; `leadKey` khi force = `L_<post_url>__<brand>`; hoặc 'Quét thử' cho brand tham gia sau đi đường riêng: fan-out chỉ brand đó với `seen.brands[B]` trống, bỏ qua backfill_done.",
+     "evidence": "index.js:171 backfill_done theo url; :386–389 leadKey(post_url) khi force; 70-shell-tools.js:843 `#bfForce`"
+    },
+    {
+     "id": "H14",
+     "sev": "Thấp",
+     "title": "§4/§5.3 — Hộp việc super 'Xem lại group dùng chung' không có chỗ trong `inboxTasks` (chỉ dựng từ lead) và `system_status/sources` chưa được subscribe/rebuild đúng view",
+     "why": "`inboxTasks()` dựng hoàn toàn từ `todayBoard()` lead, `push(kind,pri,l,…)` khoá theo `l.id`, `tkRow` render `data-lead`, `views.tasks` nhóm theo `TK_GROUPS` cố định 6 loại (70-shell-tools:85–110) → việc phi-lead cần loại việc/row/bindGo riêng. live.js super hiện chỉ subscribe `system_status/brightdata` (:955) → cần thêm listener `system_status/sources` (+ `D.sysStatusSources`) và `rebuild(['tasks','alerts','sources','overview','agency'])`; chip Nguồn quét đọc từ `D.sysStatusSources` chứ không từ `srcOut` (buildData whitelist — cần thêm `gid/sharedAt`, giống F-A1 authAccountId đang bị rơi).",
+     "fix": "Ghi rõ trong §4: `inboxTasks` thêm nhóm `system` (row không có `data-lead`, bấm → `go('sources')`), live.js listener `system_status/sources` (super, lỗi console.warn), buildData `srcOut` thêm `gid, sharedAt, sharedBy` (tránh lặp F-A1).",
+     "evidence": "70-shell-tools.js:85–110 inboxTasks/TK_GROUPS; live.js:955 chỉ system_status/brightdata; live.js:151–160 srcOut whitelist"
+    }
+   ],
+   "refuted": [
+    {
+     "claim": "§0 bảng + §4: '`buildData` gom lead theo `s.name` (10-core:149–151)'",
+     "why": "`buildData` nằm ở `assets/js/live.js:119`; phép gom là `bySrc.get(s.name)` ở live.js:151–152. 10-core-overview.js:149 là `todayBoard`/INDUSTRY_LIB; chỗ nối theo tên trong 10-core là ROI attribution :553/:565 (`srcBrand[s.name]`, `brandOf(s.name,s.url)`). Mốc patch sai file → script fail-closed sẽ dừng."
+    },
+    {
+     "claim": "§2.2: '`group_state/{urlKey}` (dùng chung theo group, không đổi)'",
+     "why": "Doc id là chuỗi `source.url` thô sau `replace(/[^\\w-]/g,'_')` (scraper.js:156; index.js:22 `groupStateDoc(url)`), KHÔNG phải `urlKey` chuẩn hoá (urlKey chỉ dùng cho ctx comment, index.js:20) và không theo gid → 2 nguồn cùng gid khác chuỗi URL = 2 doc, không 'dùng chung' được như thiết kế giả định."
+    },
+    {
+     "claim": "§2.5: 'siblings … brand user KHÔNG đọc được lead brand khác nên chỉ super dùng'",
+     "why": "Field ghi lên doc lead của CHÍNH brand user; họ nhận nguyên doc qua `onSnapshot(leads where brand==byBrand)` (live.js:1090–1096) → đọc được key = mã brand khác. Không cần đọc lead kia mới lộ."
+    },
+    {
+     "claim": "§2.7: 'Worker `preflight`: kiểm lock trước mỗi bước (chống 2 VPS)'",
+     "why": "2 VPS không bao giờ chạy cùng 1 thread: task id tất định `leadId__funnel`, claim theo `workerId` + reaper transaction (v120-scale P1, worker patch :461). Lock chống là 2 BRAND (2 lead doc khác nhau cùng bài), không phải 2 VPS — mục đích ghi sai sẽ dẫn tới test sai."
+    }
+   ],
+   "keep": [
+    "§2.7 `outreach_locks` Admin SDK không cần Rules — client không có block → deny mặc định (như `outreach_tasks`/`seen`).",
+    "§2.6 `system_status/sources` không cần Rules mới — block `match /system_status/{sid}` read=isSuperAdmin đã released (LỆNH #23, docs/lenh-2026-09-05-scheduledscan-7.md:163).",
+    "§5.2 push super tái dùng được pattern push.js: `send()` data-only + dọn token chết (push.js:29–41), `superAdmins()` đã có từ LỆNH #12, link `#sources` an toàn vì `go()` chặn view super-only cho non-super (10-core:253–255).",
+    "§2.7 điểm chèn kiểm lock ở worker hợp lý: `preflight(t)` đã chạy trước khi mở lead và trước MỖI bước (worker patch :335, :379) và `onHuman` đã có sẵn hoàn van theo `reservedDay` → 'skipped_shared' phía worker chỉ là 1 nhánh nữa của preflight.",
+    "§2.4 scanned_posts 1 dòng/brand khớp FE: brand user `lazyScanned(where brand==byBrand)` (live.js:1067), super không lọc → không lộ brand khác.",
+    "§4 Cảnh báo hệ thống: `sysAlertRows` có khung `add(ic,lb,detail,go,sev)` (50-config-views:413) → thêm dòng 'group dùng chung' là 1 dòng, không đụng cấu trúc.",
+    "§2.3 giữ doc `seen/{post_id}` cho probe `leadingNew` (index.js:212–213 chỉ kiểm `exists`) đúng — thêm map `brands` không phá probe.",
+    "§1.3 tenancy sources: brand user subscribe `sources where brand==` (live.js:944) → doc `<gid>__<brand>` của brand kia không tới client; chỉ cần giữ mã brand khác ngoài mọi doc mà brand user đọc (xem H4)."
+   ],
+   "questions": [
+    "Rules `sources` hiện cho ai create/update/delete (chưa từng dump; LỆNH #38 chỉ dump 7 block khác)? Nếu chỉ super → §4 'admin brand thêm nguồn' phải kèm LỆNH Rules; nếu admin đã ghi được → H5 mở ngay hôm nay.",
+    "Scanner/backend có ghi ngược vào `sources/{id}` mỗi lượt không (leads/hot/lastScanAt/status)? Quyết định `sourceOnWrite` phải so before/after `gid`/`brand`/`active` để không push super mỗi 3′.",
+    "Có chấp nhận id nguồn TẠO MỚI luôn là `<gid>__<brand>` (kể cả nguồn đầu tiên) để bỏ nhánh 'primary giữ id gid' và loại hẳn H5? 23 nguồn cũ giữ nguyên.",
+    "Cùng brand có lead-bài + comment-lead cùng bài → hiện 2 thread/2 nick vẫn được phép; lock §2.7 có nên chặn cả trong cùng brand không (ảnh hưởng hscl-01 44 % comment-lead)?",
+    "'Quét thử nguồn này' cho brand tham gia sau: có cho tick `force` (#bfForce) không? Nếu có phải đổi `leadKey` + `backfill_done` theo brand (H13); nếu không thì ẩn ô force ở luồng này.",
+    "Lead `skipped_shared` (máy nhường) có cần được xét lại tự động khi lock nhả (thread A expired/human) hay chấp nhận brand B chăm tay vĩnh viễn cho bài đó?"
+   ]
+  }
+ },
+ {
+  "lens": "speed-cost",
+  "r": {
+   "summary": "Lens tốc độ/chi phí/vận hành: §7 hứa \"post → lead 2–5′\" nhưng 2 trụ chính không đứng: (1) \"gặt trong lượt\" poll ≤75 s gần như không bao giờ gặt được vì đường live luôn gửi posts_to_not_include và snapshot loại này chín ~141 s (#22b B; #21: 0/15 chín trong 90 s) — chỉ tốn ~30 h CPU Cloud Run/ngày và làm tick 1′ bị bỏ; (2) \"không chồng vì maxInstances:1\" sai (containerConcurrency 80, #19 đã thấy 2 lượt trên 1 instance) — tick 1′ làm cửa sổ race với manualScan/lượt quá deadline dày gấp 3 mà kế hoạch không kéo PB-2(c) vào. Về tiền: deep sweep 1.150 record bị kích bởi mọi cú nháy [LLM-DOWN]/[LLM-UP] (OpenAI 500 theo đợt vài giây, #45) và bdwatch dễ flap khi mỗi lượt chỉ gieo 1–2 nguồn; sửa S8 làm sweep 2 h thành thật (×3 record) trong khi N1-9 chưa sửa → \"BrightData không đổi\" ở §6 không đúng. Về vận hành: scans 1.440 doc/ngày → cửa sổ FE 16 h (PB-9 300 → 5 h); BrightData API ~40–60 req/phút chưa biết trần. Về đa brand: gid slug ≠ gid số cùng 1 group → brand thứ 2 lặng lẽ 0 lead + BrightData ×2. Khoảng trống \"không bỏ lỡ lead\": COMMENTS_PER_POST 30 với bài viral, 5 group private đã tắt, rate EWMA cho group mới/sweep cũ.",
+   "holes": [
+    {
+     "id": "H1",
+     "sev": "Cao",
+     "title": "§2.1/§3: khoá `gid` không chuẩn hoá slug ↔ id số — cùng 1 group nhập 2 dạng URL thì 2 brand KHÔNG được nhận là dùng chung: brand thứ 2 lặng lẽ 0 lead, BrightData trả tiền ×2",
+     "why": "index.js:30 `match(/facebook\\.com\\/groups\\/([^\\/\\?#]+)/)` nhận cả slug (`/groups/chohaisan`) lẫn số (`/groups/1733640124552320`); post URL BrightData trả về luôn dạng số (CLAUDE.md: `facebook.com/groups/<gid>/posts/<pid>/`). scraper.js:155–156 khoá `pending_snapshots`/`group_state` theo NGUYÊN CHUỖI `source.url` (không phải gid). Nếu brand A nhập slug, brand B nhập id số (hoặc chỉ khác dấu `/` cuối, `?ref=`): thiết kế tính 2 gid khác nhau → không fan-out, không `group_state.brands`; nhưng `seen/{post_id}` vẫn toàn cục (index.js:315–320) → bài về từ snapshot của B bị `wasSeen` → brand B không bao giờ có lead; đồng thời 2 doc pending → 2 trigger/nhịp → record mua 2 lần, `recentIds` tách đôi nên mỗi bên mua lại bài bên kia. Thiết kế §2.2 giả định 'group_state theo urlKey dùng chung được' mà không nói cách chuẩn hoá.",
+     "evidence": "index.js:30 (regex chấp nhận slug/số) · scraper.js:155 `doc('P_' + String(source.url || '')…)` · :156 `group_state` theo `source.url` · index.js:315–320 seen toàn cục · 50-config-views:131 id nguồn = group id tách từ URL (chưa resolve slug→số).",
+     "fix": "Chuẩn hoá `gid` = id SỐ: khi thêm nguồn slug → resolve 1 lần (BrightData record đầu tiên có `/groups/<số>/` hoặc gọi `GET_GROUP`/HEAD redirect) và lưu `gid_num`; `group_state`/`pending_snapshots` khoá theo `gid_num` (migrate 23 doc bằng script); FE/CF `sourceOnWrite` so trùng theo `gid_num` + fallback slug; LỆNH chỉ đọc R5 in bảng `sources.url` dạng slug/số hiện có."
+    },
+    {
+     "id": "H2",
+     "sev": "Cao",
+     "title": "§7.2.3/§7.3: tick 1′ + tin 'maxInstances:1 → không chồng' → cửa sổ race gặt trùng/seen trùng với manualScan (và lượt quá 1800 s) dày gấp 3, có thể ra lead trùng — kế hoạch §7 không kéo PB-2(c) khoá lượt vào",
+     "why": "maxInstances chỉ giới hạn SỐ INSTANCE; Cloud Run `containerConcurrency 80` (#19 (b)) cho 80 request chạy song song trên cùng instance; #19 (e) đã ghi nhận tick kế `[req] 200` ở +720 s trong khi lượt 814 s vẫn chạy nền = 2 lượt trên 1 instance. Việc hôm nay không chồng là nhờ Cloud Scheduler single-flight theo attemptDeadline, KHÔNG nhờ maxInstances. `manualScan` là service riêng, không khoá lượt (#20 (b)), quét tay đi đường non-sow `bdWaitSoft` 90 s (scraper.js:178–183) → với tick 1′ mọi cú 'Quét ngay' đều trùng 1–2 lượt lịch: cả 2 cùng `pendRef.get → bdStatus → delete` (scraper.js:160–164, không transaction) → cùng gặt 1 snapshot → `seen` get→set theo lô (index.js:315–320) → chấm đôi + `leads.doc()` id ngẫu nhiên (index.js:388) → lead trùng. Sau #46 lượt có thể >1800 s (N2-1) → Scheduler retry/tick sau deadline → chồng thật trên 1 instance.",
+     "evidence": "#19 (b) `containerConcurrency 80, maxScale 20`; #19 (e) `+720 [req] 200 tick kế` khi lượt 814 s chưa xong; scraper.js:160–164, :178–183; index.js:315–320, :388; PB-2 (workflow-result) mục (b)(c)(d).",
+     "fix": "Trong LỆNH tốc độ: (1) khoá lượt `system_status/scan_lock` bằng transaction ở đầu scanAll cho MỌI trigger (lịch lẫn tay; TTL = min(1800, trần mềm)); manualScan gặp khoá → trả `{busy}` (PB-2(c)); (2) gặt pending bằng transaction (đọc→xoá trong 1 tx, lượt thua bỏ qua); (3) `seen` dùng `create()` (PB-2(d)); (4) sửa câu 'maxInstances:1 → không chồng' thành 'Scheduler single-flight + khoá lượt'."
+    },
+    {
+     "id": "H3",
+     "sev": "Vừa",
+     "title": "§7.2.3 'Gặt trong lượt' poll ≤75 s gần như KHÔNG BAO GIỜ gặt được (snapshot có posts_to_not_include chín ~141 s) — đổi lại tốn ~30 h CPU Cloud Run/ngày (~×20 hôm nay) và làm tick 1′ bị bỏ → không nhanh hơn",
+     "why": "Số '45–141 s' lấy từ #22b: **45 s là phép thử A KHÔNG có `posts_to_not_include`**, còn B (đúng cách engine gọi) là **141 s**. Đường live luôn gửi notInclude (scraper.js:153 `notInclude: opts.notInclude`, :98 `posts_to_not_include`), và #21 đo thật 'KHÔNG nguồn nào chín trong 90 s (0/15)'. Poll 75 s (15 × 5 s) → hầu hết trả 'chưa chín' rồi vẫn gặt tick sau như hiện nay. Chi phí: mỗi lượt có gieo (với 23 nguồn nhịp TB 5′ ≈ 4–5 gieo/phút → gần như MỌI lượt) giữ request 75 s → 1.440 × 75 s ≈ 30 h CPU/ngày; Cloud Run gen2 1 vCPU + 512 Mi ≈ $0,0000253/s → ≈ $2,7/ngày ≈ $80/tháng (hôm nay ~480 lượt × ~10 s ≈ $0,12/ngày; vượt free tier 180k vCPU-s/tháng). Tốc độ: lượt 90 s làm Scheduler bỏ tick 1′ → nhịp thực ~2′, và mốc gặt của các nguồn KHÁC bị dời theo; so với không poll (gieo t0 → tick t0+120 chưa chín → t0+180 gặt) thì post→lead bằng nhau.",
+     "evidence": "docs/lenh-2026-09-05-scheduledscan-6.md + CLAUDE.md #22b: A 5 bài không loại trừ ready 45 s / B có posts_to_not_include ready 141 s · #21: '0/15 trigger chín trong 90 s' · scraper.js:98, :153, :127–135 (bdWaitSoft).",
+     "fix": "Bỏ poll trong lượt. Nếu vẫn muốn rút 1 tick: chỉ poll các snapshot đã gieo ≥120 s trước (đọc `pending.t`), tối đa 2 lần × 5 s, và chỉ khi lượt hiện tại <20 s; hoặc rẻ hơn nữa: BrightData `notify` webhook URL (tham số trigger) → CF `bdReady` ghi `pending.ready=true` → lượt kế gặt không cần bdStatus."
+    },
+    {
+     "id": "H4",
+     "sev": "Vừa",
+     "title": "§7.2.4 deep sweep 23 × 50 record bị kích bởi MỌI cú nháy `llm ok:false→true` (OpenAI 500 theo đợt vài giây) và bởi bdwatch flap khi lượt 1′ chỉ gieo 1–2 nguồn → vài USD mỗi lần, có thể nhiều lần/ngày, mà LLM ngưng vốn KHÔNG mất bài (đã có score_retry)",
+     "why": "Điều kiện DOWN của #46: `llmFail46 >= 2 && llmOk46 === 0` tính TRONG 1 lượt → lượt chỉ có 2 bài, cả 2 dính 500 (#45: burst 3 → 2/3 lỗi trong 1,7 s; 15:06 ×3, 14:39 ×2 cùng ngày) → DOWN, lượt sau OK → UP → theo §7.2.4 = 1 deep sweep 1.150 record (≈$2–3, đơn giá BrightData FB posts ~$1,5–2,5/1k record — Suy luận giá). Với tick 1′ số lượt ít bài tăng ×3 → xác suất flap tăng. bdwatch: `bdErrs.length >= Math.min(3, nBd) && bdOks.length === 0` — lượt 1′ nhịp thích ứng thường chỉ gieo 1–2 nguồn → nBd=1–2, 1 trigger lỗi thoáng qua = [BRIGHTDATA-DOWN] (email alert #9) rồi UP lượt sau → deep sweep nữa. Bài trong lúc LLM ngưng đã được `score_retry` giữ (#46) — deep sweep cho LLM là mua lại 1.150 record để `seen` lọc bỏ gần hết.",
+     "evidence": "docs/lenh-2026-09-11-46-patch.cjs:272 `downNow46 = (llmFail46 >= 2 && llmOk46 === 0) || …` · #45 kết quả 'burst 3 → 2/3 lỗi trong 1,7 s' · #21 bdwatch `bdErrs.length >= Math.min(3, nBd) && bdOks.length === 0` · thiết kế §7.2.4 'khi system_status/brightdata hoặc llm chuyển ok:false→true'.",
+     "fix": "Deep sweep CHỈ cho BrightData và chỉ khi `now − since ≥ 30′` (thiết kế §7.3 có nói 'chỉ khi ≥30′' nhưng §7.2.4 không) + dùng `start_date = downSince` với `num_of_posts` theo `rate × giờ ngưng` thay 50 cứng; bỏ hẳn nhánh LLM (score_retry đã lo). bdwatch: ngưỡng theo CỬA SỔ 10′ (≥3 trigger lỗi & 0 OK trong 10′) thay vì theo lượt; đổi DOWN→UP cần ≥2 lượt OK liên tiếp."
+    },
+    {
+     "id": "H5",
+     "sev": "Vừa",
+     "title": "§7.2.1 sửa S8 (`lastSweepAt` đóng dấu hụt) làm sweep 2 h thành THẬT (~×3 số sweep) trong khi N1-9 (recentIds ≤200 → sweep mua lại bài cũ) chưa nằm trong kế hoạch → record BrightData tăng, trái câu §6 'BrightData không đổi'",
+     "why": "N1-3: hiện sweep thật chỉ ~1/3 số lần vì `lastSweepAt` ghi cả lượt gặt/skip (index.js:222 `if (didSweep) … lastSweepAt`) — vô tình tiết kiệm. Tách `sweepDue/didSweep` đúng như §7.2.1 → 23 nguồn × 12 sweep/ngày × tới 20 bài (`num_of_posts 20` với `posts_to_not_include` chỉ 200 id, scraper.js:98/187) → worst ~5.500 record/ngày là bài cũ đã `seen` (skippedSeen) + kéo theo gieo comment cho bài cũ theo nhịp 12 h (index.js:246–277). Bằng chứng yield thấp đã có: #19 '~30 bài mới/20 lượt/28 nguồn' trong khi #22a '24 h ~1.300 record' → phần lớn record là mua lại. Ước lượng: ×2–3 record sweep hôm nay (đối chiếu `bd_month.bdPostRecords` trước/sau).",
+     "evidence": "index.js:201–206, :222 (didSweep/lastSweepAt) · scraper.js:98 `.slice(0, 200)`, :187 recentIds · findings N1-3, N1-9 · CLAUDE.md #19 (yield) / #22a (1.300 record/24 h).",
+     "fix": "Làm S8 cùng N1-9: sweep dùng `start_date = lastSweepAt − 6 h` (bdTrigger đã hỗ trợ `start_date`, scraper.js:96) thay vì num_of_posts 20 mù; hoặc giảm sweep còn 10 bài + `recentIds` giữ theo thời gian đăng; thêm `scans.sweepRecords` để đo. Sửa §6: 'BrightData: +sweep thật, bù bằng start_date'."
+    },
+    {
+     "id": "H6",
+     "sev": "Vừa",
+     "title": "§7.2.3 tick 1′ + gieo 3′: BrightData API ~40–60 request/phút (23 `progress` poll/phút cho pending + ~5–8 trigger/phút + poll trong lượt) — chưa biết trần rate limit/snapshot đồng thời của gói; thiết kế để R2 'kiểm sau' nhưng vẫn hạ mặc định sàn 10′→3′ trước",
+     "why": "Mỗi lượt, mọi nguồn có `pending_snapshots` gọi `bdStatus` (scraper.js:160–166) → tick 1′ = 23 poll/phút = ~33k call/ngày (hôm nay ~11k); trigger: 23 nguồn/3′ worst = 7,7/phút = 11k/ngày (hôm nay ~2/phút); H3 thêm 15 poll × k snapshot. Nếu BrightData 429/giới hạn snapshot đang chạy (Suy luận — không có số trong code/doc), `bdStatus` catch → `'unknown'` → `mark([], 'skip')` (scraper.js:125, :166) = IM LẶNG, không vào bdwatch (chỉ đếm lỗi trigger) → nguồn 'chưa chín' mãi tới 2 h rồi xoá pending (scraper.js:165) = mất cửa sổ bài mà không ai biết.",
+     "evidence": "scraper.js:121–126 (bdStatus nuốt lỗi → 'unknown'), :160–166, :165 (xoá sau 2 h) · bdTrigger nhận MẢNG url (scraper.js:92–93 `urls.map`) nhưng engine gọi `bdTrigger([source.url])` từng nguồn (:172, :178).",
+     "fix": "(1) Gộp gieo: 1 lượt = 1 trigger cho MỌI nguồn tới hạn (mảng url), pending khoá theo snapshot_id + map url→nguồn; gặt: route record theo gid trong `url` bài → 1 progress poll/lượt thay 23; (2) `bdStatus` phân biệt 429/5xx (đếm vào bdwatch, backoff) với 'running'; (3) R2 chạy TRƯỚC khi hạ sàn; sàn mặc định giữ 5′ tới khi có số."
+    },
+    {
+     "id": "H7",
+     "sev": "Vừa",
+     "title": "§7.3 (f): tick 1′ → `scans` ~1.440 doc/ngày (mỗi doc `bySource` 23 dòng ~6–8 KB, ghi cả lượt skip 0 việc) → FE `limit(1000)` chỉ còn ~16 h; PB-9 hạ 300 → ~5 h; Lịch sử quét/Báo cáo/attribution (N3-4) tệ hơn 3×",
+     "why": "index.js `db.collection('scans').add(summary)` chạy MỌI lượt kể cả lượt chỉ skip (0 gieo/0 gặt); FE live.js:1048 `orderBy('at','desc'), limit(1000)` → mỗi F5 super tải ~7 MB (1.000 × ~7 KB) cho 16 h dữ liệu; chart '14 ngày' (N3-4/N1-8) còn 1 cột. TTL 90 ngày (PB-9) không giải quyết cửa sổ hiển thị; 300 doc = 5 h.",
+     "evidence": "live.js:1048 · index.js đoạn `const summary = {… bySource}` + `db.collection('scans').add(summary)` (fixture cuối scanAll) · findings N3-4, N1-8.",
+     "fix": "Không ghi doc `scans` cho lượt thuần skip (0 trigger, 0 gặt, 0 ứng viên) — chỉ `bd_month.runs`/`system_status/scan.lastRunAt` increment; hoặc gộp lượt 0 bài thành 1 doc/giờ (`runs++`). FE: chart/KPI theo ngày đọc `daily_stats.scanned/scanRuns` (#39) + `bd_month`, `D.scans` chỉ cho bảng lượt gần nhất (limit 200)."
+    },
+    {
+     "id": "H8",
+     "sev": "Vừa",
+     "title": "§7.1 thiếu: `COMMENTS_PER_POST 30` (`limit_records`) — bài viral >30 bình luận không bao giờ lấy phần còn lại; `watch_posts` (§7.2.2) làm mới cũng chỉ trả lại đúng 30 record ấy → chính bài có nhiều comment-lead nhất bị bỏ lỡ",
+     "why": "config.sanitized.js:26 `COMMENTS_PER_POST: 30 // tran chong bai viral no records`; scraper.js:246 `item.limit_records = perPost` cho cả gieo lẫn refresh; không có `start_date`/offset cho comment. Bài bán hàng 100 bình luận 'giá?/ib' → 70 comment không bao giờ được xét; refresh 2 lần/ngày (§7.2.2) mua lại 30 record cũ (seen lọc) mà không tới comment mới. Không có số đo: cần đếm `row.bdComments == 30` theo bài (dấu hiệu chạm trần).",
+     "evidence": "config.sanitized.js:26 · scraper.js:246, :261 · index.js:280 `fetchComments(items, { perPost: CFG.COMMENTS_PER_POST …})`.",
+     "fix": "Bài trong `watch_posts` (đã ra lead) → `limit_records` 100 và kiểm BrightData có sort mới-nhất/`start_date` cho dataset comment (R2); LỆNH chỉ đọc R3 đếm bài có `bdComments==30` 7 ngày để biết tần suất chạm trần trước khi chốt."
+    },
+    {
+     "id": "H9",
+     "sev": "Vừa",
+     "title": "§7.2.3 EWMA `rate` chưa ổn định: group mới (không lastPostAt) rơi bậc 'im' 30′; sweep gặt 20 bài CŨ (N1-9) thổi rate → bậc 3′ giả; EWMA α=0,3 cố định trong khi Δt mẫu 3′↔30′ (lệch 10×); không hysteresis → nhấp nháy 3′/5′ quanh 6 bài/giờ",
+     "why": "Thiết kế 'cập nhật lúc gặt' = Pha 1 trước khi biết bài có `seen` hay không (index.js:315–320) → sweep/escalate mua lại bài cũ (N1-9, và H5) đẩy rate lên 20/Δh; 0,7^k cần ~3 lần gặt (~10–30′) mới hạ. 'im (0 bài ≥6 h ban ngày)' áp cho group mới thêm (chưa có lastPostAt) → probe đầu tiên sau 30′ trái mục tiêu 'nhanh nhất' của wizard 'Quét thử'. α cố định: 1 mẫu ở nhịp 30′ nặng bằng 1 mẫu ở 3′ → group đêm (×2) rồi sáng lên nhịp chậm; reset 7 h giúp 1 phần nhưng cuối tuần/lễ vẫn lệch.",
+     "evidence": "Suy luận từ công thức §7.2.3 + index.js:315–320 (seen ở Pha 2) + scraper.js:187 (recentIds ghi lúc gặt gồm cả bài cũ) · PB-8 (workflow-result) công thức `rate = 0.7*rate + 0.3*(posts/Δh)`.",
+     "fix": "Tính rate ở Pha 2 trên bài `!wasSeen` (hoặc scraper trả `newIds` = ids ∉ recentIds ∪ seen); α theo thời gian `α = 1 − e^(−Δt/τ)` với τ = 60′; group mới/không dữ liệu → bậc 'thường' 5′ (ghi rõ); hysteresis lên bậc khi rate > ngưỡng×1,2, xuống khi < ngưỡng×0,8 và giữ ≥2 mẫu; sweep không cập nhật rate."
+    },
+    {
+     "id": "H10",
+     "sev": "Vừa",
+     "title": "§7.2.4 deep sweep 'numPosts 50, không posts_to_not_include, downSince → startDate' nếu đi đường backfill hiện có sẽ chờ trong lượt 240 s/nguồn (23 ÷ pool 3 ≈ 1.840 s > timeout 1800) + bị khoá `backfill_done` — cần nói rõ đi đường sow",
+     "why": "fetchPosts với `startDate` = `backfill` → `trigOpts` không notInclude (scraper.js:151–152) → non-sow → `bdWaitSoft(snap, 40, 6000)` = 240 s/nguồn (scraper.js:179); scanAll mức `opts.startDate` còn bật `isBackfill` → `backfill_done` khoá theo [url+khoảng] (index.js:169–170, :223) và tắt probe/recentIds update (scraper.js:187 `if (!backfill)`). 23 nguồn ÷ 3 slot × 240 s ≈ 1.840 s → lượt bị cắt (S3 tái diễn ngay trong 'kế hoạch không mất bài'); chạy lần 2 bị `đã backfill khoảng này — bỏ qua`. Ngoài ra `num_of_posts 50` không đủ cho group 8 bài/giờ ngưng 12 h (96 bài) — nên dùng start_date là chính, 50 chỉ là trần.",
+     "evidence": "scraper.js:148–153, :178–184 · index.js:154 `liveProbe = !isBackfill && !force`, :169–170, :223 · thiết kế §7.2.4 + §7.3 dòng cuối.",
+     "fix": "Deep sweep = sow mode riêng: gieo TẤT CẢ nguồn với `{start_date: downSince, num_of_posts: min(200, rate×giờ ngưng+10)}` không notInclude, ghi pending `deep:true`, gặt lượt sau; không đi `isBackfill`/`backfill_done`; recentIds cập nhật như live."
+    },
+    {
+     "id": "H11",
+     "sev": "Thấp",
+     "title": "§7.1 'không bỏ lỡ lead nào' bỏ qua 5 group private/nick (đã tắt #22) và nguồn `dead_page` liên tục — không có mục nào quyết định số phận, brand test-agency mất hẳn 5 nguồn",
+     "why": "#22 tắt 5 nguồn `authAccountId` vì thiếu cookie + `BROWSER_SVC_URL`; `fetchPostsAuth` chỉ chạy theo nhịp sweep 2 h (index.js:173–177) và không có đường sow/rate. §7.2.6 chỉ cảnh báo 'nguồn N ngày 0 bài', không có quyết định (cấp cookie/xoá/đổi group công khai).",
+     "evidence": "docs/lenh-2026-09-05-scheduledscan-6.md (e) tắt 5 nguồn · index.js:173–200 (nhánh authAccountId) · thiết kế §7.1 S9 chỉ nói 'không ai biết'.",
+     "fix": "Thêm dòng S11 vào §7.1: nguồn tắt/private = bỏ lỡ có chủ ý → Nguồn quét hiện chip 'Không quét được (private)' + đề nghị hành động; nếu giữ đường nick thì nó cũng cần vào rate/sow (hoặc ghi rõ ngoài phạm vi)."
+    },
+    {
+     "id": "H12",
+     "sev": "Thấp",
+     "title": "§7.2.3 'rate ≥ 6 → probe 10' + escalate trong sow mode mua lại bài vừa gặt (N1-9(b)) nhiều hơn: mỗi lần leo thang gieo snapshot 20 bài với `recentIds` CŨ đọc đầu lượt → 10 record trùng/lần thay 5, và ở nhịp 3′ leo thang xảy ra thường xuyên hơn",
+     "why": "index.js:217 escalate dùng `gsBy.get(src.url).recentIds` (đọc 1 lần đầu lượt, :159–160) trong khi scraper.js:187 vừa ghi ids mới xuống Firestore → snapshot 20 bài không loại 5–10 bài probe vừa gặt; sow mode: `usePosts = full.length ? full : posts` (#21) → lượt sau gặt 20 bài gồm 10 bài đã seen (tính tiền, skippedSeen).",
+     "evidence": "index.js:159–160, :213–218 · scraper.js:187 · findings N1-9 (b).",
+     "fix": "Escalate truyền `notInclude = [...idsVừaGặt, ...recentIdsCũ].slice(0,200)` (scraper trả `ids` kèm posts); với rate cao ưu tiên nâng probe lên 10–15 thay vì leo thang 20 riêng."
+    },
+    {
+     "id": "H13",
+     "sev": "Thấp",
+     "title": "Tick 1′ kéo theo MỌI việc phụ trong scanAll chạy 1.440 lần/ngày: `__bdProfCollect`, sweeper #46 (query lead `limit 80` + tới 12 lượt LLM), quét-vét Zalo (`leads where phone_has_zalo==null limit 50` + 20 eKYC), `db.getAll` 23 group_state + 23 pending — ~200 read + vài chục HTTP/lượt dù lượt không có việc",
+     "why": "Các khối này nằm trong thân scanAll không có điều kiện 'có gì mới' (index.js: `__bdProfCollect` đầu Pha 1; Pha 4 khối v89 zaloCheck; patch #46 sweeper cuối lượt). Firestore ~290k read/ngày ≈ $0,1/ngày (nhỏ) nhưng eKYC/LLM sweeper bị gọi theo nhịp tick chứ không theo backlog; log Cloud Logging ×3 (ingest 50 GiB free/tháng — Suy luận về dung lượng).",
+     "evidence": "index.js Pha 1 `await __bdProfCollect()` · Pha 4 khối `[zaloCheck] v89` · patch #46 sweeper cuối lượt · thiết kế §7.2.3 không nói tách.",
+     "fix": "Lượt 'skip thuần' (0 gieo/0 gặt/0 pending chín) return sớm sau Pha 1; việc phụ chạy theo nhịp riêng (mỗi 5′ hoặc khi `score_retry`/backlog >0) bằng cờ `system_status/scan.lastHousekeepingAt`."
+    }
+   ],
+   "refuted": [
+    {
+     "claim": "§7.2.3 + §7.3: 'Scheduler 3′ → 1′ … chồng không xảy ra; `maxInstances:1` đã có' và 'không chồng vì maxInstances 1'",
+     "why": "maxInstances giới hạn số instance, không giới hạn request song song: Cloud Run `containerConcurrency 80` (#19 (b)); #19 (e) đã quan sát tick kế `[req] 200` ở +720 s khi lượt 814 s vẫn chạy nền trên cùng instance. Việc hôm nay không chồng là do Cloud Scheduler single-flight trong attemptDeadline (#18/#21 quan sát 1 lượt/7–13′ dù lịch 3′); quá 1800 s hoặc manualScan (service riêng, không khoá lượt — #20 (b)) thì chồng bình thường."
+    },
+    {
+     "claim": "§7.2.3: 'Gặt trong lượt … poll tối đa 75 s … (đo 05/09: ready 45–141 s)'",
+     "why": "#22b: 45 s là phép thử A KHÔNG gửi posts_to_not_include; phép thử B (đúng cách engine gọi, scraper.js:98/153 luôn gửi notInclude) chín 141 s; #21 đo thật 0/15 trigger chín trong 90 s. Poll 75 s nằm dưới mốc chín của đường live → gần như không gặt được gì."
+    },
+    {
+     "claim": "§7.3: 'lượt 3–6 s nên chồng không xảy ra'",
+     "why": "3–6 s là lượt skip/gieo; lượt GẶT có AI đo thật 20–107 s (#23 KHỐI 2: 9/23/4/34 s; #22a: 79 s với 20 bài/35 llm) và sau #46 mỗi bài có thể tới 259 s khi LLM treo (N2-1). Kết luận 'không chồng' phải dựa vào Scheduler single-flight + khoá lượt, không dựa vào độ dài lượt."
+    },
+    {
+     "claim": "§6: 'Tiền: BrightData không đổi (1 gieo/group)'",
+     "why": "Đúng cho phần fan-out đa brand, nhưng §7 của cùng bản thiết kế đổi chi phí BrightData: sửa S8 làm sweep 2 h thành thật (~×3 số sweep, N1-3) khi N1-9 chưa sửa; deep sweep 1.150 record/lần (§7.2.4) kích bởi cả nháy LLM; probe 10 + escalate mua lại bài (H12). Câu này chỉ đúng nếu ghi 'không đổi do đa brand; §7 làm tăng'."
+    },
+    {
+     "claim": "§7.2.3: 'Chi phí: BrightData tính theo record → trigger dày không tốn thêm'",
+     "why": "Đúng về tiền record (dead_page 0 record — #22b), nhưng bỏ qua mặt API: mỗi trigger kéo theo poll `progress` mỗi lượt cho tới khi chín (scraper.js:160–166) → ~23 poll/phút ở tick 1′ + 5–8 trigger/phút; trần rate/snapshot đồng thời của gói chưa biết (R2 chưa chạy) và lỗi poll bị nuốt thành 'unknown'→'skip' im lặng (scraper.js:125, :166)."
+    }
+   ],
+   "keep": [
+    "§1.1 + §3 Pha 1: gieo/gặt BrightData 1 lần/gid rồi fan-out — đúng hướng tiết kiệm tiền (chỉ cần chuẩn hoá gid, H1).",
+    "§2.7: khoá `outreach_locks` bằng `runTransaction` + worker `preflight` kiểm lock trước mỗi bước — đúng cách chống 2 nick chạm 1 bài/1 người.",
+    "§7.2.1: làm PB-1 (lease/staging trong score_retry, seen chỉ 'đã lấy', trần mềm lượt) TRƯỚC mọi việc tăng tốc — thứ tự đúng, vì tick 1′ làm mọi lỗ 'mất bài' xảy ra dày hơn.",
+    "§7.2.3: sàn/trần nhịp do super đặt (`scanIntervalMin`/`scanIntervalMaxMin`) + reset lên nhịp nhanh ngay khi gặt được bài — ổn cho vận hành.",
+    "§7.2.4: ý dùng `downSince → start_date` cho quét bù sau sự cố (bdTrigger đã hỗ trợ start_date, scraper.js:96) — giữ, chỉ cần đi đường sow (H10).",
+    "§5.2: `[SOURCE-SHARED]` mức WARNING, không ERROR — không spam alert #9.",
+    "§3 Pha 3a: cache `prefilterLead` theo (post_id, brand) trong lượt — đúng chỗ tiết kiệm tầng 1.",
+    "§7.3: đã nhìn thấy `scans` ×3 cần TTL — đúng, chỉ thiếu phần không ghi doc cho lượt rỗng (H7).",
+    "§7.2.5: PB-10 brand vào write đầu → push admin brand — không ảnh hưởng chi phí, đúng hướng."
+   ],
+   "questions": [
+    "BrightData gói đang dùng: trần snapshot đang chạy đồng thời và request/phút cho `trigger`/`progress` là bao nhiêu (R2 — cần in từ dashboard BrightData, không có trong code)? Nếu có trần thì gộp trigger theo lượt (H6) là bắt buộc trước khi hạ sàn 3′.",
+    "Đơn giá thật BrightData cho dataset posts và dataset comments (USD/1k record) và record lỗi (`dead_page`) có bị tính không — để định lượng H4/H5 (hiện chỉ có 'ready 0 record' ở #22b, chưa có hoá đơn đối chiếu).",
+    "Cloud Scheduler job `firebase-schedule-scheduledScan-asia-southeast1`: `retryConfig.retryCount`/`maxRetryDuration` hiện là gì (#18 (b) có in nhưng doc không lưu)? Quyết định có lượt retry chồng sau 1800 s hay không.",
+    "`sources.url` 23 nguồn hiện có bao nhiêu dạng slug vs id số vs có dấu `/` cuối/query (LỆNH chỉ đọc R5) — quyết định H1 có cần resolve slug→id.",
+    "Anh có chấp nhận Cloud Run tăng từ ~$4 lên ~$80/tháng cho 'gặt trong lượt' nếu nó gặt được (H3 cho thấy không) — hay bỏ hẳn và dùng webhook `notify` của BrightData?",
+    "Với LLM ngưng, có cần deep sweep không khi `score_retry` (#46) đã giữ bài — hay chỉ deep sweep cho BrightData ngưng ≥30′?",
+    "Tỷ lệ bài chạm trần `bdComments == 30` trong 7 ngày (R3) — nếu >5 % bài có lead thì H8 lên Vừa/Cao vì chính bài viral chứa nhiều comment-lead nhất."
+   ]
+  }
+ }
+]

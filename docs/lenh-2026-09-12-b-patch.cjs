@@ -5,7 +5,7 @@
                        — 3 số BrightData dashboard CHƯA có → mặc định an toàn (sàn 5′, không notify, record lỗi coi như tính tiền); có số → sửa .env, không cần deploy lại code.
    (2) lib/scraper.js  postIdB (id tất định: post_id ‖ id ‖ urlKey(url) ‖ h_<hash>, bỏ Math.random) · gidNumOfB/slugOfB · bdTriggerB (nhiều group/1 trigger, mỗi group tham số riêng, notify) · bdProgressB (429/5xx = busy)
                        · sowPostsB (gieo gộp, pending PB_<snapshot> kèm groups[]) · harvestPostsB (gặt có claim transaction, route record theo group_id số → gkey, học gid slug→số, đếm record lỗi tính tiền) · fetchComments trả sownUrls · bdRaw cho đường cũ.
-   (3) index.js        khoá lượt system_status/scan_lock (transaction, TTL 1200 s; lịch → bỏ lượt, Quét ngay → 409 busy) · Pha 1 theo GROUP gid số (gieo gộp 1 trigger/lượt cho group tới nhịp; nhịp thích ứng EWMA bậc sàn/10′/trần, đêm ×2, hysteresis, group mới = sàn, có bài mới → nhanh ngay;
+   (3) index.js        khoá lượt system_status/scan_lock (transaction, TTL 1860 s ≥ timeout 1800; lịch → bỏ lượt (busyRuns), Quét ngay khi bận → 409 busy; Quét ngay = gieo NGAY mọi group + gặt cái đã chín) · Pha 1 theo GROUP gid số (gieo gộp 1 trigger/lượt cho group tới nhịp; nhịp thích ứng EWMA bậc sàn/10′/trần, đêm ×2, hysteresis, group mới = sàn, có bài mới → nhanh ngay;
                        gặt snapshot đã gieo ≥120 s hoặc notify; sweep = start_date lastSweepAt−6h + notInclude; escalate = gieo đủ 20 ngay; deep sweep 1 lần khi BrightData hồi sau ≥30′; watch_posts ≤5 bài/nguồn loại khỏi notInclude ở lượt sweep) · fan-out ứng viên cho TỪNG brand dùng chung group
                        · seen/{post_id}.brands{} (doc cũ: brand không sharedAt hoặc sharedAt < seen.at = đã xử lý) + quyết định ghi lại theo brand · score_retry R_<post_id>__<brand> + source_id · lead id tất định L_<post_id>__<brand> + create() · lead mang post_id/gid/source_id/brand_hint/shared_post/textKey, GIỮ 2 bước ghi brand (ZBS justTagged)
                        · lead_links/{gid}_{post_id} (super) · bỏ v-fixgrp + multitouch theo brand cho lead fan-out · Pha 1b: mọi brand của bài nhận bình luận; gieo bình luận CHỈ khi num_comments > 0; cmt_scrape.lastAt ghi SAU gieo OK · lượt thuần skip không ghi scans · việc phụ theo nhịp ≥5′
@@ -27,7 +27,7 @@ const CF1_NEW = CF1 + `
   BD_ERROR_RECORD_BILLED: bool(env.BD_ERROR_RECORD_BILLED, true), // record lỗi (dead_page) có tính tiền không — chưa biết → coi là CÓ (đếm bdRecords theo raw)
   SCAN_INTERVAL_MIN_FLOOR: num(env.SCAN_INTERVAL_MIN_FLOOR, 5),   // sàn nhịp gieo (phút) khi config/app.scanIntervalMin trống; 3 chỉ khi có trần API
   SCAN_INTERVAL_MAX_MIN: num(env.SCAN_INTERVAL_MAX_MIN, 30),      // trần nhịp (group im / đêm)
-  SCAN_LOCK_TTL_S: num(env.SCAN_LOCK_TTL_S, 1200),                // khoá lượt quét (transaction) — TTL = trần mềm
+  SCAN_LOCK_TTL_S: num(env.SCAN_LOCK_TTL_S, 1860),                // khoá lượt quét (transaction) — TTL ≥ timeoutSeconds 1800 + 60 (lượt vượt trần mềm 1200 vẫn giữ khoá tới khi xong)
   BD_DEEP_SWEEP_AFTER_MIN: num(env.BD_DEEP_SWEEP_AFTER_MIN, 30),  // BrightData ngưng ≥ N′ → khi hồi gieo sâu 1 lần (start_date = lúc ngưng)
   HOUSEKEEPING_MIN: num(env.HOUSEKEEPING_MIN, 5),                 // việc phụ (quét-vét eKYC, chấm lại điểm tạm, hồ sơ BD) theo nhịp ≥ N′`;
 
@@ -74,27 +74,30 @@ export async function sowPostsB(items, opts = {}) {
   return out;
 }
 export async function harvestPostsB(opts = {}) {
-  const res = { byKey: new Map(), pendingKeys: [], learned: new Map(), harvested: 0, pending: 0, failed: 0, busy: 0, orphan: 0, bdRaw: 0, bdGood: 0 };
+  const res = { byKey: new Map(), pendingKeys: [], learned: new Map(), harvested: 0, pending: 0, failed: 0, busy: 0, orphan: 0, bdRaw: 0, bdGood: 0, unknown: 0, unknownKeys: [], legacy: 0 };
   if (CFG.MOCK_MODE || !CFG.BRIGHTDATA_TOKEN) return res;
   const docs = [];
   try { const qs = await __pendDb().collection('pending_snapshots').where('kind', '==', 'posts').get(); qs.forEach(d => docs.push({ ref: d.ref, p: d.data() || {} })); }
   catch (e) { log.warn('harvestPostsB: doc pending loi ' + e.message); return res; }
+  const glB = Array.isArray(opts.groups) ? opts.groups.filter(g => g && g.url) : []; /* LENH B (rà): snapshot P_<url> của ĐƯỜNG CŨ (Quét thử nguồn/backfill, hoặc lượt lịch cuối trước bản B) cho URL group → gặt như 1 group (không mồ côi, không mua lại) */
+  if (glB.length) { try { const snL = await __pendDb().getAll(...glB.map(g => __pendDb().collection('pending_snapshots').doc('P_' + String(g.url || '').replace(/[^\\w-]/g, '_').slice(0, 470)))); snL.forEach((d, i) => { if (!(d && d.exists)) return; const p = d.data() || {}; if (!p.snapshot_id) return; docs.push({ ref: d.ref, p: { kind: 'legacy', snapshot_id: p.snapshot_id, t: Number(p.t) || 0, ready: false, groups: [{ gkey: glB[i].gkey, url: glB[i].url, sweep: true, legacy: true, backfill: !!p.backfill }] } }); res.legacy++; }); } catch (e) {} }
   const minAge = Math.max(0, Number(opts.minAgeS) || 0) * 1000; const runId = String(opts.runId || 'run');
   const ensure = (g) => res.byKey.get(g.gkey) || (res.byKey.set(g.gkey, { g, raw: [], billed: 0 }), res.byKey.get(g.gkey));
   for (const { ref, p } of docs) {
     const id = p.snapshot_id, groups = Array.isArray(p.groups) ? p.groups : [];
-    if (!id) { try { await ref.delete(); } catch (e) {} continue; }
-    const age = Date.now() - (Number(p.t) || 0);
+    if (!id || p.harvestedAt) { try { await ref.delete(); } catch (e) {} continue; } /* LENH B (rà): doc đã gặt nhưng xoá hụt → không gặt lại (tiền/EWMA tính đôi) */
+    const age = Date.now() - (Number(p.t) || 0); const maxAgeB = (groups.some(g => g && (g.deep || g.sweep || g.legacy)) ? 6 : 2) * 3600e3;
     if (!p.ready && age < minAge) { res.pending++; groups.forEach(g => res.pendingKeys.push(g.gkey)); continue; }
     let claimed = false; // 2 lượt chồng (Quét ngay ↔ lịch) không cùng gặt 1 snapshot
-    try { claimed = await __pendDb().runTransaction(async tx => { const s = await tx.get(ref); if (!s.exists) return false; const d = s.data() || {}; if (d.claimedBy && d.claimedBy !== runId && Date.now() - (Number(d.claimedAt) || 0) < 10 * 60e3) return false; tx.update(ref, { claimedBy: runId, claimedAt: Date.now() }); return true; }); } catch (e) { claimed = false; }
+    try { claimed = await __pendDb().runTransaction(async tx => { const s = await tx.get(ref); if (!s.exists) return false; const d = s.data() || {}; if (d.harvestedAt) return false; if (d.claimedBy && d.claimedBy !== runId && Date.now() - (Number(d.claimedAt) || 0) < 10 * 60e3) return false; tx.update(ref, { claimedBy: runId, claimedAt: Date.now() }); return true; }); } catch (e) { claimed = false; }
     if (!claimed) { res.pending++; groups.forEach(g => res.pendingKeys.push(g.gkey)); continue; }
     const unclaim = async () => { try { await ref.update({ claimedBy: '', claimedAt: 0 }); } catch (e) {} };
     const pr = await bdProgressB(id);
     if (pr.st === 'busy') { res.busy++; res.pending++; groups.forEach(g => res.pendingKeys.push(g.gkey)); await unclaim(); log.warn('BrightData ' + pr.code + ' khi hoi progress ' + id + ' — hoan'); continue; }
-    if (pr.st === 'failed' || age > 2 * 3600e3) { res.failed++; try { await ref.delete(); } catch (e) {} log.warn('snapshot ' + id + (pr.st === 'failed' ? ' failed' : ' qua han 2h') + ' — bo'); continue; }
+    if (pr.st === 'unknown') { res.unknown++; res.pending++; groups.forEach(g => { res.pendingKeys.push(g.gkey); res.unknownKeys.push(g.gkey); }); await unclaim(); log.warn('harvestPostsB: progress ' + id + ' khong tra loi (' + (pr.err || pr.code) + ') — hoan'); continue; } /* LENH B (rà): không phản hồi ≠ đang chín → bdwatch coi là lỗi (không 'ok') */
+    if (pr.st === 'failed' || (pr.st !== 'ready' && age > maxAgeB)) { res.failed++; try { await ref.delete(); } catch (e) {} log.warn('snapshot ' + id + (pr.st === 'failed' ? ' failed' : ' qua han 2h') + ' — bo'); continue; }
     if (pr.st !== 'ready') { res.pending++; groups.forEach(g => res.pendingKeys.push(g.gkey)); await unclaim(); continue; }
-    let raw0 = []; try { raw0 = await bdFetch(id); } catch (e) { res.pending++; groups.forEach(g => res.pendingKeys.push(g.gkey)); await unclaim(); log.warn('harvestPostsB: fetch ' + id + ' loi ' + e.message); continue; }
+    let raw0 = []; try { raw0 = await bdFetch(id); } catch (e) { res.pending++; res.unknown++; groups.forEach(g => { res.pendingKeys.push(g.gkey); res.unknownKeys.push(g.gkey); }); await unclaim(); log.warn('harvestPostsB: fetch ' + id + ' loi ' + e.message); continue; }
     const byGid = new Map(), byUrl = new Map(), bySlug = new Map();
     groups.forEach(g => { const n = gidNumOfB(g.url); if (n) byGid.set(n, g); byUrl.set(urlKeyB(g.url), g); const sl = slugOfB(g.url); if (sl) bySlug.set(sl, g); });
     const good = raw0.filter(r => r && (r.post_id || r.id) && !r.error && !r.error_code && !r.warning && !r.warning_code);
@@ -110,7 +113,8 @@ export async function harvestPostsB(opts = {}) {
     }
     groups.forEach(g => ensure(g)); // group không có bài vẫn "đã gặt" (bd ok)
     res.harvested++;
-    try { await ref.delete(); } catch (e) {}
+    try { await ref.set({ harvestedBy: runId, harvestedAt: Date.now() }, { merge: true }); } catch (e) {}
+    try { await ref.delete(); } catch (e) { try { await ref.delete(); } catch (e2) {} }
     log.info('GAT snapshot ' + id + ' — ' + good.length + ' bai / ' + groups.length + ' group' + (res.orphan ? ' (' + res.orphan + ' record khong khop group)' : ''));
   }
   return res;
@@ -125,6 +129,8 @@ const SR6 = A('scraper', 'SR6 fetchComments sown++', "        sown++; log.info('
 const SR6_NEW = "        sown++; batch.forEach(u => sownUrls.push(u)); log.info('GIEO snapshot comment ' + snap + ' (' + batch.length + ' bai) — gat luot sau');";
 const SR7 = A('scraper', 'SR7 fetchComments out.sown', "    try { out.sown = sown; } catch (e) {}");
 const SR7_NEW = "    try { out.sown = sown; out.sownUrls = sownUrls; } catch (e) {}";
+const SR8 = A('scraper', 'SR8 normalizePost num_comments', "    num_comments: Number(p.num_comments) || 0, gid: String(p.group_id || '').trim(), /* LENH #48: cho nhịp bình luận + gid số (LỆNH B) */");
+const SR8_NEW = "    num_comments: (p.num_comments === null || p.num_comments === undefined || p.num_comments === '' || !Number.isFinite(Number(p.num_comments))) ? null : Number(p.num_comments), gid: String(p.group_id || '').trim(), /* LENH #48: cho nhịp bình luận + gid số (LỆNH B) · LENH B (rà): record THIẾU field → null = chưa biết (vẫn gieo bình luận), 0 thật mới bỏ */";
 
 /* ================= (3) index.js ================= */
 const IX1 = A('index', 'IX1 loadSources', "  snap.forEach(d => { const s = d.data(); if (s.active !== false) out.push(s); });");
@@ -143,7 +149,7 @@ let __lockHolderB = '';
 async function acquireScanLockB(trigger, runId) { /* khoá lượt: transaction system_status/scan_lock, TTL SCAN_LOCK_TTL_S — maxInstances:1 KHÔNG chống 2 lượt chồng (containerConcurrency 80, manualScan là service riêng) */
   const ref = db.collection('system_status').doc('scan_lock'); const ttl = Math.max(60, Number(CFG.SCAN_LOCK_TTL_S) || 1200) * 1000; const now = Date.now();
   try { const r = await db.runTransaction(async tx => { const s = await tx.get(ref); const d = s.exists ? (s.data() || {}) : {}; if (d.holder && d.holder !== runId && (Number(d.expireAt) || 0) > now) return { ok: false, holder: d.holder, trigger: d.trigger || '', since: Number(d.at) || 0 }; tx.set(ref, { holder: runId, trigger, at: now, expireAt: now + ttl }); return { ok: true }; }); if (r.ok) __lockHolderB = runId; return r; }
-  catch (e) { console.warn('[SCAN-LOCK] khoá lượt lỗi (fail-open):', e && e.message); return { ok: true, err: String((e && e.message) || e).slice(0, 120) }; }
+  catch (e) { console.log(JSON.stringify({ severity: 'WARNING', message: '[SCAN-LOCK] khoá lượt lỗi (fail-open, lượt vẫn chạy): ' + String((e && e.message) || e).slice(0, 160) })); return { ok: true, err: String((e && e.message) || e).slice(0, 120) }; }
 }
 async function releaseScanLockB(runId) { const id = runId || __lockHolderB; if (!id) return; const ref = db.collection('system_status').doc('scan_lock'); try { await db.runTransaction(async tx => { const s = await tx.get(ref); if (s.exists && (s.data() || {}).holder === id) tx.set(ref, { holder: '', releasedAt: Date.now(), expireAt: 0, lastHolder: id }, { merge: true }); }); } catch (e) {} if (__lockHolderB === id) __lockHolderB = ''; }
 /* nhịp thích ứng theo EWMA bài mới/giờ (τ 60′): ≥4/giờ (≈100/ngày) → sàn · ≥0,4/giờ (≈10/ngày) → 10′ · ít hơn → trần; hysteresis ±20 %; group mới (<2 mẫu) = sàn; vừa có bài mới (<30′) = sàn; im ≥6 h ban ngày = trần; đêm 23–6 h ×2 (trần) */
@@ -163,11 +169,20 @@ async function scanAll(trigger = 'scheduled', opts = {}) {
   const lk = await acquireScanLockB(trigger, runId);
   if (!lk.ok) {
     console.log('[SCAN-BUSY] lượt ' + trigger + ' bỏ qua — đang có lượt ' + (lk.trigger || '?') + ' (' + (lk.holder || '') + ') chạy từ ' + (lk.since ? Math.round((Date.now() - lk.since) / 1000) + ' s trước' : '?'));
+    try { await db.collection('system_status').doc('scan').set({ busyRuns: FieldValue.increment(1), lastBusyAt: Date.now(), lastBusyHolder: String(lk.holder || '') }, { merge: true }); } catch (_) {} /* LENH B (rà): lượt bỏ vì khoá có dấu vết */
     if (trigger === 'scheduled') return { scanned: 0, matched: 0, kept: 0, hot: 0, durationMs: 0, tokensTotal: 0, costUsd: 0, scanId: null, jobId: opts.jobId || null, busy: true };
     const e = new Error('Đang có lượt quét khác chạy — thử lại sau ít phút'); e.code = 'busy'; e.holder = lk.holder || ''; throw e;
   }
   try { return await scanAllB0(trigger, Object.assign({}, opts, { __runIdB: runId })); } finally { await releaseScanLockB(runId); }
 }`;
+const IX48 = A('index', 'IX48 sowMode', "  const sowMode = trigger === 'scheduled' && !force && !(opts.startDate || opts.endDate) && CFG.BD_SOW_MODE !== false;");
+const IX48_NEW = "  const quickManualB = trigger !== 'scheduled' && !force && !(opts.startDate || opts.endDate) && !opts.sourceUrl; /* LENH B (rà): Quét ngay = gieo NGAY mọi group + gặt snapshot đã chín (không chờ 90 s/nguồn giữ khoá lượt ~12′; bài về ở lượt lịch kế ≤3′) */\n  const sowMode = (trigger === 'scheduled' || quickManualB) && !force && !(opts.startDate || opts.endDate) && CFG.BD_SOW_MODE !== false;";
+const IX49 = A('index', 'IX49 sowMetaOf', "    const sowMetaOf = (u) => { const c = ctx.get(urlKey(u)); return c ? { url: u, srcUrl: String((c.src && c.src.url) || ''), parentUrl: c.parentUrl || u,");
+const IX49_NEW = "    const sowMetaOf = (u) => { const c = ctx.get(urlKey(u)); return c ? { url: u, srcUrl: String((c.src && c.src.url) || ''), gkey: gkeyByUrlB.get(urlKey(String((c.src && c.src.url) || ''))) || '', parentUrl: c.parentUrl || u,"; /* LENH B (rà): meta mang gkey → nguồn gieo tắt vẫn gặt được cho brand khác cùng group */
+const IX50 = A('index', 'IX50 scanAll return', "  return { scanned, matched, kept, hot, durationMs, tokensTotal: tokTotal, costUsd, scanId, jobId: opts.jobId || null };");
+const IX50_NEW = "  return { scanned, matched, kept, hot, durationMs, tokensTotal: tokTotal, costUsd, scanId, jobId: opts.jobId || null, sown: sownB, harvested: harvestedB }; /* LENH B: Quét ngay trả thêm số group đã gieo/gặt */";
+const IX51 = A('index', 'IX51 bdwatch cond', "    if (nBd >= 1 && bdErrs.length >= Math.min(3, nBd) && bdOks.length === 0) {");
+const IX51_NEW = "    if (nBd >= 1 && ((bdErrs.length >= Math.min(3, nBd) && bdOks.length === 0) || sowFailB)) { /* LENH B (rà): trigger gộp LỖI cho mọi group tới hạn = ngưng, kể cả khi lượt này vừa gặt được snapshot cũ (bd ok) */";
 const IX3 = A('index', 'IX3 scanAll head', "async function scanAll(trigger = 'scheduled', opts = {}) {\n  const t0 = Date.now();");
 const IX3_NEW = "async function scanAllB0(trigger = 'scheduled', opts = {}) { /* LENH B: thân lượt quét (khoá lượt ở scanAll) */\n  const t0 = Date.now();";
 const IX4 = A('index', 'IX4 runId48', "  const runId48 = trigger + '_' + t0.toString(36) + '_' + Math.random().toString(36).slice(2, 8);");
@@ -194,8 +209,8 @@ const IX10_NEW = "  if (hkDueB) { try { await __bdProfCollect(); } catch (e) { c
 const IX11 = A('index', 'IX11 counters', "  let probeRuns = 0, sweepRuns = 0, probeEscalated = 0, probeIdle = 0, bdRecords = 0, authCheckpoints = 0, authRuns = 0;");
 const IX11_NEW = IX11 + String.raw`
   /* LENH B: trạng thái Pha 1 theo GROUP */
-  let nGroupsB = 0, sharedGroupsB = 0, sownB = 0, harvestedB = 0, bdBusyB = 0, deepB = 0, noCmtB = 0, dupLeadB = 0, hvHarvestedB = 0, hvOrphanB = 0, gidLearnedB = 0, sweepRecordsB = 0, escalatedB = 0;
-  const gkeyBySrcIdB = new Map(), gkeyByUrlB = new Map(), gidByGkeyB = new Map(), seenCacheB = new Map(), effCacheB = new Map(), watchAddsB = new Map(), gsAllB = new Map();
+  let nGroupsB = 0, sharedGroupsB = 0, sownB = 0, harvestedB = 0, bdBusyB = 0, deepB = 0, noCmtB = 0, dupLeadB = 0, hvHarvestedB = 0, hvOrphanB = 0, gidLearnedB = 0, sweepRecordsB = 0, escalatedB = 0, dupSrcB = 0, sowFailB = false;
+  const gkeyBySrcIdB = new Map(), gkeyByUrlB = new Map(), gidByGkeyB = new Map(), seenCacheB = new Map(), effCacheB = new Map(), watchAddsB = new Map(), gsAllB = new Map(), leaseSeenB = new Set();
   const effOfB = s => { const k = s && s.__id ? s.__id : s; if (!effCacheB.has(k)) effCacheB.set(k, { ...s, keywords: [...(s.keywords || []), ...gKw], exclude: [...(s.exclude || []), ...gEx] }); return effCacheB.get(k); };
   const rowOfB = s => { let r = bySource.find(rr => s.__id ? rr.source_id === s.__id : rr.url === String(s.url || '')); if (!r) { r = { name: s.name || '', industry: s.industry || '', url: s.url || '', brand: String(s.brand || '').trim(), source_id: String(s.__id || ''), gid: gidNumB(s.url) || String(s.gid || ''), posts: 0, matched: 0, leads: 0, hot: 0, error: null, bdPosts: 0, bdComments: 0, ekyc: 0 }; bySource.push(r); } return r; };
   const watchAddB = (gk, post) => { if (!gk || !post || !post.post_id) return; const m = watchAddsB.get(gk) || (watchAddsB.set(gk, {}).get(gk)); if (Object.keys(m).length >= Math.max(1, Number(CFG.WATCH_POSTS_PER_SOURCE) || 5)) return; m[String(post.post_id)] = { url: String(post.url || '').slice(0, 300), at: Date.now(), checks: 0 }; };
@@ -210,7 +225,9 @@ const IX11_NEW = IX11 + String.raw`
       const g = groups.get(gk) || (groups.set(gk, { gkey: gk, gidNum: gk.startsWith('g_') ? gk.slice(2) : '', slug: sl, sources: [], url: '', primary: null }).get(gk));
       g.sources.push(s);
     }
-    for (const g of groups.values()) { g.sources.sort((a, b) => ((tsMsB(a.sharedAt) || 0) - (tsMsB(b.sharedAt) || 0)) || String(a.name || '').localeCompare(String(b.name || ''))); g.primary = g.sources[0]; g.url = g.primary.url; if (!g.slug) g.slug = slugB(g.url); g.sources.forEach(s => { gkeyBySrcIdB.set(s.__id, g.gkey); gkeyByUrlB.set(urlKey(s.url), g.gkey); }); gidByGkeyB.set(g.gkey, g.gidNum); }
+    for (const g of groups.values()) { g.sources.sort((a, b) => ((tsMsB(a.sharedAt) || 0) - (tsMsB(b.sharedAt) || 0)) || String(a.name || '').localeCompare(String(b.name || '')));
+      { const seenBr = new Set(); const keep = []; for (const s of g.sources) { const bk = String(s.brand || '').trim() || ('_' + s.__id); if (seenBr.has(bk)) { const row = rowOfB(s); row.bd = 'skip'; row.error = 'trùng nguồn cùng brand trong 1 group (bỏ qua — dùng nguồn "' + String((keep.find(z => (String(z.brand || '').trim() || ('_' + z.__id)) === bk) || {}).name || '') + '")'; dupSrcB++; continue; } seenBr.add(bk); keep.push(s); } g.sources = keep; } /* LENH B (rà): 2 doc nguồn cùng brand cùng group (slug + số) → 1 ứng viên/brand, không lease trùng */
+      g.primary = g.sources[0]; g.url = g.primary.url; if (!g.slug) g.slug = slugB(g.url); g.sources.forEach(s => { gkeyBySrcIdB.set(s.__id, g.gkey); gkeyByUrlB.set(urlKey(s.url), g.gkey); const row = rowOfB(s); row.gid = g.gidNum || row.gid; row.bdShared = g.sources.length > 1 && s !== g.primary; }); gidByGkeyB.set(g.gkey, g.gidNum); } /* LENH B (rà): bdShared đặt ở cả 2 đường (Quét ngay/backfill cũng tách key bd_month) */
     return groups;
   }
   const fanoutLegacyB = (groups) => { /* Quét ngay/backfill: bài của nguồn chủ → ứng viên cho MỌI brand dùng chung group */
@@ -218,9 +235,11 @@ const IX11_NEW = IX11 + String.raw`
       x.brandB = String(x.src.brand || '').trim(); x.gkeyB = gk; x.post.gid = g.gidNum || ''; x.post.shared = sh; x.post.__brand = x.brandB;
       for (const s of g.sources) { if (s === x.src) continue; const row = rowOfB(s); row.posts++; scanned++; collected.push({ post: Object.assign({}, x.post, { source: s.name, __brand: String(s.brand || '').trim() }), effSrc: effOfB(s), src: s, row, brandB: String(s.brand || '').trim(), gkeyB: gk }); } } };
   async function flushWatchB() { /* watch_posts: bài đã ra lead nhưng 0 bình luận lúc gặt → ghi group_state.watch (≤5/nguồn) để lượt sweep loại khỏi notInclude (record trả lại với num_comments) */
-    if (!watchAddsB.size) return; const wb = db.batch(); let n = 0; const cap = Math.max(1, Number(CFG.WATCH_POSTS_PER_SOURCE) || 5);
-    for (const [gk, adds] of watchAddsB) { const gs = gsAllB.get(gk) || {}; const cur = (gs.watch && typeof gs.watch === 'object') ? gs.watch : {}; const w = {}; let live = 0;
-      for (const [id, it] of Object.entries(cur)) { if ((Number(it && it.checks) || 0) >= 4 || Date.now() - (Number(it && it.at) || 0) > 2 * 86400e3) w[id] = FieldValue.delete(); else live++; }
+    const expB = it => (Number(it && it.checks) || 0) >= 4 || Date.now() - (Number(it && it.at) || 0) > 2 * 86400e3;
+    const keysB = new Set(watchAddsB.keys()); for (const [k0, gs0] of gsAllB) { if (gs0 && gs0.watch && typeof gs0.watch === 'object' && Object.values(gs0.watch).some(expB)) keysB.add(k0); } /* LENH B (rà): dọn entry hết hạn cả khi không có bài mới */
+    if (!keysB.size) return; const wb = db.batch(); let n = 0; const cap = Math.max(1, Number(CFG.WATCH_POSTS_PER_SOURCE) || 5);
+    for (const gk of keysB) { const adds = watchAddsB.get(gk) || {}; const gs = gsAllB.get(gk) || {}; const cur = (gs.watch && typeof gs.watch === 'object') ? gs.watch : {}; const w = {}; let live = 0;
+      for (const [id, it] of Object.entries(cur)) { if (expB(it)) w[id] = FieldValue.delete(); else live++; }
       for (const [id, it] of Object.entries(adds)) { if (cur[id] || live >= cap) continue; w[id] = it; live++; }
       if (Object.keys(w).length) { wb.set(db.collection('group_state').doc(gk), { watch: w, watchAt: Date.now() }, { merge: true }); n++; } }
     if (n) { try { await wb.commit(); } catch (e) { console.warn('[B] ghi watch_posts lỗi:', e && e.message); } }
@@ -235,11 +254,12 @@ const IX12_BD1_NEW = "      { const nb = (CFG.BD_ERROR_RECORD_BILLED !== false &
 const PHA1B = String.raw`
   /* ===== LENH B (12/09/2026) — PHA 1 THEO GROUP (gid số): gặt snapshot gộp đã chín → fan-out ứng viên cho từng brand dùng chung group; gieo GỘP 1 trigger/lượt cho group tới nhịp (thích ứng);
      sweep = start_date lastSweepAt−6h + notInclude; probe đầy bài mới → gieo đủ POSTS_PER_GROUP ngay; deep sweep 1 lần khi BrightData hồi sau ≥ BD_DEEP_SWEEP_AFTER_MIN; watch_posts loại khỏi notInclude ở lượt sweep ===== */
-  const pha1B = async (groups) => {
+  const pha1B = async (groups, pOpts) => { pOpts = pOpts || {};
     const SRB = await import('./lib/scraper.js');
     const nowB = Date.now(); const stBd = await db.collection('system_status').doc('brightdata').get().catch(() => null); const stBdD = (stBd && stBd.exists) ? (stBd.data() || {}) : {};
     for (const g of groups.values()) g.sources.forEach(s => { const row = rowOfB(s); row.gid = g.gidNum || row.gid; row.bdShared = g.sources.length > 1 && s !== g.primary; });
     const gkeys = [...groups.keys()]; if (!gkeys.length) return;
+    const aliasB = new Map(); for (const g of groups.values()) { if (g.slug) aliasB.set('s_' + g.slug, g.gkey); if (g.gidNum) aliasB.set('g_' + g.gidNum, g.gkey); } const grpOfB = k => groups.get(k) || groups.get(aliasB.get(k)); const keyOfB = g => (g.gidNum ? 'g_' + g.gidNum : g.gkey); /* LENH B (rà): nguồn slug học gid TRONG lượt → snapshot gieo cùng lượt mang khoá g_<num>; khoá cũ s_<slug> (snapshot đang chín) resolve qua alias — không mồ côi */
     // group_state theo gkey (migration: chưa có → đọc doc cũ theo URL nguồn chủ)
     let gsNew = []; try { gsNew = await db.getAll(...gkeys.map(k => db.collection('group_state').doc(k))); } catch (e) { gsNew = []; }
     const oldNeed = gkeys.filter((k, i) => !(gsNew[i] && gsNew[i].exists));
@@ -250,30 +270,33 @@ const PHA1B = String.raw`
     oldNeed.forEach((k, i) => { if (gsAllB.has(k)) return; const ss = gsSlug[i]; if (ss && ss.exists && k.startsWith('g_')) { gsAllB.set(k, Object.assign({}, ss.data() || {}, { migratedFrom: 's_' + groups.get(k).slug })); return; }
       const sn = gsOld[i]; if (sn && sn.exists) { const d = sn.data() || {}; gsAllB.set(k, { url: d.url || '', lastTriggerAt: Number(d.lastTriggerAt) || 0, lastSweepAt: tsMsB(d.lastSweepAt) || 0, recentIds: Array.isArray(d.recentIds) ? d.recentIds : [], migratedFrom: 'url' }); } });
     const gsWrite = new Map(); const upd = (k, patch) => gsWrite.set(k, Object.assign(gsWrite.get(k) || {}, patch));
+    for (const k of oldNeed) { const m0 = gsAllB.get(k); if (m0 && m0.migratedFrom) { const seed = Object.assign({}, m0); delete seed.migratedFrom; upd(k, seed); } } /* LENH B (rà): doc g_<num> mới ghi KÈM lastTriggerAt/lastSweepAt/recentIds/rate/watch di trú (không thì lượt kế thấy doc trống → gieo sớm + sweep notInclude rỗng 1 lần) */
     // (a) GẶT
-    const hv = await SRB.harvestPostsB({ runId: runId48, minAgeS: CFG.BD_NOTIFY_URL ? 0 : CFG.BD_PROGRESS_MIN_AGE_S });
+    const hv = await SRB.harvestPostsB({ runId: runId48, minAgeS: CFG.BD_PROGRESS_MIN_AGE_S, groups: [...groups.values()].flatMap(g => g.sources.map(s => ({ gkey: g.gkey, url: String(s.url || '') }))) });
     harvestedB = hv.harvested; bdBusyB = hv.busy; hvOrphanB += hv.orphan || 0;
+    for (const gk of new Set(hv.unknownKeys || [])) { const g = grpOfB(gk); if (g) g.sources.forEach(s => { const row = rowOfB(s); row.bd = 'skip'; row.error = 'BrightData không phản hồi progress/snapshot (fetch failed)'; scrapeErrors++; }); } /* LENH B (rà): mất kết nối BrightData khi có snapshot chờ → không đánh 'ok' → bdwatch bắt DOWN đúng lượt */
+    const collKeyB = new Set(); /* LENH B (rà): 2 snapshot cùng group trong 1 lượt (probe đang chín + deep/escalate) → không đưa cùng (bài, brand) vào ứng viên 2 lần */
     for (const [gk, e] of hv.byKey) {
-      const g = groups.get(gk); if (!g) { hvOrphanB += e.raw.length; continue; } // group đã tắt/đổi → bỏ (nguồn tắt tạm = chấp nhận)
-      const gs = gsAllB.get(gk) || {};
+      const g = grpOfB(gk); if (!g) { hvOrphanB += e.raw.length; continue; } // group đã tắt/đổi → bỏ (nguồn tắt tạm = chấp nhận)
+      const gs = Object.assign({}, gsAllB.get(g.gkey) || {}, gsWrite.get(g.gkey) || {});
       g.sources.forEach(s => { const row = rowOfB(s); row.bd = 'ok'; if (s === g.primary) { const nb = CFG.BD_ERROR_RECORD_BILLED !== false ? e.billed : e.raw.length; row.bdPosts += nb; bdRecords += nb; } });
-      const learned = hv.learned.get(gk); if (learned && !g.gidNum) { upd('s_' + g.slug, { gidNum: learned, url: g.url }); g.gidNum = learned; gidByGkeyB.set(gk, learned); g.sources.forEach(s => { rowOfB(s).gid = learned; db.collection('sources').doc(s.__id).set({ gid: learned }, { merge: true }).catch(() => {}); }); gidLearnedB++; }
+      const learned = hv.learned.get(gk); if (learned && !g.gidNum) { upd('s_' + g.slug, { gidNum: learned, url: g.url }); g.gidNum = learned; gidByGkeyB.set(g.gkey, learned); aliasB.set('g_' + learned, g.gkey); g.sources.forEach(s => { rowOfB(s).gid = learned; db.collection('sources').doc(s.__id).set({ gid: learned }, { merge: true }).catch(() => {}); }); gidLearnedB++; }
       const posts0 = e.raw.map(r => SRB.normalizePost(r, g.primary)); const ids = posts0.map(p => String(p.post_id)).filter(Boolean);
       let seenSn = []; try { seenSn = ids.length ? await db.getAll(...ids.map(id => seenDoc(id))) : []; } catch (er) { seenSn = []; }
       let newN = 0; ids.forEach((id, i) => { const sn = seenSn[i] || null; seenCacheB.set(id, sn); if (!(sn && sn.exists)) newN++; });
       const prevAt = Number(gs.lastHarvestAt) || 0; let rate = Number(gs.rate) || 0, samples = Number(gs.rateN) || 0;
       if (!e.g.sweep && !e.g.deep) { const dtH = prevAt ? Math.max(1 / 60, (nowB - prevAt) / 3600e3) : 0; if (dtH) { const alpha = 1 - Math.exp(-dtH); rate = rate + alpha * ((newN / dtH) - rate); } else rate = newN; samples++; }
-      upd(gk, Object.assign({ url: g.url, gidNum: g.gidNum || '', lastHarvestAt: nowB, rate: Math.round(rate * 1000) / 1000, rateN: samples, lastPostAt: newN ? nowB : (Number(gs.lastPostAt) || 0), recentIds: [...new Set([...ids, ...(Array.isArray(gs.recentIds) ? gs.recentIds : [])])].slice(0, 200), recentIdsAt: nowB, brands: g.sources.map(s => String(s.brand || '').trim()) }, newN ? { band: 'fast' } : {}));
+      upd(g.gkey, Object.assign({ url: g.url, gidNum: g.gidNum || '', lastHarvestAt: nowB, rate: Math.round(rate * 1000) / 1000, rateN: samples, lastPostAt: newN ? nowB : (Number(gs.lastPostAt) || 0), recentIds: [...new Set([...ids, ...(Array.isArray(gs.recentIds) ? gs.recentIds : [])])].slice(0, 200), recentIdsAt: nowB, brands: g.sources.map(s => String(s.brand || '').trim()) }, newN ? { band: 'fast' } : {}));
       if (e.g.sweep) { sweepRuns++; sweepRecordsB += e.raw.length; } else if (!e.g.deep && !e.g.escalate) probeRuns++;
       if (e.g.deep) deepB++;
       const wantN = Number(e.g.numPosts) || 0; if (!e.g.sweep && !e.g.deep && !e.g.escalate && wantN && posts0.length >= wantN && newN >= posts0.length) { g.escalate = true; probeEscalated++; }
       if (posts0.length && newN === 0 && !e.g.sweep && !e.g.deep) probeIdle++;
       const watch = (gs.watch && typeof gs.watch === 'object') ? gs.watch : {};
       e.raw.forEach((r, i) => { const base = posts0[i]; const sn = seenCacheB.get(String(base.post_id)); const isNew = !(sn && sn.exists); const watched = !isNew && !!watch[String(base.post_id)] && Number(base.num_comments) > 0;
-        g.sources.forEach(s => { const p = Object.assign(SRB.normalizePost(r, s), { gid: g.gidNum || '', shared: g.sources.length > 1, __brand: String(s.brand || '').trim(), __watch: watched }); const row = rowOfB(s); row.posts++; scanned++; collected.push({ post: p, effSrc: effOfB(s), src: s, row, brandB: String(s.brand || '').trim(), gkeyB: gk }); }); });
+        g.sources.forEach(s => { const p = Object.assign(SRB.normalizePost(r, s), { gid: g.gidNum || '', shared: g.sources.length > 1, __brand: String(s.brand || '').trim(), __watch: watched }); const ck = String(p.post_id) + '|' + String(s.brand || '').trim(); if (collKeyB.has(ck)) return; collKeyB.add(ck); const row = rowOfB(s); if (isNew) { row.posts++; scanned++; } collected.push({ post: p, effSrc: effOfB(s), src: s, row, brandB: String(s.brand || '').trim(), gkeyB: g.gkey }); }); }); /* LENH B (rà): posts/scanned chỉ đếm bài MỚI (như leadingNew cũ; bdPosts = record tính tiền) */
     }
     // (b) GIEO
-    const pendingKeys = new Set(hv.pendingKeys || []);
+    const pendingKeys = new Set((hv.pendingKeys || []).map(k => { const g0 = grpOfB(k); return g0 ? g0.gkey : k; }));
     if (hv.busy) for (const gk of pendingKeys) { const g = groups.get(gk); if (g) g.sources.forEach(s => { const row = rowOfB(s); row.bd = 'busy'; row.error = 'BrightData tạm quá tải (rate limit) khi hỏi progress — hoãn gặt/gieo, không tính là ngưng'; }); }
     const floorMin = Math.max(3, Number(config.scanIntervalMin) || Number(CFG.SCAN_INTERVAL_MIN_FLOOR) || 5), maxMin = Math.max(floorMin, Number(config.scanIntervalMaxMin) || Number(CFG.SCAN_INTERVAL_MAX_MIN) || 30);
     const vnH = new Date(nowB + 7 * 3600e3).getUTCHours(); const night = vnH >= 23 || vnH < 6;
@@ -284,30 +307,33 @@ const PHA1B = String.raw`
       if (pendingKeys.has(g.gkey) && !deepDue && !g.escalate) { g.sources.forEach(s => { const row = rowOfB(s); if (!row.bd) row.bd = 'ok'; }); continue; } // snapshot đang chín → chờ (deep/escalate vẫn gieo)
       const adapt = ivB(gs, floorMin, maxMin, night, nowB); const ovr = Math.max(0, ...g.sources.map(s => Number(s.scanIntervalMin) || 0)); const ivMin = ovr > 0 ? Math.max(3, ovr) : adapt.iv;
       upd(g.gkey, { iv: ivMin, band: adapt.band, url: g.url });
-      const due = !!(g.escalate || deepDue) || (nowB - (Number(gs.lastTriggerAt) || 0)) >= ivMin * 60e3;
+      const due = !!(g.escalate || deepDue || pOpts.forceDue) || (nowB - (Number(gs.lastTriggerAt) || 0)) >= ivMin * 60e3; /* LENH B (rà): Quét ngay → mọi group tới hạn (snapshot đang chín thì vẫn chờ) */
       if (!due) { g.sources.forEach(s => { const row = rowOfB(s); if (!row.bd) row.bd = 'skip'; }); continue; }
       if (hv.busy && !g.escalate) { g.sources.forEach(s => { const row = rowOfB(s); row.bd = 'busy'; row.error = 'BrightData tạm quá tải (rate limit) — hoãn gieo, không tính là ngưng'; }); continue; }
       const recent = Array.isArray(gs.recentIds) ? gs.recentIds : []; const watch = (gs.watch && typeof gs.watch === 'object') ? gs.watch : {};
-      const it = { gkey: g.gkey, url: g.url, sweep: false, deep: false, escalate: false, notInclude: recent };
+      const it = { gkey: keyOfB(g), url: g.url, sweep: false, deep: false, escalate: false, notInclude: recent };
+      const wLiveB = Object.keys(watch).filter(id => (Number(watch[id] && watch[id].checks) || 0) < 4 && nowB - (Number(watch[id] && watch[id].at) || 0) < 2 * 86400e3); let wIds = []; /* LENH B (rà): watch kiểm ở sweep VÀ ở probe mỗi ≥12 h (2 ngày ≈ 4 lần), không chỉ 4 sweep liên tiếp */
       if (deepDue) { const hrs = Math.max(1, (nowB - (Number(deepDue.downSince) || nowB)) / 3600e3); it.deep = true; it.numPosts = Math.min(200, Math.ceil((Number(gs.rate) || 1) * hrs) + 10); it.startDate = fmtMDY(new Date((Number(deepDue.downSince) || nowB) - 3600e3)); it.endDate = fmtMDY(new Date(nowB)); }
       else if ((nowB - (tsMsB(gs.lastSweepAt) || 0)) >= SWEEP_MS) { it.sweep = true; it.numPosts = CFG.POSTS_PER_GROUP; const from = (tsMsB(gs.lastSweepAt) || (nowB - 24 * 3600e3)) - 6 * 3600e3; it.startDate = fmtMDY(new Date(from)); it.endDate = fmtMDY(new Date(nowB));
-        const wIds = Object.keys(watch).filter(id => (Number(watch[id] && watch[id].checks) || 0) < 4 && nowB - (Number(watch[id] && watch[id].at) || 0) < 2 * 86400e3); if (wIds.length) { it.notInclude = recent.filter(id => !wIds.includes(id)); it.watchIds = wIds; } }
+        wIds = wLiveB; }
       else if (g.escalate) { it.escalate = true; it.numPosts = CFG.POSTS_PER_GROUP; }
-      else { it.numPosts = ((Number(gs.rate) || 0) >= 4) ? Math.max(PROBE, 10) : PROBE; }
+      else { it.numPosts = ((Number(gs.rate) || 0) >= 4) ? Math.max(PROBE, 10) : PROBE; wIds = wLiveB.filter(id => nowB - (Number(watch[id] && watch[id].lastCheckAt) || Number(watch[id] && watch[id].at) || 0) >= 12 * 3600e3); }
+      if (wIds.length) { it.notInclude = recent.filter(id => !wIds.includes(id)); it.watchIds = wIds; }
       items.push(it);
     }
     const sow = items.length ? await SRB.sowPostsB(items, { notify: CFG.BD_NOTIFY_URL || '', chunk: CFG.BD_MAX_TRIGGERS_PER_RUN, runId: runId48 }) : { sown: 0, sownKeys: [], failedKeys: [], err: '' };
     sownB = sow.sown; escalatedB = items.filter(i => i.escalate).length;
-    for (const it of items) { const g = groups.get(it.gkey); const okS = sow.sownKeys.indexOf(it.gkey) >= 0;
+    for (const it of items) { const g = grpOfB(it.gkey); const okS = sow.sownKeys.indexOf(it.gkey) >= 0;
       if (okS) { const patch = { url: g.url, lastTriggerAt: nowB }; if (it.sweep) patch.lastSweepAt = nowB; if (it.deep) patch.lastDeepAt = nowB; if (it.watchIds) { patch.watch = {}; it.watchIds.forEach(id => { patch.watch[id] = { checks: FieldValue.increment(1), lastCheckAt: nowB }; }); } upd(g.gkey, patch); g.sources.forEach(s => { rowOfB(s).bd = 'ok'; }); }
-      else if (!sow.mock) { g.sources.forEach(s => { const row = rowOfB(s); row.error = ('trigger lỗi: ' + (sow.err || '?')).slice(0, 140); scrapeErrors++; }); } }
+      else if (!sow.mock) { g.sources.forEach(s => { const row = rowOfB(s); row.bd = 'err'; row.error = ('trigger lỗi: ' + (sow.err || '?')).slice(0, 140); scrapeErrors++; }); } }
+    if (items.length && !sow.mock && !sow.sown && sow.err) sowFailB = true; /* LENH B (rà): mọi lô trigger lỗi → bdwatch coi là ngưng dù vừa gặt được */
     if (deepDue && items.some(i => i.deep) && sow.sown) { try { await db.collection('system_status').doc('brightdata').set({ deepDue: Object.assign({}, deepDue, { doneAt: nowB, groups: sow.sown }) }, { merge: true }); } catch (e) {} console.log('[BRIGHTDATA-DEEP] gieo sâu ' + sow.sown + ' group từ ' + new Date((Number(deepDue.downSince) || nowB) - 3600e3 + 7 * 3600e3).toISOString().slice(0, 16).replace('T', ' ') + ' VN (bù bài trong lúc BrightData ngưng)'); }
     { const wb = db.batch(); let n = 0; for (const [k, patch] of gsWrite) { wb.set(db.collection('group_state').doc(k), Object.assign({ updatedAt: nowB }, patch), { merge: true }); n++; } if (n) { try { await wb.commit(); } catch (e) { console.warn('[B] ghi group_state lỗi:', e && e.message); } } }
     if (sownB || harvestedB) console.log('[B] group ' + groups.size + ' · gặt ' + harvestedB + ' snapshot (' + hv.bdGood + '/' + hv.bdRaw + ' record) · gieo ' + sownB + ' group' + (escalatedB ? ' (' + escalatedB + ' escalate)' : '') + (items.filter(i => i.sweep).length ? ' · sweep ' + items.filter(i => i.sweep).length : '') + (hv.busy ? ' · BrightData busy ' + hv.busy : '') + ' · ứng viên ' + collected.length);
   };
-  const groupsB = await buildGroupsB(sources.filter(s => !s.authAccountId)); nGroupsB = groupsB.size; sharedGroupsB = [...groupsB.values()].filter(g => g.sources.length > 1).length;
+  const groupsB = await buildGroupsB(sources.filter(s => !s.authAccountId)); nGroupsB = groupsB.size; if (dupSrcB) console.log(JSON.stringify({ severity: 'WARNING', message: '[SOURCE-DUP] ' + dupSrcB + ' nguồn trùng brand+group (chỉ nguồn đầu được quét) — xem scans.bySource.error' })); sharedGroupsB = [...groupsB.values()].filter(g => g.sources.length > 1).length;
   const restB = sources.filter(s => s.authAccountId || !gkeyBySrcIdB.has(s.__id)); // nguồn nick / URL không phải group → đường cũ
-  if (sowMode) { await pha1B(groupsB); if (restB.length) await legacyPha1B(restB); }
+  if (sowMode) { await pha1B(groupsB, { forceDue: quickManualB }); if (restB.length) await legacyPha1B(restB); }
   else { const prim = new Set([...groupsB.values()].map(g => g.primary)); await legacyPha1B(sources.filter(s => restB.indexOf(s) >= 0 || prim.has(s))); fanoutLegacyB(groupsB); } // Quét ngay/backfill: 1 lần/group (nguồn chủ) rồi fan-out
   srcDone = sources.length; await prog('scraping', true);
 `;
@@ -319,21 +345,21 @@ const IX15_NEW = String.raw`      if (!pd || pd.ok !== true) { /* LENH B: đang 
         const wasDown = !!(pd && pd.ok === false); const streak = wasDown ? (Number(pd.okStreak) || 0) + 1 : 2;
         if (streak < 2) await stRef.set({ okStreak: streak, at: Date.now() }, { merge: true });
         else { const downMs = (wasDown && pd.since) ? Date.now() - Number(pd.since) : 0; const deep = downMs >= Math.max(1, Number(CFG.BD_DEEP_SWEEP_AFTER_MIN) || 30) * 60e3 ? { downSince: Number(pd.since), at: Date.now(), downMin: Math.round(downMs / 60000) } : null;
-          await stRef.set(Object.assign({ ok: true, at: Date.now(), recoveredAt: Date.now(), runs: 0, okStreak: 0 }, deep ? { deepDue: deep } : {}), { merge: true });
+          await stRef.set(Object.assign({ ok: true, at: Date.now(), recoveredAt: Date.now(), runs: 0, okStreak: 0 }, deep ? { deepDue: Object.assign({}, deep, { doneAt: FieldValue.delete(), groups: FieldValue.delete() }) } : {}), { merge: true }); /* LENH B (rà): set-merge giữ doneAt cũ → xoá tường minh, lần ngưng sau vẫn gieo sâu */
           if (wasDown) console.log(JSON.stringify({ severity: 'WARNING', message: '[BRIGHTDATA-UP] BrightData hoạt động lại' + (deep ? ' — ngưng ' + deep.downMin + '′ → lượt sau gieo sâu (deep sweep) mọi group' : '') })); } }`;
 /* --- Pha 1b --- */
 const IX16 = A('index', 'IX16 ctx map', "    const ctx = new Map();\n    const cand = []; // ứng viên bài (đã khử trùng theo URL trong lần chạy này)");
 const IX16_NEW = "    const ctx = new Map(); const ctxAllB = new Map(); /* LENH B: MỌI brand dùng chung group của 1 bài */\n    const cand = []; // ứng viên bài (đã khử trùng theo URL trong lần chạy này)";
 const IX17 = A('index', 'IX17 ctx set', "      const k = urlKey(u); if (ctx.has(k)) continue;\n      ctx.set(k, { effSrc: x.effSrc, src: x.src, row: x.row, parentAuthor: x.post.author || '', parentText: x.post.text || '', parentUrl: x.post.url || '', parentUserUrl: x.post.user_url || '' }); /* v-selfcmt */\n      cand.push({ k, url: u, src: x.src });");
-const IX17_NEW = "      const k = urlKey(u); const cB = { effSrc: x.effSrc, src: x.src, row: x.row, parentAuthor: x.post.author || '', parentText: x.post.text || '', parentUrl: x.post.url || '', parentUserUrl: x.post.user_url || '', gid: x.post.gid || '' }; /* v-selfcmt · LENH B */\n      { const arr = ctxAllB.get(k) || (ctxAllB.set(k, []).get(k)); if (!arr.some(z => z.src === x.src)) arr.push(cB); }\n      if (ctx.has(k)) continue;\n      ctx.set(k, cB);\n      cand.push({ k, url: u, src: x.src, nc: Number(x.post.num_comments), watch: !!x.post.__watch });";
+const IX17_NEW = "      const k = urlKey(u); const cB = { effSrc: x.effSrc, src: x.src, row: x.row, parentAuthor: x.post.author || '', parentText: x.post.text || '', parentUrl: x.post.url || '', parentUserUrl: x.post.user_url || '', gid: x.post.gid || '' }; /* v-selfcmt · LENH B */\n      { const arr = ctxAllB.get(k) || (ctxAllB.set(k, []).get(k)); if (!arr.some(z => z.src === x.src)) arr.push(cB); }\n      if (ctx.has(k)) continue;\n      ctx.set(k, cB);\n      cand.push({ k, url: u, src: x.src, nc: (x.post.num_comments === null || x.post.num_comments === undefined || x.post.num_comments === '') ? null : Number(x.post.num_comments), watch: !!x.post.__watch });";
 const IX18 = A('index', 'IX18 srcCtx', "        for (const s of sources) { const u = String(s.url || ''); const r = bySource.find(rr => rr.url === u); if (u && r && !srcCtx.has(u)) srcCtx.set(u, { src: s, effSrc: { ...s, keywords: [...(s.keywords || []), ...gKw], exclude: [...(s.exclude || []), ...gEx] }, row: r }); }");
 const IX18_NEW = IX18 + "\n        const srcCtxAllB = new Map(); for (const s of sources) { const gk = gkeyBySrcIdB.get(s.__id); if (!gk) continue; const r2 = bySource.find(rr => rr.source_id === s.__id) || bySource.find(rr => rr.url === String(s.url || '')); if (!r2) continue; (srcCtxAllB.get(gk) || (srcCtxAllB.set(gk, []).get(gk))).push({ src: s, effSrc: effOfB(s), row: r2 }); } /* LENH B */";
 const IX19 = A('index', 'IX19 harvest metas', "        for (const m of hv.metas) { const cc = m && srcCtx.get(String(m.srcUrl || '')); const k = urlKey((m && (m.parentUrl || m.url)) || ''); if (!cc || !k) { orphan++; continue; } if (!ctx.has(k)) ctx.set(k, { effSrc: cc.effSrc, src: cc.src, row: cc.row, parentAuthor: m.parentAuthor || '', parentText: m.parentText || '', parentUrl: m.parentUrl || m.url || '', parentUserUrl: m.parentUserUrl || '' }); }\n        hvCmts = hv.items;");
-const IX19_NEW = "        for (const m of hv.metas) { const cc = m && srcCtx.get(String(m.srcUrl || '')); const k = urlKey((m && (m.parentUrl || m.url)) || ''); if (!cc || !k) { orphan++; continue; } if (!ctx.has(k)) ctx.set(k, { effSrc: cc.effSrc, src: cc.src, row: cc.row, parentAuthor: m.parentAuthor || '', parentText: m.parentText || '', parentUrl: m.parentUrl || m.url || '', parentUserUrl: m.parentUserUrl || '' });\n          { const gk = gkeyByUrlB.get(urlKey(m.srcUrl)) || ''; const all = (gk && srcCtxAllB.get(gk)) || [cc]; const arr = ctxAllB.get(k) || (ctxAllB.set(k, []).get(k)); all.forEach(c2 => { if (!arr.some(z => z.src === c2.src)) arr.push({ effSrc: c2.effSrc, src: c2.src, row: c2.row, parentAuthor: m.parentAuthor || '', parentText: m.parentText || '', parentUrl: m.parentUrl || m.url || '', parentUserUrl: m.parentUserUrl || '', gid: gidByGkeyB.get(gk) || '' }); }); } } /* LENH B: mọi brand của group nhận bình luận đã gặt */\n        hvCmts = hv.items; hvHarvestedB = Number(hv.harvested) || 0;";
+const IX19_NEW = "        for (const m of hv.metas) { let cc = m && srcCtx.get(String(m.srcUrl || '')); if (m && !cc && m.gkey && srcCtxAllB.has(String(m.gkey))) cc = srcCtxAllB.get(String(m.gkey))[0]; /* LENH B (rà): nguồn của brand gieo đã tắt → nguồn khác cùng group nhận */ const k = urlKey((m && (m.parentUrl || m.url)) || ''); if (!cc || !k) { orphan++; continue; } if (!ctx.has(k)) ctx.set(k, { effSrc: cc.effSrc, src: cc.src, row: cc.row, parentAuthor: m.parentAuthor || '', parentText: m.parentText || '', parentUrl: m.parentUrl || m.url || '', parentUserUrl: m.parentUserUrl || '' });\n          { const gk = (m.gkey && srcCtxAllB.has(String(m.gkey))) ? String(m.gkey) : (gkeyByUrlB.get(urlKey(m.srcUrl)) || ''); const all = (gk && srcCtxAllB.get(gk)) || [cc]; const arr = ctxAllB.get(k) || (ctxAllB.set(k, []).get(k)); all.forEach(c2 => { if (!arr.some(z => z.src === c2.src)) arr.push({ effSrc: c2.effSrc, src: c2.src, row: c2.row, parentAuthor: m.parentAuthor || '', parentText: m.parentText || '', parentUrl: m.parentUrl || m.url || '', parentUserUrl: m.parentUserUrl || '', gid: gidByGkeyB.get(gk) || '' }); }); } } /* LENH B: mọi brand của group nhận bình luận đã gặt */\n        hvCmts = hv.items; hvHarvestedB = Number(hv.harvested) || 0;";
 const IX20 = A('index', 'IX20 bw batch', "    const bw = db.batch(); let bwN = 0;");
 const IX20_NEW = "    const bkOpsB = []; /* LENH B (S6): bookkeeping cmt_scrape ghi SAU khi gieo OK (quét theo lịch) */";
 const IX21 = A('index', 'IX21 doIt block', "      if (doIt) {\n        items.push({ url: c.url, source: c.src });\n        bw.set(cmtDoc(c.k), d ? { lastAt: FieldValue.serverTimestamp() } : { firstAt: FieldValue.serverTimestamp(), lastAt: FieldValue.serverTimestamp() }, { merge: true });\n        bwN++;\n      } else { commentsRefreshSkipped++; }\n    });\n    if (bwN) { try { await bw.commit(); } catch (e) {} }");
-const IX21_NEW = "      if (doIt && sowMode && !c.watch && Number.isFinite(c.nc) && c.nc <= 0) { doIt = false; noCmtB++; } /* LENH B (§9.4/9.20): bài 0 bình luận lúc gặt → không gieo snapshot bình luận (record rỗng vẫn tốn tiền); bài watch được gieo khi num_comments > 0 */\n      if (doIt) {\n        items.push({ url: c.url, source: c.src });\n        bkOpsB.push({ url: c.url, ref: cmtDoc(c.k), data: d ? { lastAt: FieldValue.serverTimestamp() } : { firstAt: FieldValue.serverTimestamp(), lastAt: FieldValue.serverTimestamp() } });\n      } else { commentsRefreshSkipped++; }\n    });\n    const commitBkB = async (urlSet) => { const wb2 = db.batch(); let n2 = 0; for (const o of bkOpsB) { if (urlSet && !urlSet.has(o.url)) continue; wb2.set(o.ref, o.data, { merge: true }); n2++; } if (n2) { try { await wb2.commit(); } catch (e) {} } };\n    if (!sowMode) await commitBkB(null); /* quét tay/backfill: chờ trong lượt như cũ → ghi ngay */";
+const IX21_NEW = "      if (doIt && sowMode && !c.watch && c.nc !== null && Number.isFinite(c.nc) && c.nc <= 0) { doIt = false; noCmtB++; } /* LENH B (§9.4/9.20): bài 0 bình luận lúc gặt → không gieo snapshot bình luận (record rỗng vẫn tốn tiền); bài watch được gieo khi num_comments > 0 */\n      if (doIt) {\n        items.push({ url: c.url, source: c.src });\n        bkOpsB.push({ url: c.url, ref: cmtDoc(c.k), data: d ? { lastAt: FieldValue.serverTimestamp() } : { firstAt: FieldValue.serverTimestamp(), lastAt: FieldValue.serverTimestamp() } });\n      } else { commentsRefreshSkipped++; }\n    });\n    const commitBkB = async (urlSet) => { const wb2 = db.batch(); let n2 = 0; for (const o of bkOpsB) { if (urlSet && !urlSet.has(o.url)) continue; wb2.set(o.ref, o.data, { merge: true }); n2++; } if (n2) { try { await wb2.commit(); } catch (e) {} } };\n    if (!sowMode) await commitBkB(null); /* quét tay/backfill: chờ trong lượt như cũ → ghi ngay */";
 const IX22 = A('index', 'IX22 fetchComments call', "      const cmts = await fetchComments(items, { perPost: CFG.COMMENTS_PER_POST, billed: cmtBilled, sow: sowMode, metaOf: sowMetaOf }); // v-sowc: sow=true → chỉ gieo");
 const IX22_NEW = IX22 + "\n      if (sowMode) await commitBkB(new Set(Array.isArray(cmts && cmts.sownUrls) ? cmts.sownUrls : [])); /* LENH B (S6): chỉ bài gieo OK mới ghi lastAt (snapshot lỗi → lượt sau gieo lại) */";
 const IX23_A = A('index', 'IX23 cmt loop head', "      for (const { comment, parentUrl } of [...hvCmts, ...cmts]) { // v-sowc: comment đã gặt + comment quét ngay (quét tay/backfill)\n        const c = ctx.get(urlKey(parentUrl)) || ctx.get(urlKey(comment.parent_url));");
@@ -363,7 +389,8 @@ const IX24_NEW = String.raw`  /* LENH B (T-6): lượt THUẦN SKIP (không gieo
       try { await db.collection('system_status').doc('scan').set({ phase: 'done', at: Date.now(), runId: runId48, trigger, lastRunAt: Date.now(), lastDurationMs: Date.now() - t0, skipRuns: FieldValue.increment(1), lastSkipAt: Date.now() }, { merge: true }); } catch (_) {}
       if (job) { try { await job.set({ status: 'done', phase: 'done', finishedAt: FieldValue.serverTimestamp(), skipped: true }, { merge: true }); } catch (e) {} }
       console.log('[B] lượt thuần skip (' + Math.round((Date.now() - t0) / 100) / 10 + ' s): chưa tới nhịp gieo, không snapshot chín, không bài chờ AI — không ghi scans');
-      return { scanned: 0, matched: 0, kept: 0, hot: 0, durationMs: Date.now() - t0, tokensTotal: 0, costUsd: 0, scanId: null, jobId: opts.jobId || null, skipped: true };
+      try { const ymB = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 7); await db.collection('bd_month').doc(ymB).set({ month: ymB, updatedAt: FieldValue.serverTimestamp(), runs: FieldValue.increment(1), skipRuns: FieldValue.increment(1) }, { merge: true }); } catch (_) {} /* LENH B (rà): lượt thuần skip vẫn đếm runs/skipRuns ở bd_month (T-6) */
+      return { scanned: 0, matched: 0, kept: 0, hot: 0, durationMs: Date.now() - t0, tokensTotal: 0, costUsd: 0, scanId: null, jobId: opts.jobId || null, skipped: true, sown: 0, harvested: 0 };
     }
   }
 ` + IX24;
@@ -406,7 +433,7 @@ const IX25_NEW = String.raw`    /* LENH #48 (PB-2d) · LENH B: seen/{post_id} = 
         for (const m of merge2.values()) { wb2.set(m.ref, { brands: m.brands }, { merge: true }); w2++; }
         if (w2) { try { await wb2.commit(); markCreatedB(create2); } catch (e2) { console.warn('[seen] commit lần 2 lỗi:', e2 && e2.message); } } } } }`;
 const IX26 = A('index', 'IX26 lease src', "lw.set(ref, { post: slimPost48(x.post), src: { name: (x.src && x.src.name) || '', url: (x.src && x.src.url) || '', industry: (x.src && x.src.industry) || '', brand: String((x.src && x.src.brand) || '') },");
-const IX26_NEW = "lw.set(ref, { post: slimPost48(x.post), src: { name: (x.src && x.src.name) || '', url: (x.src && x.src.url) || '', industry: (x.src && x.src.industry) || '', brand: String((x.src && x.src.brand) || ''), source_id: String((x.src && x.src.__id) || ''), gid: String((x.post && x.post.gid) || ''), fanout: !!x.brandB /* LENH B */ },";
+const IX26_NEW = "if (leaseSeenB.has(ref.id)) continue; leaseSeenB.add(ref.id); /* LENH B (rà): 1 doc chờ/ứng viên trong 1 batch */ lw.set(ref, { post: slimPost48(x.post), src: { name: (x.src && x.src.name) || '', url: (x.src && x.src.url) || '', industry: (x.src && x.src.industry) || '', brand: String((x.src && x.src.brand) || ''), source_id: String((x.src && x.src.__id) || ''), gid: String((x.post && x.post.gid) || ''), fanout: !!x.brandB /* LENH B */ },";
 /* --- commitLeadNow --- */
 const IX27 = A('index', 'IX27 fixgrp', "    try {\n      const _gm = String((lead && (lead.comment_url || lead.post_url || lead.url)) || '').match(/facebook\\.com\\/groups\\/([^\\/\\?#]+)/);");
 const IX27_NEW = "    try { if (lead && lead.brand_hint) throw 0; /* LENH B: lead fan-out đã đúng nguồn/brand theo source_id — không đổi nguồn theo group */\n      const _gm = String((lead && (lead.comment_url || lead.post_url || lead.url)) || '').match(/facebook\\.com\\/groups\\/([^\\/\\?#]+)/);";
@@ -416,13 +443,13 @@ const IX29 = A('index', 'IX29 lead ref', "    let ref;\n    if (force && lead.po
 const IX29_NEW = String.raw`    let ref;
     if (lead && lead.brand_hint && lead.post_id) { /* LENH B: id TẤT ĐỊNH L_<post_id>__<brand> + create() → không bao giờ 2 lead cùng bài cùng brand (kể cả 2 lượt chồng / quét lại) */
       ref = db.collection('leads').doc(leadIdB(lead.post_id, lead.brand_hint));
-      try { await ref.create(lead); } catch (e) { if (e && (e.code === 6 || /ALREADY_EXISTS/i.test(String(e.message || e)))) { dupLeadB++; return false; } console.warn('[lead] create lỗi:', e && e.message); return false; }
+      try { await ref.create(lead); } catch (e) { if (e && (e.code === 6 || /ALREADY_EXISTS/i.test(String(e.message || e)))) { dupLeadB++; return false; } console.warn('[lead] create lỗi (giữ lease, lượt sau ghi lại):', e && e.message); throw e; } /* LENH B (rà): lỗi không phải trùng → ném để Pha 3b giữ lease (không mất bài) */
     } else {
     if (force && lead.post_url) {
       ref = db.collection('leads').doc(leadKey(lead.post_url));
       try { const s = await ref.get(); if (s.exists) return false; } catch (e) {}
     } else ref = db.collection('leads').doc();
-    try { await ref.set(lead); } catch (e) { return false; }
+    try { await ref.set(lead); } catch (e) { console.warn('[lead] set lỗi (giữ lease, lượt sau ghi lại):', e && e.message); throw e; } /* LENH B (rà) */
     }`;
 const IX30 = A('index', 'IX30 birthstamp', "    const _b = (typeof brandBySource !== 'undefined' && brandBySource[lead.source]) || '';");
 const IX30_NEW = "    const _b = String((lead && lead.brand_hint) || '') || (typeof brandBySource !== 'undefined' && brandBySource[lead.source]) || ''; /* LENH B: brand theo nguồn fan-out (giữ 2 bước ghi brand → ZBS justTagged) */";
@@ -437,10 +464,10 @@ const IX34 = A('index', 'IX34 retry src find', "        const r = d.data() || {}
 const IX34_NEW = "        const r = d.data() || {}; const rs = r.src || {}; const src = (rs.source_id && sources.find(s => s.__id === rs.source_id)) || (rs.brand && sources.find(s => s.url === rs.url && String(s.brand || '').trim() === String(rs.brand))) || sources.find(s => s.url === rs.url) || null; /* LENH B: nguồn theo source_id → (url+brand) → url */";
 const IX35 = A('index', 'IX35 retry row', "        let row = bySource.find(b => b.url === src.url); if (!row) { row = { name: src.name || '', industry: src.industry || '', url: src.url || '', posts: 0, matched: 0, leads: 0, hot: 0, error: null, bdPosts: 0, bdComments: 0, ekyc: 0 }; bySource.push(row); }\n        toScore.push({ post: r.post, effSrc, src, row, deferredRef: d.ref, deferredDoc: r }); n46++;");
 const IX35_NEW = "        const row = rowOfB(src); /* LENH B */\n        const bB = (rs.fanout || rs.source_id) ? String(rs.brand || '').trim() : ''; const pB = bB ? Object.assign({}, r.post, { __brand: bB }) : r.post;\n        toScore.push({ post: pB, effSrc, src, row, deferredRef: d.ref, deferredDoc: r, brandB: bB, gkeyB: gkeyBySrcIdB.get(src.__id) || '' }); n46++;";
-const IX36 = A('index', 'IX36 qualifiedUrls', "    { const pURL = (x.post.kind === 'comment') ? (x.post.parent_url || x.post.url) : x.post.url; if (pURL) qualifiedUrls.add(urlKey(pURL)); }");
-const IX36_NEW = IX36 + "\n    if (x.post.kind !== 'comment' && x.gkeyB && !x.post.__watch && Number(x.post.num_comments) === 0) watchAddB(x.gkeyB, x.post); /* LENH B: bài ra lead nhưng 0 bình luận lúc gặt → theo dõi (≤5/nguồn, 2 ngày) */";
+const IX36 = A('index', 'IX36 isLead settle', "    if (!isLead) { await settle48(x); return; } // LENH #48: không phải lead → gỡ lease/doc chờ");
+const IX36_NEW = "    if (x.post.kind !== 'comment' && x.gkeyB && !x.post.__watch && x.post.num_comments === 0) watchAddB(x.gkeyB, x.post); /* LENH B (rà): bài đã qua AI (lead HAY KHÔNG — bài chào bán của người khác vẫn sinh comment-lead) nhưng 0 bình luận lúc gặt → theo dõi (≤5/group, 2 ngày) */\n" + IX36;
 const IX37 = A('index', 'IX37 lead fields', "      author_uid: String(x.post.author_uid || '').slice(0, 40), zalo_defer: !!(zaloDefer48 && _zc.phone), /* LENH #48 */");
-const IX37_NEW = IX37 + "\n      post_id: String(x.post.post_id || '').slice(0, 200), gid: String(x.post.gid || ''), source_id: String((x.src && x.src.__id) || ''), brand_hint: String(x.brandB || ''), shared_post: !!x.post.shared, num_comments: Number(x.post.num_comments) || 0, /* LENH B */";
+const IX37_NEW = IX37 + "\n      post_id: String(x.post.post_id || '').slice(0, 200), gid: String(x.post.gid || ''), source_id: String((x.src && x.src.__id) || ''), brand_hint: String(x.brandB || ''), shared_post: !!x.post.shared, num_comments: (x.post.num_comments === null || x.post.num_comments === undefined) ? null : (Number(x.post.num_comments) || 0), /* LENH B */";
 const IX38 = A('index', 'IX38 flushPosts final', "  await flushPosts(true); // ghi nốt nhật ký bài đã quét còn trong bộ đệm");
 const IX38_NEW = IX38 + "\n  await flushWatchB(); /* LENH B */";
 const IX39 = A('index', 'IX39 zalo sweep', "  try {\n    const _zsnap = await db.collection('leads').where('phone_has_zalo', '==', null).limit(50).get();");
@@ -450,7 +477,7 @@ const IX40_NEW = "  if (hkDueB && sow46 && CFG.LLM_API_KEY && !cb48.open && !ove
 const IX41 = A('index', 'IX41 src46', "          const l = c.l; const src46 = sources.find(s => s.name === l.source) || { name: l.source || '', industry: l.industry || '' };");
 const IX41_NEW = "          const l = c.l; const src46 = (l.source_id && sources.find(s => s.__id === l.source_id)) || sources.find(s => s.name === l.source) || { name: l.source || '', industry: l.industry || '' }; /* LENH B: nguồn theo source_id */";
 const IX42 = A('index', 'IX42 summary', "    probeRuns, sweepRuns, probeEscalated, probeIdle, bdRecords, bdCommentRecords: bdCmtRecords, authRuns, authCheckpoints,");
-const IX42_NEW = IX42 + "\n    groups: nGroupsB, sharedGroups: sharedGroupsB, sown: sownB, harvested: harvestedB, escalated: escalatedB, bdBusy: bdBusyB, deepSweep: deepB, sweepRecords: sweepRecordsB, noCmt: noCmtB, dupLead: dupLeadB, hvOrphan: hvOrphanB, gidLearned: gidLearnedB, housekeeping: hkDueB, /* LENH B */";
+const IX42_NEW = IX42 + "\n    groups: nGroupsB, sharedGroups: sharedGroupsB, sown: sownB, harvested: harvestedB, escalated: escalatedB, bdBusy: bdBusyB, deepSweep: deepB, sweepRecords: sweepRecordsB, noCmt: noCmtB, dupLead: dupLeadB, hvOrphan: hvOrphanB, gidLearned: gidLearnedB, dupSources: dupSrcB, housekeeping: hkDueB, /* LENH B */";
 const IX43 = A('index', 'IX43 bd_month key', "      const k = 's_' + String(r.url || r.name || '?').replace(/[^\\w-]/g, '_').slice(0, 140);");
 const IX43_NEW = "      const k = 's_' + String(r.url || r.name || '?').replace(/[^\\w-]/g, '_').slice(0, 140) + (r.bdShared ? '__' + slugIdB(r.brand).slice(0, 40) : ''); /* LENH B: nguồn dùng chung (không phải nguồn chủ) có key riêng, tiền BrightData ở nguồn chủ */";
 const IX44 = A('index', 'IX44 bd_month fields', "        name: r.name || '', url: r.url || '', industry: r.industry || '',\n        bdPosts: inc(r.bdPosts || 0), bdComments: inc(r.bdComments || 0),");
@@ -476,8 +503,9 @@ function lockKeysB(lead) {
   if (cid) keys.push('cmt_' + String(cid).replace(/[^\w-]/g, '_').slice(0, 200)); else if (pidPost) keys.push('post_' + String(pidPost).replace(/[^\w-]/g, '_').slice(0, 200));
   const uid = String(lead.author_uid || '').trim() || uidFromAuthor(lead.author_url) || '';
   if (/^\d{5,}$/.test(uid)) keys.push('person_' + uid);
-  else { const raw = String(lead.author_url || '').trim(); const pf = raw.match(/id=(pfbid[\w-]{10,})/i); const u = raw.toLowerCase().replace(/^https?:\/\/(www\.|m\.|web\.)?/, '').split(/[?#]/)[0].replace(/\/+$/, '').replace(/^facebook\.com\//, '');
-    if (pf) keys.push('person_' + pf[1].slice(0, 120)); else if (u && !/^(groups|people|profile\.php|photo|watch|share)/.test(u)) keys.push('person_u_' + u.replace(/[^\w.-]/g, '_').slice(0, 180)); }
+  else { let raw = String(lead.author_url || '').trim(); try { raw = decodeURIComponent(raw); } catch (_) {} const pf = raw.match(/id=(pfbid[\w-]{10,})/i); const u = raw.toLowerCase().replace(/^https?:\/\/(www\.|m\.|web\.|mbasic\.)?/, '').split(/[?#]/)[0].replace(/\/+$/, '').replace(/^facebook\.com\//, '');
+    const pp = u.match(/^people\/[^/]+\/(\d{5,})$/); /* LENH B (rà): chỉ khoá NGƯỜI khi chắc là 1 người — uid số · pfbid · people/<tên>/<uid> · username FB hợp lệ (allowlist); l.php/permalink.php/story.php/events/… KHÔNG khoá người (khoá chung sai cho nhiều lead) */
+    if (pf) keys.push('person_' + pf[1].slice(0, 120)); else if (pp) keys.push('person_' + pp[1]); else if (/^[a-z0-9.]{5,50}$/.test(u) && !/\.php$/.test(u) && !/^(login|home|events|marketplace|hashtag|stories|reel|reels|watch|pages|groups|people|photo|share|profile|messages|friends|help|privacy|settings|search|gaming|videos|notifications|bookmarks|about|policies|business|ads|memories|saved|dialog)$/.test(u)) keys.push('person_u_' + u); }
   return keys;
 }
 async function acquireLocksB(lead, brand, pid) {
@@ -487,24 +515,29 @@ async function acquireLocksB(lead, brand, pid) {
   try {
     return await db().runTransaction(async tx => {
       const snaps = []; for (const k of keys) snaps.push(await tx.get(col.doc(k)));
+      const thSn = new Map(); /* LENH B (rà): khoá brand khác ĐÃ HẾT HẠN (reserved 6 h) → xem phễu của họ đã chạm chưa (outreach_threads.doneSteps do worker ghi) → chạm rồi = touched 14 ngày, không ghi đè (không cần đợi worker mới) */
+      for (let i = 0; i < keys.length; i++) { const s = snaps[i]; if (!s.exists) continue; const d = s.data() || {}; if (d.brand === code || (d.state === 'touched' && (Number(d.expireAt) || 0) > now) || (Number(d.expireAt) || 0) > now || !d.leadId || thSn.has(d.leadId)) continue; thSn.set(d.leadId, await tx.get(db().collection('outreach_threads').doc(String(d.leadId)))); }
+      const touchedByOther = d => { if (!d || d.brand === code) return false; if (d.state === 'touched' && (Number(d.expireAt) || 0) > now) return true; const t = thSn.get(d.leadId); const td = (t && t.exists) ? (t.data() || {}) : null; return !!(td && ((Array.isArray(td.doneSteps) && td.doneSteps.length) || /^(comment|inbox|done|replied|human)$/.test(String(td.step || '')))); }; /* doneSteps = worker AdsPower; step sau react = phễu func (không ghi doneSteps) */
       for (let i = 0; i < keys.length; i++) { const s = snaps[i]; if (!s.exists) continue; const d = s.data() || {}; if (d.brand === code) continue;
-        if ((Number(d.expireAt) || 0) > now) return { ok: false, key: keys[i], by: d.brand || '?', byLead: d.leadId || '', touched: d.state === 'touched', expireAt: Number(d.expireAt) || (now + LOCK_RESERVED_MS_B), keys }; }
-      for (let i = 0; i < keys.length; i++) { const s = snaps[i]; const d = s.exists ? (s.data() || {}) : null; if (d && d.brand === code && d.state === 'touched' && (Number(d.expireAt) || 0) > now) continue;
-        tx.set(col.doc(keys[i]), { brand: code, leadId, pid: String(pid || ''), state: 'reserved', at: now, expireAt: now + LOCK_RESERVED_MS_B, key: keys[i], touchedTtlMs: LOCK_TOUCHED_MS_B }, { merge: true }); }
+        if (touchedByOther(d)) { if (d.state !== 'touched' || (Number(d.expireAt) || 0) <= now) tx.set(col.doc(keys[i]), { state: 'touched', touchedAt: now, expireAt: now + LOCK_TOUCHED_MS_B, expireTs: new Date(now + LOCK_TOUCHED_MS_B + 3600e3) }, { merge: true }); return { ok: false, key: keys[i], by: d.brand || '?', byLead: d.leadId || '', touched: true, expireAt: now + LOCK_TOUCHED_MS_B, keys }; }
+        if ((Number(d.expireAt) || 0) > now) return { ok: false, key: keys[i], by: d.brand || '?', byLead: d.leadId || '', touched: false, expireAt: Number(d.expireAt) || (now + LOCK_RESERVED_MS_B), keys }; }
+      for (let i = 0; i < keys.length; i++) { const s = snaps[i]; const d = s.exists ? (s.data() || {}) : null; if (d && d.brand === code && (Number(d.expireAt) || 0) > now) continue; /* LENH B (rà): cùng brand còn hạn (touched, hoặc lead khác cùng người đang chạy) → giữ nguyên leadId, không đè */
+        tx.set(col.doc(keys[i]), { brand: code, leadId, pid: String(pid || ''), state: 'reserved', at: now, expireAt: now + LOCK_RESERVED_MS_B, expireTs: new Date(now + LOCK_TOUCHED_MS_B + LOCK_RESERVED_MS_B), key: keys[i], touchedTtlMs: LOCK_TOUCHED_MS_B }, { merge: true }); } /* expireTs (Timestamp) = trần tuổi doc cho TTL policy outreach_locks */
       return { ok: true, keys };
     });
   } catch (e) { console.warn('[LENH B] acquireLocksB lỗi (fail-open):', e && e.message); return { ok: true, keys, err: String((e && e.message) || e).slice(0, 120) }; }
 }
-async function releaseLocksB(leadId, keys) { /* xoá khoá 'reserved' của lead (touched giữ tới hết hạn) */
+async function releaseLocksB(leadId, keys, touched) { /* xoá khoá 'reserved' của lead (touched giữ tới hết hạn); touched=true (phễu đã có bước / người thật tiếp quản) → chuyển 'touched' 14 ngày thay vì xoá — LENH B (rà) */
   const col = db().collection('outreach_locks'); let list = Array.isArray(keys) ? keys.slice() : [];
   if (!list.length && leadId) { try { const q = await col.where('leadId', '==', String(leadId)).get(); list = q.docs.map(d => d.id); } catch (_) { list = []; } }
-  let n = 0; for (const k of list) { try { const s = await col.doc(k).get(); const d = s.exists ? (s.data() || {}) : null; if (d && d.leadId === String(leadId) && d.state !== 'touched') { await col.doc(k).delete(); n++; } } catch (_) {} }
+  let n = 0; for (const k of list) { try { const s = await col.doc(k).get(); const d = s.exists ? (s.data() || {}) : null; if (d && d.leadId === String(leadId) && d.state !== 'touched') { if (touched) await col.doc(k).set({ state: 'touched', touchedAt: nowMs(), expireAt: nowMs() + LOCK_TOUCHED_MS_B, expireTs: new Date(nowMs() + LOCK_TOUCHED_MS_B + 3600e3) }, { merge: true }); else await col.doc(k).delete(); n++; } } catch (_) {} }
   return n;
 }
 async function skipLeadSharedB(lead, brand, acct, lk, tref) {
   const pid = acct.id || acct.pid; const until = Number(lk.expireAt) || (nowMs() + LOCK_RESERVED_MS_B); const ref = tref || db().collection('outreach_threads').doc(lead.id);
-  await ref.set({ leadId: lead.id, brand: brand.code, brandCode: brand.code, brandName: brand.name || brand.code, pid, name: lead.name || '', temp: lead.temp || 'cold', score: Number(lead.score) || 0, post_url: lead.post_url || '', author_url: lead.author_url || '',
-    active: !lk.touched, step: 'skipped_shared', taskStatus: 'skipped', skipReason: 'brand ' + (lk.by || '?') + ' đang tiếp cận (' + (lk.key || '') + ')', lockedBy: lk.by || '', lockKey: lk.key || '', retryAt: lk.touched ? 0 : until, nextAt: lk.touched ? 0 : until, sharedSkipAt: nowMs(), sharedSkips: FieldValue.increment(1) }, { merge: true });
+  let hadB = false; try { const cs = await ref.get(); hadB = !!(cs.exists && (cs.data() || {}).createdAt); } catch (_) {} /* LENH B (rà): createdAt để sweep44 tính tuổi thread nhường */
+  await ref.set(Object.assign(hadB ? {} : { createdAt: FieldValue.serverTimestamp() }, { leadId: lead.id, brand: brand.code, brandCode: brand.code, brandName: brand.name || brand.code, pid, name: lead.name || '', temp: lead.temp || 'cold', score: Number(lead.score) || 0, post_url: lead.post_url || '', author_url: lead.author_url || '',
+    active: !lk.touched, step: 'skipped_shared', taskStatus: 'skipped', skipReason: 'brand ' + (lk.by || '?') + ' đang tiếp cận (' + (lk.key || '') + ')', lockedBy: lk.by || '', lockKey: lk.key || '', retryAt: lk.touched ? 0 : until, nextAt: lk.touched ? 0 : until, sharedSkipAt: nowMs(), sharedSkips: FieldValue.increment(1) }), { merge: true });
   await addLog({ leadId: lead.id, name: lead.name || '', brand: brand.name || brand.code, brandCode: brand.code, pid, temp: lead.temp || 'cold', score: Number(lead.score) || 0, action: '⏭ Nhường — brand ' + (lk.by || '?') + ' đã tiếp cận bài/khách này' + (lk.touched ? ' (đã chạm, không xét lại)' : ' (xét lại sau ' + Math.max(1, Math.round((until - nowMs()) / 60000)) + '′)'), text: lk.key || '', status: 'skip' });
 }
 export { acquireLocksB, releaseLocksB, skipLeadSharedB, lockKeysB };
@@ -517,21 +550,30 @@ const OA3_NEW = "  if (!steps.length) { await releaseLocksB(lead.id, lkB.keys); 
 const OA4 = A('outreach', 'OA4 thread set', "fpayload: payload, reservedDay: dayKey(), /* LENH #44 (E-4) */ createdAt: FieldValue.serverTimestamp() }), { merge: true });");
 const OA4_NEW = "fpayload: payload, reservedDay: dayKey(), /* LENH #44 (E-4) */ lockKeysB: lkB.keys || [], /* LENH B */ createdAt: FieldValue.serverTimestamp() }), { merge: true });";
 const OA5 = A('outreach', 'OA5 adspower else', "    } else await d.ref.set({ active: false }, { merge: true });");
-const OA5_NEW = "    } else if (th.step === 'skipped_shared') { /* LENH B: khoá brand khác hết hạn → xét lại như lead mới (lead vẫn mở, chưa ai chăm) */\n      const ls = await db().collection('leads').doc(d.id).get(); const lead = ls.exists ? Object.assign({ id: d.id }, ls.data()) : null;\n      if (!lead || lead.dropped || lead.lost || lead.ai_scored === false || (lead.temp || 'cold') === 'junk' || humanBusy44(lead, brand) || roleBlockOf(lead)) await d.ref.set({ active: false, step: 'skipped_shared_closed' }, { merge: true });\n      else if (await apEnqueueFunnel(acct, brand, lead, d.ref)) return true;\n    } else await d.ref.set({ active: false }, { merge: true });";
+const OA5_NEW = "    } else if (th.step === 'skipped_shared') { /* LENH B: khoá brand khác hết hạn → xét lại như lead mới (lead vẫn mở, chưa ai chăm) */\n      const ls = await db().collection('leads').doc(d.id).get(); const lead = ls.exists ? Object.assign({ id: d.id }, ls.data()) : null;\n      if (!lead || lead.dropped || lead.lost || lead.ai_scored === false || (lead.temp || 'cold') === 'junk' || humanBusy44(lead, brand) || roleBlockOf(lead)) await d.ref.set({ active: false, step: 'skipped_shared_closed' }, { merge: true });\n      else if (await apEnqueueFunnel(acct, brand, lead, d.ref)) return true;\n      else { const th2 = (await d.ref.get()).data() || {}; if (th2.step === 'skipped_shared' && !(Number(th2.nextAt) > nowMs())) { /* LENH B (rà): thua khoá lần nữa thì skipLeadSharedB đã hẹn lại; còn lại = không bước nào (ma trận tắt / hết van) → hẹn sáng mai hoặc đóng, không để nextAt quá hạn chiếm limit(1) mỗi tick */\n        if (!brandAllow(brand, lead.temp || 'cold', 'react')) await d.ref.set({ active: false, step: 'skipped_matrix', lastError: 'ma trận brand tắt cho nhiệt độ ' + (lead.temp || 'cold') }, { merge: true });\n        else await d.ref.set({ nextAt: nextMorning44(), lastError: 'hết van hôm nay — chờ sáng mai' }, { merge: true }); } }\n    } else await d.ref.set({ active: false }, { merge: true });";
 const OA6 = A('outreach', 'OA6 stepNick post_id', "    const { post_id } = parsePost(lead.post_url);\n    if (!post_id) continue;");
 const OA6_NEW = OA6 + "\n    const lkB = await acquireLocksB(lead, brand, pid); /* LENH B */\n    if (!lkB.ok) { await skipLeadSharedB(lead, brand, acct, lkB, tref); continue; }";
 const OA7 = A('outreach', 'OA7 stepNick thread set', "      pid, step: 'react', active: true, nextAt: nowMs(), createdAt: FieldValue.serverTimestamp(),");
 const OA7_NEW = "      pid, step: 'react', active: true, nextAt: nowMs(), createdAt: FieldValue.serverTimestamp(), lockKeysB: lkB.keys || [], /* LENH B */";
 const OA8 = A('outreach', 'OA8 drive guard', "      if (!t.active || t.step === prevStep) return; // không tiến (cap/auth/xong) → dừng");
-const OA8_NEW = "      if (t.active && t.step === 'skipped_shared') { /* LENH B: khoá brand khác hết hạn → thử lấy khoá lại rồi chạy từ react */\n        const lk = await acquireLocksB(Object.assign({ id: tref.id }, t), brand, pid);\n        if (!lk.ok) { await tref.set({ nextAt: Number(lk.expireAt) || (nowMs() + 6 * 3600e3), retryAt: Number(lk.expireAt) || 0, active: !lk.touched }, { merge: true }); return; }\n        await tref.set({ step: 'react', nextAt: nowMs(), lockKeysB: lk.keys || [], lockedBy: '' }, { merge: true }); prevStep = null; continue; }\n" + OA8;
+const OA8_NEW = "      if (t.active && t.step === 'skipped_shared') { /* LENH B: khoá brand khác hết hạn → thử lấy khoá lại rồi chạy từ react */\n        const lk = await acquireLocksB(Object.assign({ id: tref.id }, t), brand, pid);\n        if (!lk.ok) { await tref.set({ nextAt: Number(lk.expireAt) || (nowMs() + 6 * 3600e3), retryAt: Number(lk.expireAt) || 0, active: !lk.touched }, { merge: true }); return; }\n        const ls2 = await db().collection('leads').doc(tref.id).get(); const ld2 = ls2.exists ? Object.assign({ id: tref.id }, ls2.data()) : null; /* LENH B (rà): xét lại như lead mới + ghi đủ field phễu func (reply/need/uid/allow) */\n        if (!ld2 || ld2.dropped || ld2.lost || ld2.ai_scored === false || (ld2.temp || 'cold') === 'junk' || humanBusy44(ld2, brand) || roleBlockOf(ld2)) { await releaseLocksB(tref.id, lk.keys); await tref.set({ active: false, step: 'skipped_shared_closed' }, { merge: true }); return; }\n        const tp2 = ld2.temp || 'cold';\n        await tref.set({ step: 'react', nextAt: nowMs(), lockKeysB: lk.keys || [], lockedBy: '', taskStatus: 'queued', skipReason: FieldValue.delete(), name: ld2.name || 'Ẩn danh', temp: tp2, score: Number(ld2.score) || 0, post_url: ld2.post_url || t.post_url || '', author_url: ld2.author_url || '', uid: uidFromAuthor(ld2.author_url), reply: ld2.reply || '', need: ld2.need || '', intent: ld2.intent || '', service: ld2.service || '', industry: ld2.industry || '', allow: { comment: (typeof brandAllow === 'function') ? !!brandAllow(brand, tp2, 'comment') : true, inbox: (typeof brandAllow === 'function') ? !!brandAllow(brand, tp2, 'inbox') : true } }, { merge: true }); prevStep = null; continue; }\n" + OA8;
 const OA9 = A('outreach', 'OA9 sweep44 expired', "      await cancelQueued44(d.id, 'quá 72 giờ');");
-const OA9_NEW = OA9 + "\n      await releaseLocksB(d.id, Array.isArray(th.lockKeysB) ? th.lockKeysB : null).catch(() => {}); /* LENH B: đóng phễu → nhả khoá */";
+const OA9_NEW = OA9 + "\n      await releaseLocksB(d.id, Array.isArray(th.lockKeysB) ? th.lockKeysB : null, !!(Array.isArray(th.doneSteps) && th.doneSteps.length)).catch(() => {}); /* LENH B: đóng phễu → nhả khoá (đã có bước → touched 14 ngày) */";
+const OA10 = A('outreach', 'OA10 sweep44 expire head', "    if (now - born > EXPIRE_AFTER44) {");
+const OA10_NEW = String.raw`    if (th.step === 'skipped_shared') { /* LENH B (rà): thread nhường gắn với nick thua khoá — quá 14 ngày → đóng; nick cờ/tắt → chuyển sang nick AdsPower sống cùng brand để được xét lại */
+      if (now - born > 14 * 86400e3) { await d.ref.set({ active: false, step: 'skipped_shared_expired', closedAt: now }, { merge: true }); out.closed++; continue; }
+      const nk0 = await nickOf(th.pid); const fl0 = nickFlag44(nk0); if (!fl0) continue; const al0 = await aliveApOf(code);
+      if (al0.length && out.moved < MOVE_MAX44) { const i0 = (rr[code] = (rr[code] || 0) + 1) - 1; const to0 = al0[i0 % al0.length]; await d.ref.set({ pid: to0.id, movedFrom: th.pid || '', movedAt: now, nextAt: Math.max(tsMs44(th.nextAt) || 0, now + 60000) }, { merge: true }); out.moved++; } else { b.orphan++; out.orphan++; }
+      continue; }
+` + OA10;
+const OA11 = A('outreach', 'OA11 sweep44 tail', "  await stRef.set(out).catch(() => {});\n  return out;");
+const OA11_NEW = "  try { const oldLk = await db().collection('outreach_locks').where('expireAt', '<', now - 86400e3).limit(200).get(); if (!oldLk.empty) { const wbL = db().batch(); oldLk.docs.forEach(x => wbL.delete(x.ref)); await wbL.commit(); out.locksPruned = oldLk.size; } } catch (e) {} /* LENH B (rà): dọn khoá hết hạn > 24 h (TTL policy expireTs là đường dọn chính) */\n" + OA11;
 
 /* ================= (5) stats.js ================= */
 const ST1 = A('stats', 'ST1 KIND44', "const KIND44 = { react: 'react', comment: 'comment', add_friend: 'friend', inbox: 'inbox' };");
-const ST1_NEW = ST1 + "\n/* LENH B: nhả khoá tranh chấp automation (outreach_locks 'reserved' của lead) khi phễu dừng (người thật tiếp quản) */\nexport async function releaseLocksB(db, leadId, keys) { const col = db.collection('outreach_locks'); let list = Array.isArray(keys) && keys.length ? keys.slice() : []; if (!list.length) { const q = await col.where('leadId', '==', String(leadId)).get(); list = q.docs.map(d => d.id); } let n = 0; for (const k of list) { const s = await col.doc(k).get(); const d = s.exists ? (s.data() || {}) : null; if (d && d.leadId === String(leadId) && d.state !== 'touched') { await col.doc(k).delete(); n++; } } return n; }";
+const ST1_NEW = ST1 + "\n/* LENH B: khoá tranh chấp automation của lead khi người thật tiếp quản → chuyển 'touched' 14 ngày (brand khác không tự động chạm khách đang được sales chăm). Hàm NỘI BỘ (không export — tránh trùng tên releaseLocksB của outreach.js khi index.js export *) */\nasync function touchLocksStB(db, leadId, keys) { const col = db.collection('outreach_locks'); let list = Array.isArray(keys) && keys.length ? keys.slice() : []; if (!list.length) { const q = await col.where('leadId', '==', String(leadId)).get(); list = q.docs.map(d => d.id); } let n = 0; const now = Date.now(); for (const k of list) { const s = await col.doc(k).get(); const d = s.exists ? (s.data() || {}) : null; if (d && d.leadId === String(leadId) && d.state !== 'touched') { await col.doc(k).set({ state: 'touched', touchedAt: now, touchedBy: 'human', expireAt: now + 14 * 86400e3, expireTs: new Date(now + 14 * 86400e3 + 3600e3) }, { merge: true }); n++; } } return n; }";
 const ST2 = A('stats', 'ST2 stopMachine task', "  const taskRef = db.collection('outreach_tasks').doc(id + '__funnel');");
-const ST2_NEW = "  try { await releaseLocksB(db, id, Array.isArray(t.lockKeysB) ? t.lockKeysB : null); } catch (e) { console.warn('[LENH B] releaseLocksB', e && e.message); }\n" + ST2;
+const ST2_NEW = "  try { await touchLocksStB(db, id, Array.isArray(t.lockKeysB) ? t.lockKeysB : null); } catch (e) { console.warn('[LENH B] touchLocksStB', e && e.message); }\n" + ST2;
 
 /* ================= (6) scanstats.js ================= */
 const SS1 = A('scanstats', 'SS1 brand of row', "  for (const r of rows) { if (!r || typeof r !== 'object') continue; const brand = brandMap.get(normUrl(r.url)); if (!brand) continue;");
@@ -553,7 +595,9 @@ async function tryMergeTextB(db, lead, opts, brandB) {
   if (!brandB) return false; // lead cũ không brand → không gộp theo văn bản (tránh gộp chéo brand)
   const now = Date.now(), cutoff = now - 14 * 86400e3;
   let snap; try { snap = await db.collection('leads').where('textKey', '==', tk).limit(20).get(); } catch (e) { return false; }
-  let doc = null; snap.forEach(d => { const x = d.data() || {}; if (!doc && isOpen(x.stage) && String(x.brand_hint || x.brand || '').trim() === brandB && (Number(x.last_seen_ms) || 0) >= cutoff && !x.dropped && !x.lost) doc = d; });
+  const nIdkB = mtIdentityKey(lead.author_url, lead.phone, lead.email) || '', nUidB = String(lead.author_uid || '').trim();
+  const sameWhoB = x => (!nIdkB || !x.identityKey || x.identityKey === nIdkB) && (!nUidB || !x.author_uid || String(x.author_uid).trim() === nUidB); /* LENH B (rà): cùng văn bản nhưng KHÁC người (identityKey/author_uid khác) → KHÔNG gộp (2 người copy cùng mẫu tin) */
+  let doc = null; snap.forEach(d => { const x = d.data() || {}; if (!doc && isOpen(x.stage) && String(x.brand_hint || x.brand || '').trim() === brandB && (Number(x.last_seen_ms) || 0) >= cutoff && !x.dropped && !x.lost && sameWhoB(x)) doc = d; });
   if (!doc) return false;
   const cur = doc.data() || {}; const touches = Array.isArray(cur.touches) ? cur.touches.slice() : []; const url = lead.post_url || lead.url || '';
   if (url && touches.some(t => t.url === url)) return true;
@@ -578,7 +622,7 @@ const rep = (s, a, b) => s.replace(a, () => b);
 const rep1 = (s, name, a, b) => { if (s.split(a).length - 1 !== 1) { console.error('KHONG THAY MOC (phụ) ' + name); process.exit(1); } return rep(s, a, b); };
 /* (1) config · (2) scraper */
 let cf = rep(src.cf, CF1, CF1_NEW);
-let sr = src.sr; for (const [a, b] of [[SR1, SR1_NEW], [SR2, SR2_NEW], [SR3, SR3_NEW], [SR4, SR4_NEW], [SR5, SR5_NEW], [SR6, SR6_NEW], [SR7, SR7_NEW]]) sr = rep(sr, a, b);
+let sr = src.sr; for (const [a, b] of [[SR1, SR1_NEW], [SR2, SR2_NEW], [SR3, SR3_NEW], [SR4, SR4_NEW], [SR5, SR5_NEW], [SR6, SR6_NEW], [SR7, SR7_NEW], [SR8, SR8_NEW]]) sr = rep(sr, a, b);
 /* (3) index — 4 đoạn between trước (Pha 1 / vòng bình luận / Pha 2), rồi mốc đơn */
 let ix = src.ix;
 { const [i, j] = between(ix, 'index.js/Pha1 mapPool', IX12_A, IX12_B); let seg = ix.slice(i, j);
@@ -587,14 +631,14 @@ let ix = src.ix;
   ix = ix.slice(0, i) + "  /* LENH B: đường cũ (Quét ngay / backfill / nguồn nick / URL không phải group) — thân giữ nguyên, chỉ nhận danh sách nguồn */\n  const legacyPha1B = async (list) => {\n" + seg + "\n  };" + PHA1B + ix.slice(j); }
 { const [i, j] = between(ix, 'index.js/vòng bình luận', IX23_A, IX23_B); ix = ix.slice(0, i) + IX23_NEW + ix.slice(j); }
 { const [i, j] = between(ix, 'index.js/Pha 2 seen', IX25_A, IX25_B); ix = ix.slice(0, i) + IX25_NEW + ix.slice(j); }
-for (const [a, b] of [[IX1, IX1_NEW], [IX2, IX2_NEW], [IX3, IX3_NEW], [IX4, IX4_NEW], [IX5, IX5_NEW], [IX6, IX6_NEW], [IX7, IX7_NEW], [IX8, IX8_NEW], [IX9, IX9_NEW], [IX10, IX10_NEW], [IX11, IX11_NEW], [IX14, IX14_NEW], [IX15, IX15_NEW], [IX16, IX16_NEW], [IX17, IX17_NEW], [IX18, IX18_NEW], [IX19, IX19_NEW], [IX20, IX20_NEW], [IX21, IX21_NEW], [IX22, IX22_NEW], [IX24, IX24_NEW], [IX26, IX26_NEW], [IX27, IX27_NEW], [IX28, IX28_NEW], [IX29, IX29_NEW], [IX30, IX30_NEW], [IX31, IX31_NEW], [IX32, IX32_NEW], [IX33, IX33_NEW], [IX34, IX34_NEW], [IX35, IX35_NEW], [IX36, IX36_NEW], [IX37, IX37_NEW], [IX38, IX38_NEW], [IX39, IX39_NEW], [IX40, IX40_NEW], [IX41, IX41_NEW], [IX42, IX42_NEW], [IX43, IX43_NEW], [IX44, IX44_NEW], [IX45b, IX45b_NEW], [IX45, IX45_NEW], [IX46, IX46_NEW], [IX47, IX47_NEW]]) ix = rep(ix, a, b);
+for (const [a, b] of [[IX1, IX1_NEW], [IX2, IX2_NEW], [IX3, IX3_NEW], [IX4, IX4_NEW], [IX5, IX5_NEW], [IX6, IX6_NEW], [IX7, IX7_NEW], [IX8, IX8_NEW], [IX9, IX9_NEW], [IX10, IX10_NEW], [IX11, IX11_NEW], [IX14, IX14_NEW], [IX15, IX15_NEW], [IX16, IX16_NEW], [IX17, IX17_NEW], [IX18, IX18_NEW], [IX19, IX19_NEW], [IX20, IX20_NEW], [IX21, IX21_NEW], [IX22, IX22_NEW], [IX24, IX24_NEW], [IX26, IX26_NEW], [IX27, IX27_NEW], [IX28, IX28_NEW], [IX29, IX29_NEW], [IX30, IX30_NEW], [IX31, IX31_NEW], [IX32, IX32_NEW], [IX33, IX33_NEW], [IX34, IX34_NEW], [IX35, IX35_NEW], [IX36, IX36_NEW], [IX37, IX37_NEW], [IX38, IX38_NEW], [IX39, IX39_NEW], [IX40, IX40_NEW], [IX41, IX41_NEW], [IX42, IX42_NEW], [IX43, IX43_NEW], [IX44, IX44_NEW], [IX45b, IX45b_NEW], [IX45, IX45_NEW], [IX46, IX46_NEW], [IX47, IX47_NEW], [IX48, IX48_NEW], [IX49, IX49_NEW], [IX50, IX50_NEW], [IX51, IX51_NEW]]) ix = rep(ix, a, b);
 /* (4) outreach · (5) stats · (6) scanstats · (7) multitouch */
-let oa = src.oa; for (const [a, b] of [[OA1, OA1_NEW], [OA2, OA2_NEW], [OA3, OA3_NEW], [OA4, OA4_NEW], [OA5, OA5_NEW], [OA6, OA6_NEW], [OA7, OA7_NEW], [OA8, OA8_NEW], [OA9, OA9_NEW]]) oa = rep(oa, a, b);
+let oa = src.oa; for (const [a, b] of [[OA1, OA1_NEW], [OA2, OA2_NEW], [OA3, OA3_NEW], [OA4, OA4_NEW], [OA5, OA5_NEW], [OA6, OA6_NEW], [OA7, OA7_NEW], [OA8, OA8_NEW], [OA9, OA9_NEW], [OA10, OA10_NEW], [OA11, OA11_NEW]]) oa = rep(oa, a, b);
 let st = src.st; for (const [a, b] of [[ST1, ST1_NEW], [ST2, ST2_NEW]]) st = rep(st, a, b);
 let ss = rep(src.ss, SS1, SS1_NEW);
 let mt = src.mt; for (const [a, b] of [[MT1, MT1_NEW], [MT2, MT2_NEW], [MT3, MT3_NEW]]) mt = rep(mt, a, b);
 /* kiểm sau khi ghép */
-const must = [[cf, 'config', 'BD_PROGRESS_MIN_AGE_S'], [sr, 'scraper', 'harvestPostsB'], [sr, 'scraper', 'sowPostsB'], [sr, 'scraper', 'postIdB(p)'], [ix, 'index', 'scanAllB0'], [ix, 'index', 'acquireScanLockB'], [ix, 'index', 'pha1B'], [ix, 'index', 'legacyPha1B'], [ix, 'index', 'leadIdB('], [ix, 'index', 'flushSeenB'], [ix, 'index', 'lead_links'], [ix, 'index', "export * from './sources.js'"], [oa, 'outreach', 'acquireLocksB'], [oa, 'outreach', 'skipped_shared'], [st, 'stats', 'releaseLocksB'], [ss, 'scanstats', 'r.brand'], [mt, 'multitouch', 'tryMergeTextB']];
+const must = [[cf, 'config', 'BD_PROGRESS_MIN_AGE_S'], [sr, 'scraper', 'harvestPostsB'], [sr, 'scraper', 'sowPostsB'], [sr, 'scraper', 'postIdB(p)'], [ix, 'index', 'scanAllB0'], [ix, 'index', 'acquireScanLockB'], [ix, 'index', 'pha1B'], [ix, 'index', 'legacyPha1B'], [ix, 'index', 'leadIdB('], [ix, 'index', 'flushSeenB'], [ix, 'index', 'lead_links'], [ix, 'index', "export * from './sources.js'"], [oa, 'outreach', 'acquireLocksB'], [oa, 'outreach', 'skipped_shared'], [st, 'stats', 'touchLocksStB'], [ss, 'scanstats', 'r.brand'], [mt, 'multitouch', 'tryMergeTextB']];
 for (const [s, n, t] of must) if (!s.includes(t)) { console.error('GHÉP LỖI ' + n + ': thiếu ' + t); process.exit(1); }
 if (ix.includes('await mapPool(sources, 3, async (src) => {')) { console.error('GHÉP LỖI index: mapPool(sources) còn sót'); process.exit(1); }
 /* ghi 2 pha: mọi mốc 7 file đã khớp mới ghi đĩa */

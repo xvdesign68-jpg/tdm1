@@ -77,18 +77,21 @@ export const sourceOnWrite = onDocumentWritten({ region: REGION, document: 'sour
   const all = (await db().collection('sources').get()).docs.map(d => Object.assign({ __id: d.id }, d.data() || {}));
   const members = []; for (const x of all) { if (x.active === false) continue; if ((await gkeyOfB(x)) === gk) members.push(x); }
   const brands = [...new Set(members.map(x => String(x.brand || '').trim()).filter(Boolean))].sort();
-  const stRef = db().collection('system_status').doc('sources'); const st = await stRef.get().catch(() => null); const cur = (st && st.exists) ? (st.data() || {}) : {}; const prev = (cur.shared && cur.shared[gk]) || null;
-  if (brands.length >= 2) {
-    const grew = !prev || brands.some(b => !(Array.isArray(prev.brands) ? prev.brands : []).includes(b));
-    const primary = members.slice().sort((a, b) => (Number(a.sharedAt) || 0) - (Number(b.sharedAt) || 0))[0] || members[0];
-    const ent = { brands, gid: gk.startsWith('g_') ? gk.slice(2) : '', slug: slugOfB(s.url), name: (primary && primary.name) || '', url: (primary && primary.url) || s.url || '', since: (prev && prev.since) ? prev.since : Date.now(), by: (after && after.sharedBy) ? after.sharedBy : ((prev && prev.by) || ''), at: Date.now(), sources: members.map(m => ({ id: m.__id, brand: String(m.brand || ''), name: m.name || '' })), ackAt: grew ? null : ((prev && prev.ackAt) || null) };
-    await stRef.set({ shared: { [gk]: ent }, at: Date.now() }, { merge: true });
-    if (grew) {
-      console.log(JSON.stringify({ severity: 'WARNING', message: '[SOURCE-SHARED] group ' + (ent.name || gk) + ' giờ dùng chung: ' + brands.join(' + ') + ' (mỗi brand chấm bằng Hồ sơ AI riêng → lead riêng; automation first-come)' }));
-      try { const n = await send(await tokensFor(await superAdmins()), { title: '👥 Group dùng chung: ' + (ent.name || gk), body: brands.join(' + ') + ' cùng quét 1 group — kiểm Nguồn quét', link: SITE + '#sources', tag: 'shared-' + gk, require: '1', actionTitle: 'Mở Nguồn quét' }); console.log('[SOURCE-SHARED] push super sent', n); }
-      catch (e) { console.warn('[SOURCE-SHARED] push lỗi', e && e.message); }
-    }
-  } else if (prev) { await stRef.set({ shared: { [gk]: FieldValue.delete() }, at: Date.now() }, { merge: true }); console.log('[SOURCE-SHARED] group ' + gk + ' không còn dùng chung'); }
+  const stRef = db().collection('system_status').doc('sources'); let grew = false, ent = null, removed = false; /* LENH B (rà): transaction — 2 trigger cùng group (scanner ghi gid cho 2 nguồn cùng lượt) không push/WARNING đôi */
+  try { await db().runTransaction(async tx => { const st = await tx.get(stRef); const cur = st.exists ? (st.data() || {}) : {}; const prev = (cur.shared && cur.shared[gk]) || null; grew = false; ent = null; removed = false;
+    if (brands.length >= 2) {
+      grew = !prev || brands.some(b => !(Array.isArray(prev.brands) ? prev.brands : []).includes(b));
+      const primary = members.slice().sort((a, b) => (Number(a.sharedAt) || 0) - (Number(b.sharedAt) || 0))[0] || members[0];
+      ent = { brands, gid: gk.startsWith('g_') ? gk.slice(2) : '', slug: slugOfB(s.url), name: (primary && primary.name) || '', url: (primary && primary.url) || s.url || '', since: (prev && prev.since) ? prev.since : Date.now(), by: (after && after.sharedBy) ? after.sharedBy : ((prev && prev.by) || ''), at: Date.now(), sources: members.map(m => ({ id: m.__id, brand: String(m.brand || ''), name: m.name || '' })), ackAt: grew ? null : ((prev && prev.ackAt) || null) };
+      tx.set(stRef, { shared: { [gk]: ent }, at: Date.now() }, { merge: true });
+    } else if (prev) { removed = true; tx.set(stRef, { shared: { [gk]: FieldValue.delete() }, at: Date.now() }, { merge: true }); } }); }
+  catch (e) { console.warn('[SOURCE-SHARED] transaction lỗi', e && e.message); return; }
+  if (ent && grew) {
+    console.log(JSON.stringify({ severity: 'WARNING', message: '[SOURCE-SHARED] group ' + (ent.name || gk) + ' giờ dùng chung: ' + brands.join(' + ') + ' (mỗi brand chấm bằng Hồ sơ AI riêng → lead riêng; automation first-come)' }));
+    try { const n = await send(await tokensFor(await superAdmins()), { title: '👥 Group dùng chung: ' + (ent.name || gk), body: brands.join(' + ') + ' cùng quét 1 group — kiểm Nguồn quét', link: SITE + '#sources', tag: 'shared-' + gk, require: '1', actionTitle: 'Mở Nguồn quét' }); console.log('[SOURCE-SHARED] push super sent', n); }
+    catch (e) { console.warn('[SOURCE-SHARED] push lỗi', e && e.message); }
+  }
+  if (removed) console.log('[SOURCE-SHARED] group ' + gk + ' không còn dùng chung');
 });
 /* ---- (3) bdReady (notify webhook BrightData; chỉ dùng khi .env BD_NOTIFY_URL/BD_NOTIFY_KEY đặt) ---- */
 export const bdReady = onRequest({ region: REGION, cors: false }, async (req, res) => {

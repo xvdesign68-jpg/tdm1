@@ -621,6 +621,7 @@ async function tryMergeTextB(db, lead, opts, brandB) {
   touches.push(mtTouch({ source: lead.source, time: lead.time, kind: lead.kind, url, text: lead.text, atMs: Number(lead.post_ts || lead.date_posted_ms || 0) || now }, now));
   const group_count = new Set(touches.map(t => t.source).filter(Boolean)).size; const base_score = Math.max(Number(cur.base_score || cur.score || 0), Number(lead.score || 0)); const score = Math.min(100, base_score + calcBoost(group_count));
   const upd = { touches, group_count, base_score, score, last_seen_ms: now, merged_at_ms: now, merged_by: 'textKey', insight_stale: group_count >= 2 }; const wl = spanLabel(touches); if (wl) upd.window_label = wl;
+  if (!cur.identityKey && nIdkB) { upd.identityKey = nIdkB; if (!cur.author_url && lead.author_url) upd.author_url = lead.author_url; if (!cur.author_uid && nUidB) upd.author_uid = nUidB; if (!cur.phone && lead.phone) upd.phone = lead.phone; if (!cur.email && lead.email) upd.email = lead.email; if ((!cur.name || /^(ẩn danh|an danh)$/i.test(String(cur.name))) && lead.name) upd.name = lead.name; } /* LENH B (rà): lead gộp không định danh nhận định danh của bản mới (lần sau gộp theo identityKey, sales thấy tên/SĐT) */
   if (score >= ((typeof opts.hotThreshold === 'number') ? opts.hotThreshold : 80)) upd.temp = 'hot';
   await doc.ref.update(upd); return true;
 }`;

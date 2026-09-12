@@ -13,7 +13,7 @@ const ms = v => !v ? 0 : (typeof v === 'number' ? v : (v.toMillis ? v.toMillis()
 const hm = v => ms(v) ? new Date(ms(v) + OFF).toISOString().slice(5, 16).replace('T', ' ') : '—';
 const day = v => ms(v) ? new Date(ms(v) + OFF).toISOString().slice(0, 10) : '—';
 const mask = s => String(s || '').replace(/sk-[A-Za-z0-9_-]{6,}/g, 'sk-…').replace(/\b\d{1,3}(\.\d{1,3}){3}\b/g, '<ip>').replace(/\s+/g, ' ').slice(0, 170);
-const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
+const fold = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 const gidOf = u => ((String(u || '').match(/facebook\.com\/groups\/([^\/\?#]+)/) || [])[1] || '');
 const pct = (a, b) => b ? Math.round(a * 1000 / b) / 10 + '%' : '—';
 const med = arr => { const a = arr.filter(x => Number.isFinite(x)).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : null; };

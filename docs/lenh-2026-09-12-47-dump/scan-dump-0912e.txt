@@ -1,0 +1,258 @@
+== LỆNH B · KHỐI 0 · 2026-09-12T07:44Z ==
+===== (a) tagLeadBrand (codebase2) =====
+----- FILE /home/xuanvinhsc68_work/codebase2/tagLeadBrand/index.js (94 dòng, in tối đa 500) -----
+     1	/**
+     2	 * SmartLead — tagLeadBrand
+     3	 * ------------------------------------------------------------------
+     4	 * Function ĐỘC LẬP, gắn `brand` cho lead MỚI theo thời gian thực.
+     5	 * KHÔNG đụng tới onLeadCreated (thông báo) và KHÔNG đụng pipeline quét.
+     6	 *
+     7	 * Khi lead mới được tạo trong collection `leads`:
+     8	 *   1. Đọc field `source` (tên group/nguồn).
+     9	 *   2. Tra `sources` lấy document có name === lead.source.
+    10	 *   3. Ghi `brand` của nguồn đó vào lead.
+    11	 *
+    12	 * Là mắt xích #1 của chuỗi: lead tạo -> GẮN BRAND -> (sau này) ZBS bắn tin.
+    13	 * Bước ZBS sẽ là một function riêng, kích hoạt KHI brand đã được gắn
+    14	 * (lead update có brand + điểm đạt ngưỡng) -> không có race condition.
+    15	 */
+    16	
+    17	const { onDocumentCreated } = require('<che>');
+    18	const { setGlobalOptions } = require('firebase-functions/v2');
+    19	const { initializeApp } = require('firebase-admin/app');
+    20	const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+    21	
+    22	initializeApp();
+    23	const db = getFirestore();
+    24	
+    25	setGlobalOptions({ region: 'asia-southeast1', maxInstances: 10 });
+    26	
+    27	// Cache nhỏ map name->brand để giảm số lần đọc `sources` khi lead về dồn dập.
+    28	let _srcCache = null;
+    29	let _srcCacheAt = 0;
+    30	const CACHE_TTL_MS = 60 * 1000;
+    31	
+    32	async function getBrandForSource(sourceName) {
+    33	  if (!sourceName) return '';
+    34	
+    35	  const now = Date.now();
+    36	  if (_srcCache && (now - _srcCacheAt) < CACHE_TTL_MS && (sourceName in _srcCache)) {
+    37	    return _srcCache[sourceName] || '';
+    38	  }
+    39	
+    40	  const snap = await db.collection('sources')
+    41	    .where('name', '==', sourceName)
+    42	    .limit(1)
+    43	    .get();
+    44	
+    45	  let brand = '';
+    46	  if (!snap.empty) brand = snap.docs[0].get('brand') || '';
+    47	
+    48	  if (!_srcCache || (now - _srcCacheAt) >= CACHE_TTL_MS) {
+    49	    _srcCache = {};
+    50	    _srcCacheAt = now;
+    51	  }
+    52	  _srcCache[sourceName] = brand;
+    53	  return brand;
+    54	}
+    55	
+    56	exports.tagLeadBrand = onDocumentCreated('leads/{leadId}', async (event) => {
+    57	  const snap = event.data;
+    58	  if (!snap) return;
+    59	
+    60	  const lead = snap.data() || {};
+    61	  const leadId = event.params.leadId;
+    62	
+    63	  // Đã có brand -> bỏ qua, tránh ghi thừa.
+    64	  if (lead.brand && String(lead.brand).trim() !== '') {
+    65	    console.log(`[tagLeadBrand][skip] lead ${leadId} đã có brand=${lead.brand}`);
+    66	    return;
+    67	  }
+    68	
+    69	  const sourceName = lead.source || '';
+    70	  if (!sourceName) {
+    71	    console.warn(`[tagLeadBrand][warn] lead ${leadId} không có field 'source'`);
+    72	    return;
+    73	  }
+    74	
+    75	  const brand = await getBrandForSource(sourceName);
+    76	  if (!brand) {
+    77	    // Nguồn chưa gán brand -> đánh dấu để super admin xử lý, KHÔNG fail.
+    78	    console.warn(`[tagLeadBrand][warn] nguồn "${sourceName}" chưa có brand -> lead ${leadId} để trống`);
+    79	    await snap.ref.set({
+    80	      brand_pending: true,
+    81	      brand_tagged_at: FieldValue.serverTimestamp(),
+    82	    }, { merge: true });
+    83	    return;
+    84	  }
+    85	
+    86	  await snap.ref.set({
+    87	    brand: brand,
+    88	    brand_pending: FieldValue.delete(),
+    89	    brand_tagged_at: FieldValue.serverTimestamp(),
+    90	    brand_tagged_by: 'tagLeadBrand',
+    91	  }, { merge: true });
+    92	
+    93	  console.log(`[tagLeadBrand][ok] lead ${leadId} (source="${sourceName}") -> brand=${brand}`);
+    94	});
+-- /home/xuanvinhsc68_work/codebase2/tagLeadBrand/package.json:
+{"name":"smartlead-tag-lead-brand","main":"index.js","engines":{"node":"22"},"deps":["firebase-admin","firebase-functions"]}
+-- file khác trong codebase2 có chữ brand_pending / tagLeadBrand:
+/home/xuanvinhsc68_work/codebase2/notifyBrandZalo/index.js
+/home/xuanvinhsc68_work/codebase2/tagLeadBrand/index.js
+/home/xuanvinhsc68_work/codebase2/sendZaloZBS/index.js
+-- mtime 3 bản index.js:
+2026-06-30 12:19:04.000000000 +0000 /home/xuanvinhsc68_work/codebase2/tagLeadBrand/index.js
+2026-06-30 10:09:44.000000000 +0000 /home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js
+2026-06-30 10:09:44.000000000 +0000 /home/xuanvinhsc68_work/codebase2/notifyBrandZalo/index.js
+-- functions đang deploy (tagLeadBrand / notifyBrandZalo / sendZaloZBS):
+sendZaloZBS	ACTIVE	GEN_2	2026-08-06T10:00:59.209390875Z
+tagLeadBrand	ACTIVE	GEN_2	2026-08-11T09:10:27.662319265Z
+notifyBrandZalo	ACTIVE	GEN_2	2026-08-12T14:00:53.416872159Z
+-- describe tagLeadBrand @ asia-southeast1:
+buildConfig:
+  entryPoint: tagLeadBrand
+  runtime: nodejs22
+eventTrigger:
+  eventFilters:
+  - attribute: database
+    value: (default)
+  - attribute: document
+    operator: match-path-pattern
+    value: leads/{leadId}
+  eventType: google.cloud.firestore.document.v1.created
+serviceConfig:
+  maxInstanceCount: 100
+  timeoutSeconds: 60
+updateTime: '<che>'
+-- describe notifyBrandZalo @ asia-southeast1:
+buildConfig:
+  entryPoint: notifyBrandZalo
+  runtime: nodejs22
+eventTrigger:
+  eventFilters:
+  - attribute: database
+    value: (default)
+  - attribute: namespace
+    value: (default)
+  - attribute: document
+    operator: match-path-pattern
+    value: leads/{leadId}
+  eventType: google.cloud.firestore.document.v1.updated
+serviceConfig:
+  maxInstanceCount: 10
+  timeoutSeconds: 60
+updateTime: '<che>'
+===== (b) zalo-fn getConfig =====
+--- /home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js :: /async function getConfig|function getConfig|getConfig ?=/ từ dòng 70 (30 dòng) ---
+    70	async function getConfig() {
+    71	  const snap = await CONFIG_DOC.get();
+    72	  return snap.exists ? (snap.data() || {}) : {};
+    73	}
+    74	
+    75	async function readTokens() {
+    76	  const snap = await TOKEN_DOC.get();
+    77	  return snap.exists ? (snap.data() || {}) : null;
+    78	}
+    79	
+    80	/* Exchange refresh_token -> new access_token (+ rotated refresh_token).
+    81	 * Zalo rotates refresh_token on every call; persist the NEW one atomically. */
+    82	async function refreshTokens(appId, secretKey) {
+    83	  const cur = await readTokens();
+    84	  if (!cur || !cur.refresh_token) {
+    85	    throw new Error('No refresh_token in /_system/zalo_tokens — run bootstrapZaloTokens first');
+    86	  }
+    87	  const body = new URLSearchParams({
+    88	    refresh_token: cur.refresh_token,
+    89	    app_id: appId,
+    90	    grant_type: 'refresh_token',
+    91	  });
+    92	  const res = await fetch(OAUTH_URL, {
+    93	    method: 'POST',
+    94	    headers: { 'secret_key': secretKey, 'Content-Type': '<che>' },
+    95	    body,
+    96	  });
+    97	  const data = await res.json().catch(() => ({}));
+    98	  if (!data || !data.access_token) {
+    99	    throw new Error('Zalo refresh failed: ' + JSON.stringify(data));
+===== (c) field thô record BrightData =====
+[vòng 1] pending: bài 3 · bình luận 1
+  BÀI sd_mty2ueyz14lf9pkp6t → running
+  BÀI sd_mty2ufcafpjqv58mk → ready · records 0 · errors 1
+    1 record, dùng được 0 · record đầu: {"timestamp":"2026-09-12T07:44:01.149Z","input":{"url":"…","num_of_posts":5,"posts_to_not_include":["162165733…(3983)
+  BÀI sd_mty2ufpj2nnx1dnj2y → ready · records 2
+    2 record, dùng được 2
+  BÌNH LUẬN sd_mty2ugpy1lmqnyzlqs → ready · records 0 · errors 3
+    3 record, dùng được 0 · record đầu: {"timestamp":"2026-09-12T07:42:16.710Z","input":{"url":"…","limit_records":30,"comments_sort":""},"error":"Thi…(160)
+[vòng 2] pending: bài 7 · bình luận 1
+  BÌNH LUẬN sd_mty2ybv81op28x2j3p → ready · records 3 · errors 1
+    4 record, dùng được 3
+
+===== RECORD BÀI (field thô) =====
+· 37 field: attachments, avatar_image_url, content, date_posted, delegate_page_id, following, group_category, group_created_at, group_external_website, group_id, group_intro, group_logo, group_members, group_name, group_url, hashtags, header_image, input, is_sponsored, location, num_comments, num_reaction_type, num_shares, other_posts_url, post_external_image, post_id, post_type, posts_to_not_include, price, profile_id, publisher_image_url, shortcode, timestamp, url, user_is_verified, user_to_not_include, user_username_raw
+  attachments : array(0)
+  avatar_image_url : string (449 ký tự, che)
+  content : string (81 ký tự, che)
+  date_posted : string = 2026-09-12T07:44:07.000Z
+  delegate_page_id : null = null
+  following : null = null
+  group_category : string = Public group
+  group_created_at : string = 2022-09-09T08:14:23.000Z
+  group_external_website : null = null
+  group_id : string = 1189400231607822
+  group_intro : null = null
+  group_logo : string = https://scontent-lga3-2.xx.fbcdn.net/v/t39.30808-6/305969740_1740569956276079_7977895349355795070_n.png?stp=c1…(449)
+  group_members : number = 24300
+  group_name : string (33 ký tự, che)
+  group_url : string = https://www.facebook.com/groups/vieclamtotchosv/
+  hashtags : array(0)
+  header_image : string (434 ký tự, che)
+  input : object {end_date, num_of_posts, posts_to_not_include, start_date, url}
+  is_sponsored : boolean = false
+  location : null = null
+  num_comments : number = 0
+  num_reaction_type : array(0)
+  num_shares : number = 0
+  other_posts_url : array(0)
+  post_external_image : null = null
+  post_id : string = 2182424042305431
+  post_type : string = Post
+  posts_to_not_include : array(200) phần tử đầu: "2182410612306774"
+  price : null = null
+  profile_id : string (16 ký tự, che)
+  publisher_image_url : null = null
+  shortcode : string (16 ký tự)
+  timestamp : string = 2026-09-12T07:44:38.769Z
+  url : string = https://www.facebook.com/groups/vieclamtotchosv/posts/2182424042305431/
+  user_is_verified : boolean = false
+  user_to_not_include : array(0)
+  user_username_raw : null = null
+TÓM: field liên quan BÌNH LUẬN → num_comments=0 | liên quan GROUP → group_category=Public group · group_created_at=2022-09-09T08:14:23.000Z · group_external_website=null · group_id=1189400231607822 · group_intro=null · group_logo=https://scontent-lga3-2.xx.fbcdn.net/v/t39.30808-6/305969740_1740569956276079_7977895349355795070_n.png?stp=c1…(449) · group_members=24300 · group_name=(che) · group_url=https://www.facebook.com/groups/vieclamtotchosv/ | id/url → post_id=2182424042305431 · url=https://www.facebook.com/groups/vieclamtotchosv/posts/2182424042305431/
+
+===== RECORD BÌNH LUẬN (field thô) =====
+· 21 field: attached_images, comment_id, comment_link, comment_text, commentator_profile, commentator_profile_url, date_created, input, num_likes, num_replies, parent_comment_id, post_id, post_url, reply, source_type, subtype, timestamp, type, url, user_id, user_name
+  attached_images : null = null
+  comment_id : string = Y29tbWVudDoyMTgyNDE4NTE4OTcyNjUwXzIxODI0MTg2MzU2MzkzMDU=
+  comment_link : string = https://www.facebook.com/groups/vieclamtotchosv/posts/2182418518972650/?locale=en_US&comment_id=21824186356393…(112)
+  comment_text : string (1 ký tự, che)
+  commentator_profile : null = null
+  commentator_profile_url : string (454 ký tự, che)
+  date_created : string = 2026-09-12T07:34:05.000Z
+  input : object {comments_sort, limit_records, url}
+  num_likes : number = 0
+  num_replies : number = 0
+  parent_comment_id : null = null
+  post_id : string = 2182418518972650
+  post_url : string = https://www.facebook.com/groups/vieclamtotchosv/posts/2182418518972650/?locale=en_US
+  reply : boolean = false
+  source_type : string = TextWithEntities
+  subtype : string = TextWithEntities
+  timestamp : string = 2026-09-12T07:45:19.947Z
+  type : string = Comment
+  url : string = https://www.facebook.com/groups/vieclamtotchosv/posts/2182418518972650/?locale=en_US
+  user_id : string (72 ký tự, che)
+  user_name : string (13 ký tự, che)
+TÓM: field liên quan BÌNH LUẬN → comment_id=Y29tbWVudDoyMTgyNDE4NTE4OTcyNjUwXzIxODI0MTg2MzU2MzkzMDU= · comment_link=https://www.facebook.com/groups/vieclamtotchosv/posts/2182418518972650/?locale=en_US&comment_id=21824186356393…(112) · comment_text=(che) · commentator_profile=object · commentator_profile_url=(che) · parent_comment_id=object | liên quan GROUP → KHÔNG CÓ | id/url → post_id=2182418518972650 · url=https://www.facebook.com/groups/vieclamtotchosv/posts/2182418518972650/?locale=en_US · post_url=https://www.facebook.com/groups/vieclamtotchosv/posts/2182418518972650/?locale=en_US
+
+== XONG (c) ==
+== XONG — cloudshell download /home/xuanvinhsc68_work/scan-dump-0912e.txt  (rồi upload file vào chat) ==

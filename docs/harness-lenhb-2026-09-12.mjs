@@ -377,6 +377,14 @@ clockOff += 130e3; await ixm.scanAll('scheduled');
   if (process.env.LB_DBG) OUT('DBG C23', JSON.stringify({ ids: L.map(l => l.id), dup: last.dupSources, rd, ai: calls.filter(c => c.body.model === 'gpt-5.6-sol').length, logs: LOGS.filter(l => /SOURCE-DUP|lease/.test(l)) }));
   ok(L.length === 2 && L.map(l => l.id).sort().join(',') === 'L_u1__b1,L_u1__b2' && last.dupSources === 1 && rd && /trùng nguồn cùng brand/.test(rd.error || '') && calls.filter(c => c.body.model === 'gpt-5.6-sol').length === 2 && !logHas(/ghi lease lỗi/) && logHas(/\[SOURCE-DUP\]/) && nT1 === 1 && !BD.triggers.some(t => t.inputs.some(i => /ref=share/.test(i.url))), 'C23 (rà) nguồn trùng brand+group → bỏ qua (row.error + scans.dupSources + WARNING), 2 lead đúng, AI 2 lượt, lease không lỗi batch, KHÔNG đi đường cũ (không trigger riêng)'); }
 
+/* C25 (rà) progress 502 (nginx) ≠ busy → unknown → bd skip + lỗi → DOWN; snapshot busy quá 2 h → bỏ */
+{ fresh(); clockOff = 0; await ixm.scanAll('scheduled'); clockOff += 130e3; const realFetch = globalThis.fetch; globalThis.fetch = async (u, o) => (String(u).includes('/progress/') ? mk({ status: 502, body: '<html>bad gateway</html>' }) : realFetch(u, o)); await ixm.scanAll('scheduled'); globalThis.fetch = realFetch; const last = scansAll()[scansAll().length - 1]; const st = sysDoc('brightdata');
+  if (process.env.LB_DBG) OUT('DBG C25', JSON.stringify({ rows: last.bySource.map(r => [r.bd, r.error]), st, logs: LOGS.slice(-5) }));
+  ok(last.bySource.every(r => r.bd === 'skip') && last.bdBusy === 0 && st && st.ok === false && logHas(/\[BRIGHTDATA-DOWN\]/), 'C25 (rà) progress 5xx → unknown (không busy) → DOWN đúng lượt');
+  const oldPend = [...F.store.keys()].filter(k => k.startsWith('pending_snapshots/PB_')); BD.busy = true; clockOff += 7 * 3600e3; await ixm.scanAll('scheduled'); BD.busy = false; /* snapshot sweep: trần 6 h */
+  if (process.env.LB_DBG) OUT('DBG C25b', JSON.stringify({ oldPend, still: !!F.store.get(oldPend[0]), pend: [...F.store.keys()].filter(k => k.startsWith('pending_snapshots/')), logs: LOGS.slice(-8), doc: F.store.get(oldPend[0]) }));
+  ok(oldPend.length === 1 && !F.store.get(oldPend[0]) && logHas(/qua han khi BrightData busy/), 'C25 (rà) snapshot sweep chờ quá 6 h (probe 2 h) trong lúc 429 busy → bỏ (không treo vô hạn; group được gieo lại)'); }
+
 /* ---------- D. outreach.js — khoá tranh chấp automation ---------- */
 OUT('-- outreach.js (acquireLocksB · skipped_shared · stepNick · sweep44)');
 const oam = await import(pathToFileURL(path.join(W, 'outreach.js')).href);
@@ -410,6 +418,7 @@ const stm = await import(pathToFileURL(path.join(W, 'stats.js')).href);
   await db.collection('fb_accounts').doc('apB').set({ brand: 'b2', engine: 'adspower', adspower_id: 'k2', active: true, nextFreeAt: 0 });
   clockOff += 7 * 3600e3; // khoá reserved 6 h hết hạn
   await db.collection('outreach_threads').doc('L_cmt_777__b2').set({ active: false }, { merge: true }); await db.collection('outreach_threads').doc('L_p8__b2').set({ active: false }, { merge: true }); // chỉ còn thread skipped_shared L_p1__b2 tới hạn
+  await db.collection('outreach_threads').doc('L_p1__b1').set({ active: false, step: 'expired' }, { merge: true }); // (rà) phễu A đã đóng mà KHÔNG có bước nào (nick chết) → khoá hết hạn = trống thật
   const r5 = await oam.stepNickAdspower(brandB, acctB); const th2b = F0.store.get('outreach_threads/L_p1__b2'); const lk2 = F0.store.get('outreach_locks/post_p1');
   if (process.env.LB_DBG) OUT('DBG D5', JSON.stringify({ r5, th2b, lk2, logs: LOGS.slice(-5) }));
   ok(r5 === true && th2b.step === 'funnel' && th2b.taskStatus === 'queued' && lk2.brand === 'b2' && F0.store.get('outreach_tasks/L_p1__b2__funnel'), 'stepNickAdspower: thread skipped_shared tới hạn + khoá A hết hạn (A không chạm) → brand B lấy khoá, xếp phễu');
@@ -447,6 +456,12 @@ const stm = await import(pathToFileURL(path.join(W, 'stats.js')).href);
   const leadPF = { id: 'L_pf__b2', name: 'K', temp: 'hot', score: 90, post_url: G1 + 'posts/pf/', post_id: 'pf', brand: 'b2', stage: 'new' };
   const rpf = await oam.apEnqueueFunnel(acctB, brandB, leadPF, db.collection('outreach_threads').doc(leadPF.id));
   ok(rpf === false && (F0.store.get('outreach_locks/post_pf') || {}).state === 'touched' && (F0.store.get('outreach_threads/L_pf__b2') || {}).active === false, 'acquireLocksB (rà): holder là phễu func (step comment, không doneSteps) → vẫn coi là đã chạm → touched, B nhường');
+  /* (rà) khoá hết hạn nhưng phễu holder CÒN ĐANG CHẠY (chưa bước nào) → B chờ thêm 6 h, khoá gia hạn */
+  await db.collection('outreach_locks').doc('post_pa').set({ brand: 'b1', leadId: 'L_pa__b1', state: 'reserved', at: Date.now() - 7 * 3600e3, expireAt: Date.now() - 3600e3 }); await db.collection('outreach_threads').doc('L_pa__b1').set({ leadId: 'L_pa__b1', brand: 'b1', pid: 'apA', active: true, step: 'funnel', fpayload: { steps: ['react'] }, doneSteps: [], lockKeysB: ['post_pa'] });
+  const leadPA = { id: 'L_pa__b2', name: 'K', temp: 'hot', score: 90, post_url: G1 + 'posts/pa/', post_id: 'pa', brand: 'b2', stage: 'new' };
+  const rpa = await oam.apEnqueueFunnel(acctB, brandB, leadPA, db.collection('outreach_threads').doc(leadPA.id)); const lkpa = F0.store.get('outreach_locks/post_pa'); const thpa = F0.store.get('outreach_threads/L_pa__b2');
+  ok(rpa === false && lkpa.brand === 'b1' && lkpa.state === 'reserved' && lkpa.expireAt > Date.now() + 5 * 3600e3 && thpa.active === true && thpa.step === 'skipped_shared' && thpa.nextAt === lkpa.expireAt, 'acquireLocksB (rà): holder hết hạn nhưng phễu A còn ĐANG chạy (chưa bước) → B không chen, khoá A gia hạn 6 h, B hẹn lại đúng mốc');
+  ok(oam.lockKeysB({ post_url: G1 + 'posts/1010/', author_url: 'https://www.facebook.com/100012345678777' }).join(',') === 'post_1010,person_100012345678777', 'lockKeysB (rà): facebook.com/<uid số> → person_<uid> (trùng khoá với profile.php?id=)');
   /* (rà) cùng brand, 2 lead cùng người: khoá person không bị đè leadId; release lead 2 không xoá khoá của lead 1 */
   const leadG1 = { id: 'L_g1__b2', name: 'K', temp: 'hot', score: 90, post_url: 'https://www.facebook.com/groups/999/posts/g1/', post_id: 'g1', author_url: 'https://www.facebook.com/profile.php?id=100066666666666', author_uid: '100066666666666', brand: 'b2', stage: 'new' };
   const leadG2 = Object.assign({}, leadG1, { id: 'L_g2__b2', post_url: 'https://www.facebook.com/groups/999/posts/g2/', post_id: 'g2' });

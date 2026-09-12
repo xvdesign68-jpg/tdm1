@@ -1,0 +1,635 @@
+== LỆNH #47d · 2026-09-12T04:58Z ==
+-- sha8 để đối chiếu mốc patch: index.js=14a3a823 lib/scorer.js=12223e1c lib/scraper.js=66714197 lib/config.js=81d91f79 stats.js=5dc6d521 push.js=59a304aa outreach.js=457c9290 
+----- index.js dòng 148–211 -----
+   148	async function verifyCaller(req) {
+   149	  const authz = req.get('Authorization') || '';
+   150	  const m = /^Bearer (.+)$/.exec(authz);
+   151	  if (!m) return null;
+   152	  let dec;
+   153	  try { dec = await getAuth().verifyIdToken(m[1]); } catch (e) { return null; }
+   154	  const email = String(dec.email || '').toLowerCase();
+   155	  if (email === SUPER_EMAIL) return { uid: dec.uid, email, role: 'superadmin' };
+   156	  try {
+   157	    const snap = await db.collection('users').doc(dec.uid).get();
+   158	    const d = snap.exists ? snap.data() : {};
+   159	    if (d.active !== true) return { uid: dec.uid, email, role: 'inactive' };
+   160	    return { uid: dec.uid, email, role: d.role || 'pending' };
+   161	  } catch (e) { return null; }
+   162	}
+   163	
+   164	/* Nguồn quét: đọc từ Firestore collection "sources" (active != false) */
+   165	async function loadSources() {
+   166	  const snap = await db.collection('sources').get();
+   167	  const out = [];
+   168	  snap.forEach(d => { const s = d.data(); if (s.active !== false) out.push(s); });
+   169	  return out;
+   170	}
+   171	
+   172	/* Đã xử lý post chưa? dùng collection "seen" với doc id = post_id */
+   173	async function seenRef(postId) { return db.collection('seen').doc(postId.replace(/[^\w-]/g, '_').slice(0, 480)); }
+   174	
+   175	/* Cấu hình toàn cục từ Firestore (config/app): keyword, exclude, weights, channels */
+   176	async function loadConfig() {
+   177	  try { const d = await db.collection('config').doc('app').get(); return d.exists ? d.data() : {}; }
+   178	  catch (e) { console.warn('loadConfig', e.message); return {}; }
+   179	}
+   180	
+   181	/* Tính khoảng ngày (MM-DD-YYYY) cho "quét quá khứ" từ preset hoặc ngày tuỳ chỉnh */
+   182	const pad2 = n => String(n).padStart(2, '0');
+   183	const fmtMDY = d => `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${d.getFullYear()}`;
+   184	function computeRange(range, customStart, customEnd) {
+   185	  const now = new Date();
+   186	  const DAYS = { '24h': 1, '3d': 3, '7d': 7, '30d': 30, '90d': 90 };
+   187	  if (range === 'custom') {
+   188	    const s = customStart ? new Date(customStart) : new Date(now.getTime() - 7 * 86400e3);
+   189	    const e = customEnd ? new Date(customEnd) : now;
+   190	    return { start: fmtMDY(s), end: fmtMDY(e) };
+   191	  }
+   192	  const n = DAYS[range] || 7;
+   193	  return { start: fmtMDY(new Date(now.getTime() - n * 86400e3)), end: fmtMDY(now) };
+   194	}
+   195	
+   196	/* Chạy song song có giới hạn (concurrency pool) */
+   197	async function mapPool(items, limit, fn) {
+   198	  let i = 0;
+   199	  const n = Math.max(1, Math.min(limit, items.length || 1));
+   200	  await Promise.all(Array.from({ length: n }, async () => {
+   201	    while (i < items.length) { const idx = i++; await fn(items[idx], idx); }
+   202	  }));
+   203	}
+   204	const seenDoc = id => db.collection('seen').doc(String(id).replace(/[^\w-]/g, '_').slice(0, 480));
+   205	// Chuẩn hoá URL bài (bỏ query/fragment, bỏ "/" thừa, lowercase) — dùng chung cho khớp bài cha & bookkeeping comment.
+   206	const urlKey = u => String(u || '').split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase();
+   207	const cmtScrapeDoc = k => db.collection('cmt_scrape').doc(String(k).replace(/[^\w-]/g, '_').slice(0, 480));
+   208	const groupStateDoc = url => db.collection('group_state').doc(String(url || '').replace(/[^\w-]/g, '_').slice(0, 480));
+   209	
+   210	/* Quét nguồn (SONG SONG) + chấm điểm AI (POOL) + ghi TIẾN ĐỘ realtime vào scan_jobs/{jobId}.
+   211	 * opts: { sourceUrl?, startDate?, endDate?, numPosts?, rangeLabel?, jobId? } */
+----- index.js dòng 762–870 -----
+   762	        const brandAiCache46 = {}; let stop46 = false;
+   763	        const brandAiOf46 = async code => { if (!code) return null; if (!(code in brandAiCache46)) { try { const s = await db.collection('brands').doc(String(code)).get(); brandAiCache46[code] = (s.exists && s.data().ai) || null; } catch (_) { brandAiCache46[code] = null; } } return brandAiCache46[code]; };
+   764	        await mapPool(cand46, 3, async (c) => {
+   765	          if (stop46) return;
+   766	          const l = c.l; const src46 = sources.find(s => s.name === l.source) || { name: l.source || '', industry: l.industry || '' };
+   767	          const post46 = { post_id: l.post_id || c.id, url: l.post_url || l.url || '', text: l.text || '', author: l.name || '', time: l.time || '', source: l.source || '', kind: l.kind || 'post', comment_id: l.comment_id || '', comment_url: l.comment_url || '', parent_url: l.parent_url || '', parent_author: l.parent_author || '', parent_text: l.parent_text || '', parent_user_url: l.parent_user_url || '', user_url: l.author_url || l.user_url || '', self_comment: !!l.self_comment };
+   768	          let ai;
+   769	          try { ai = await scoreLead(post46, src46, config.weights, await brandAiOf46(l.brand), { tries: 2 }); }
+   770	          catch (e) { const k = (e && e.kind) || ''; await c.ref.set({ rescore_tries: FieldValue.increment(1), rescore_err: String((e && e.message) || e).slice(0, 160), rescore_at: Date.now() }, { merge: true }).catch(() => {}); if (/^(auth|quota|model|server|net|rate)$/.test(k)) stop46 = true; return; }
+   771	          const u = ai._usage || {}; if (ai._llm) scoreCalls++; mainIn += u.prompt || 0; mainOut += u.completion || 0;
+   772	          const h = Math.max(0, Math.min(100, Number(ai.hotness) || 0)), t = tempOf(h);
+   773	          const role = String(ai.role || '').toLowerCase().trim(), roleBlock = (role === 'seller' || role === 'poster_self');
+   774	          const isLead = !!ai.is_real_lead && !roleBlock && h >= CFG.MIN_KEEP_SCORE;
+   775	          const human = !!(__ms46(l.first_care_at) || __ms46(l.last_touch_at) || (l.stage && l.stage !== 'new') || l.assignee);
+   776	          const up = { score: h, temp: t, intent: ai.intent || '', need: ai.need || ai.intent || '', service: ai.service || '', role, role_reason: String(ai.role_reason || '').slice(0, 160), ai_scored: true, rescored_at: Date.now(), ai_prev: { score: Number(l.score) || 0, temp: l.temp || '', intent: String(l.intent || '').slice(0, 120) }, rescore_err: FieldValue.delete() };
+   777	          if (ai.industry) up.industry = ai.industry; if (ai.reply && String(ai.reply).trim()) up.reply = ai.reply;
+   778	          if (!isLead) {
+   779	            if (human) up.rescore_note = 'AI chấm lại: không phải lead (' + (roleBlock ? 'vai ' + role : 'điểm ' + h) + ') – giữ vì sales đang chăm';
+   780	            else { up.dropped = true; up.dropped_by = roleBlock ? 'rescore_role' : 'rescore'; up.dropped_at = Date.now(); up.dropped_reason = roleBlock ? ('AI chấm lại: ' + (role === 'seller' ? 'người bán/đối thủ' : 'chính chủ bài')) : ('AI chấm lại: không phải khách có nhu cầu (điểm ' + h + ')'); rescoreDropped46++; }
+   781	          }
+   782	          await c.ref.set(up, { merge: true }); rescoredLeads46++;
+   783	          try { await db.collection('leads').doc(c.id).collection('notes').add({ leadId: c.id, brand: l.brand || '', vis: 'team', text: 'AI đã chấm lại lead này: ' + (Number(l.score) || 0) + ' → ' + h + ' điểm (' + t + ')' + (up.dropped ? ' · ' + up.dropped_reason : (up.rescore_note ? ' · ' + up.rescore_note : '')) + '. Trước đó là điểm tạm vì AI gián đoạn lúc quét.', by_uid: 'engine', by_name: 'Chấm điểm AI (tự động)', at: Date.now() }); } catch (_) { }
+   784	        });
+   785	        if (cand46.length) console.log('[LLM-RESCORE] chấm lại ' + rescoredLeads46 + '/' + cand46.length + ' lead điểm tạm' + (rescoreDropped46 ? ' · loại ' + rescoreDropped46 : '') + (stop46 ? ' · DỪNG sớm vì LLM lỗi' : ''));
+   786	      } catch (e) { console.warn('[LLM-RESCORE] lỗi:', e && e.message); }
+   787	    }
+   788	  }
+   789	  const durationMs = Date.now() - t0;
+   790	  const tokIn = mainIn + preIn, tokOut = mainOut + preOut, tokTotal = tokIn + tokOut;
+   791	  /* ===== LENH #46: GIÁM SÁT LLM — lượt này ≥ 2 lượt chấm hỏng & 0 thành công (hoặc lỗi auth/quota/model) → console ERROR [LLM-DOWN] (alert LỆNH #9) + system_status/llm {ok:false,…};
+   792	     có lượt OK sau khi đang down → [LLM-UP] + ok:true. FE (v119-89) đọc system_status/llm → Cảnh báo hệ thống + thẻ + chip thanh nhịp quét. ===== */
+   793	  const __hE = scoreLead.health46 || {};
+   794	  const llmOk46 = Math.max(0, (Number(__hE.ok) || 0) - __h0.ok), llmFail46 = Math.max(0, (Number(__hE.fail) || 0) - __h0.fail), llmPreFail46 = Math.max(0, (Number(__hE.preFail) || 0) - __h0.pre);
+   795	  const llmErr46 = llmFail46 ? String(__hE.lastKind || '') : '', llmErrMsg46 = llmFail46 ? String(__hE.last || '').slice(0, 200) : '';
+   796	  try {
+   797	    const downNow46 = (llmFail46 >= 2 && llmOk46 === 0) || (/^(auth|quota|model)$/.test(llmErr46) && llmOk46 === 0);
+   798	    const stRef46 = db.collection('system_status').doc('llm'); const stS46 = await stRef46.get().catch(() => null); const prev46 = (stS46 && stS46.exists) ? (stS46.data() || {}) : {};
+   799	    if (downNow46) {
+   800	      const runs46 = (prev46.ok === false ? Number(prev46.runs) || 0 : 0) + 1;
+   801	      await stRef46.set({ ok: false, since: (prev46.ok === false && prev46.since) ? prev46.since : Date.now(), at: Date.now(), runs: runs46, kind: llmErr46, sample: llmErrMsg46, model: CFG.LLM_MODEL || '', fails: llmFail46, deferred: llmDeferred, fallback: llmFallback });
+   802	      if (prev46.ok !== false) console.log(JSON.stringify({ severity: 'ERROR', message: '[LLM-DOWN] OpenAI (' + (CFG.LLM_MODEL || '') + ') lỗi ' + llmErr46 + ' — ' + llmFail46 + ' lượt chấm hỏng, 0 thành công; ' + llmDeferred + ' bài xếp hàng chấm lại, ' + llmFallback + ' lead dự phòng · ' + llmErrMsg46 }));
+   803	      else console.log('[LLM-DOWN] vẫn lỗi (' + runs46 + ' lượt): ' + llmErr46 + ' · ' + llmErrMsg46);
+   804	    } else if (llmOk46 > 0 && (prev46.ok === false || !stS46 || !stS46.exists)) {
+   805	      await stRef46.set({ ok: true, recoveredAt: Date.now(), at: Date.now(), since: prev46.since || null, runs: prev46.runs || 0, kind: '', sample: '', model: CFG.LLM_MODEL || '' });
+   806	      if (prev46.ok === false) console.log(JSON.stringify({ severity: 'WARNING', message: '[LLM-UP] OpenAI hoạt động lại — ' + llmOk46 + ' lượt chấm OK' + (llmFail46 ? ' (' + llmFail46 + ' hỏng)' : '') }));
+   807	    }
+   808	  } catch (e) { console.warn('[LLM-WATCH] lỗi:', e && e.message); }
+   809	  const llmCalls = scoreCalls + preCalls;
+   810	  const costUsd = (mainIn / 1e6) * CFG.LLM_PRICE_IN + (mainOut / 1e6) * CFG.LLM_PRICE_OUT
+   811	                + (preIn / 1e6) * CFG.LLM_PREFILTER_PRICE_IN + (preOut / 1e6) * CFG.LLM_PREFILTER_PRICE_OUT;
+   812	  const costR = Math.round(costUsd * 1e6) / 1e6;
+   813	  const summary = {
+   814	    at: FieldValue.serverTimestamp(), trigger, twoStage, aiMode,
+   815	    durationMs, sourcesCount: sources.length,
+   816	    postsFetched: scanned, commentsFetched: commentsScanned, scanComments, candidates: candTotal, postsMatched: matched, leadsCreated: kept, hotLeads: hot,
+   817	    skippedSeen, backfillSkipped, commentsRefreshSkipped, scoreErrors, scrapeErrors, llmCalls, prefilterCalls: preCalls, scoreCalls,
+   818	    llmDeferred, llmFallback, llmRescored: rescored46, llmRescoredLeads: rescoredLeads46, llmOk: llmOk46, llmFail: llmFail46, llmErr: llmErr46, llmPreFail: llmPreFail46, /* LENH #46 */
+   819	    probeRuns, sweepRuns, probeEscalated, probeIdle, bdRecords, bdCommentRecords: bdCmtRecords, authRuns, authCheckpoints,
+   820	    tokensIn: tokIn, tokensOut: tokOut, tokensTotal: tokTotal,
+   821	    tokensPrefilter: preIn + preOut, tokensScore: mainIn + mainOut,
+   822	    costUsd: costR,
+   823	    conversion: scanned ? Math.round((kept / scanned) * 1e4) / 1e4 : 0,
+   824	    dist, bySource
+   825	  };
+   826	  if (range) summary.range = range;
+   827	  let scanId = null;
+   828	  try { const ref = await db.collection('scans').add(summary); scanId = ref.id; }
+   829	  catch (e) { console.error('ghi log scan lỗi:', e.message); }
+   830	  /* ==== v-patch chi-phí 16/08/2026: ROLLUP THÁNG theo TỪNG NGUỒN — bd_month/{YYYY-MM} ====
+   831	     Cộng dồn số record BrightData TÍNH TIỀN (post + comment), lượt eKYC, chi phí AI ($) và lead
+   832	     bằng FieldValue.increment → đúng 1 lần ghi Firestore mỗi lượt quét, số CẢ THÁNG chính xác 100%.
+   833	     Nguồn private (nick/browser) tự nhiên có bdPosts=0 — không tính nhầm tiền BrightData.
+   834	     Fail-safe: lỗi ghi rollup KHÔNG ảnh hưởng lượt quét. */
+   835	  try {
+   836	    const ym = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 7); // YYYY-MM theo giờ VN
+   837	    const inc = FieldValue.increment;
+   838	    const roll = {
+   839	      month: ym, updatedAt: FieldValue.serverTimestamp(), runs: inc(1),
+   840	      bdPostRecords: inc(bdRecords), bdCommentRecords: inc(bdCmtRecords),
+   841	      aiUsd: inc(costR), leads: inc(kept), hotLeads: inc(hot),
+   842	      ekycChecks: inc(bySource.reduce((a, r) => a + (r.ekyc || 0), 0))
+   843	    };
+   844	    const srcMap = {};
+   845	    for (const r of bySource) {
+   846	      if (!(r.bdPosts || r.bdComments || r.leads || r.ekyc || r.posts)) continue; // nguồn im lặng → khỏi ghi
+   847	      const k = 's_' + String(r.url || r.name || '?').replace(/[^\w-]/g, '_').slice(0, 140);
+   848	      srcMap[k] = {
+   849	        name: r.name || '', url: r.url || '', industry: r.industry || '',
+   850	        bdPosts: inc(r.bdPosts || 0), bdComments: inc(r.bdComments || 0),
+   851	        posts: inc(r.posts || 0), leads: inc(r.leads || 0), hot: inc(r.hot || 0), ekyc: inc(r.ekyc || 0)
+   852	      };
+   853	    }
+   854	    // QUAN TRỌNG: chỉ đính kèm src khi CÓ dữ liệu — gửi src:{} kèm merge:true sẽ XOÁ SẠCH map từng-nguồn!
+   855	    if (Object.keys(srcMap).length) roll.src = srcMap;
+   856	    await db.collection('bd_month').doc(ym).set(roll, { merge: true });
+   857	  } catch (e) { console.error('ghi rollup bd_month lỗi (không ảnh hưởng quét):', e.message); }
+   858	  if (job) { try { await job.set({
+   859	    status: 'done', phase: 'done', scanId, sourcesDone: srcDone, twoStage, aiMode,
+   860	    postsFetched: scanned, commentsFetched: commentsScanned, scanComments, candidatesTotal: candTotal, prefilterDone,
+   861	    postsMatched: matched, postsScored: scored, scannedLogged: postLogged,
+   862	    leadsCreated: kept, hotLeads: hot, skippedSeen, scrapeErrors, scoreErrors,
+   863	    costUsd: costR, durationMs,
+   864	    finishedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+   865	  }, { merge: true }); } catch (e) {} }
+   866	  console.log(`scan xong: ${scanned} bài → ${candTotal} ứng viên → ${matched} qua tầng 1 → giữ ${kept} lead (${hot} nóng), ${preCalls}+${scoreCalls} lượt AI, ${tokTotal} token, ~$${costUsd.toFixed(4)}`);
+   867	  return { scanned, matched, kept, hot, durationMs, tokensTotal: tokTotal, costUsd, scanId, jobId: opts.jobId || null };
+   868	}
+   869	
+   870	/* 1) Quét theo lịch */
+----- lib/scorer.js dòng 1–56 -----
+     1	/* v-ai1500: noi gioi han dichvu/khach 700->1500 dong bo voi web v104 */
+     2	/* AI chấm điểm lead. Dùng LLM (tương thích OpenAI). Nếu không có key → heuristic dự phòng. */
+     3	import { CFG } from './config.js';
+     4	import { log } from './logger.js';
+     5	
+     6	/* ===== v-brandai: Ho so AI theo brand (brands/{code}.ai) =====
+     7	   Brand khai bao nganh/dich vu/khach muc tieu -> khoi ngu canh nay duoc noi vao system prompt
+     8	   cua prefilter + scorer + needsynth. Brand chua khai (ai rong) -> tra '' -> hanh vi cu 100%. */
+     9	export function brandAiCtx(ai) {
+    10	  if (!ai) return '';
+    11	  const p = [];
+    12	  if (ai.nganh)  p.push('- Ngành nghề: ' + String(ai.nganh).slice(0, 200));
+    13	  if (ai.dichvu) p.push('- Sản phẩm/dịch vụ & thế mạnh: ' + String(ai.dichvu).slice(0, 1500));
+    14	  if (ai.khach)  p.push('- Khách mục tiêu & nhu cầu thường gặp: ' + String(ai.khach).slice(0, 1500));
+    15	  if (!p.length) return '';
+    16	  return '\n\n=== BRAND ĐANG PHỤC VỤ (QUAN TRỌNG - áp dụng THAY CHO mặc định "agency marketing" ở trên) ===\n'
+    17	    + p.join('\n')
+    18	    + '\nĐịnh nghĩa lead cho brand này: người CÓ NHU CẦU MUA / TÌM / THUÊ sản phẩm-dịch vụ thuộc ngành trên (diễn đạt trực tiếp hay gián tiếp đều tính).'
+    19	    + '\nKHÔNG loại bài chỉ vì nó không liên quan marketing/quảng cáo. Các tiêu chí về ads/TikTok Shop/KOC/agency chỉ áp dụng khi khớp ngành của brand.'
+    20	    + '\nNếu JSON có field "service": gợi ý 1 sản phẩm/dịch vụ CỦA BRAND phù hợp nhất (không dùng danh sách dịch vụ marketing mặc định).';
+    21	}
+    22	
+    23	const SYS = `Bạn là bộ lọc lead cho một agency marketing tại Việt Nam.
+    24	Phân tích bài đăng CÔNG KHAI và trả về DUY NHẤT một JSON:
+    25	{"is_real_lead":bool,"hotness":0-100,"intent":string,"industry":string,"service":string,"reply":string,"role":"buyer|seller|poster_self|other","role_reason":string}
+    26	Quy tắc:
+    27	- Loại (is_real_lead=false, hotness thấp) các bài: bán dịch vụ ngược, tuyển dụng, bán khoá học, sinh viên hỏi định hướng, chia sẻ kinh nghiệm chung.
+    28	- Chấm CAO (80-100) khi người đăng đang CẦN MUA / TÌM NHÀ CUNG CẤP, có dấu hiệu ngân sách/độ gấp.
+    29	- "service": gợi ý 1 dịch vụ phù hợp (Performance Marketing, Creative Production, TikTok Shop Operation, Booking KOC, AI Automation...).
+    30	- "reply": 1 đoạn gợi ý phản hồi ngắn, đúng ngữ cảnh, lịch sự, không spam.
+    31	- "role" = VAI của người viết so với brand: "buyer" = đang CẦN MUA / TÌM / THUÊ thứ brand cung cấp; "seller" = đang CHÀO BÁN / CUNG CẤP / TUYỂN NGƯỜI cho chính họ, hoặc là nhà cung cấp cùng ngành với brand (ĐỐI THỦ) — kể cả khi chỉ viết ngắn kiểu "ib em", "em gửi giá", "nhà em có sẵn", "bên mình có", "check ib nhé", "liên hệ zalo"; "poster_self" = người bình luận CHÍNH LÀ tác giả bài gốc (tự trả lời dưới bài của mình); "other" = còn lại (hỏi chơi, tag bạn, cảm ơn, bàn luận).
+    32	- Với BÌNH LUẬN: đọc BÀI GỐC để biết ai là người mua, ai là người bán. Bài gốc của NGƯỜI MUA (cần tìm / cần mua) mà người bình luận chào hàng, gửi giá, mời ib → role="seller" (đối thủ), is_real_lead=false. Người bình luận là tác giả bài gốc (dòng "CÙNG MỘT NGƯỜI" = CÓ, hoặc giọng chủ bài: "ib mình", "gửi kết bạn nhận JD", "còn hàng nhé") → role="poster_self", is_real_lead=false (nhu cầu nếu có đã nằm ở bài gốc). Bài gốc của NGƯỜI BÁN (chào hàng / tuyển dụng) mà người bình luận hỏi mua, hỏi giá, xin ib → có thể là role="buyer".
+    33	- CHỈ role="buyer" mới được is_real_lead=true. "role_reason": 1 câu ngắn tiếng Việt giải thích vì sao xếp vai đó.`;
+    34	
+    35	/* ===== TẦNG 1: sàng lọc ngữ cảnh bằng model RẺ (gpt-4o-mini) =====
+    36	   Đọc HIỂU bài (không dựa keyword) → quyết định bài có ĐÁNG đưa lên model thông minh chấm sâu không.
+    37	   Trả { maybe:bool, _usage, _llm }. Lỗi/không có key → maybe:true (fail-open, không bỏ sót lead). */
+    38	const PRE_SYS = `Bạn là bộ SÀNG LỌC NHANH cho agency marketing tại Việt Nam.
+    39	Đọc HIỂU NGỮ CẢNH bài đăng CÔNG KHAI (đừng chỉ bắt từ khoá) và trả về DUY NHẤT JSON: {"maybe":bool}.
+    40	- maybe=true nếu bài CÓ KHẢ NĂNG là người đang CẦN MUA / TÌM / THUÊ một dịch vụ (chạy ads, vận hành sàn/TikTok Shop, sản xuất nội dung/video, booking KOC/KOL, thiết kế, automation, agency...), kể cả khi diễn đạt gián tiếp.
+    41	- maybe=false nếu RÕ RÀNG không phải nhu cầu mua: bán/chào dịch vụ ngược, tuyển dụng, bán khoá học, chia sẻ kinh nghiệm chung, hỏi vu vơ, tin rác, giao lưu.
+    42	- maybe=false nếu người viết là NGƯỜI BÁN / nhà cung cấp đang chào hàng, gửi giá, mời inbox (kể cả bình luận ngắn kiểu "ib em", "em gửi giá", "bên mình có sẵn") hoặc bình luận là của CHÍNH tác giả bài gốc (dòng "CÙNG MỘT NGƯỜI" = CÓ).
+    43	Khi phân vân → để maybe=true.`;
+    44	
+    45	/* v-selfcmt (LỆNH #31b 05/09/2026): vai người viết (buyer/seller/poster_self/other). Chuẩn hoá giá trị AI trả: đồng nghĩa → 4 giá trị chuẩn, lạ → "other", trống → "". */
+    46	export function normRole(r) {
+    47	  const s = String(r || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().trim().replace(/[\s-]+/g, '_');
+    48	  if (!s) return '';
+    49	  if (/^(buyer|seller|poster_self|other)$/.test(s)) return s;
+    50	  if (/self|author|tac.?gia|chu.?bai|poster|nguoi.?dang|owner/.test(s)) return 'poster_self';
+    51	  if (/sell|vendor|supplier|compet|doi.?thu|nguoi.?ban|nha.?cung|recruit|tuyen/.test(s)) return 'seller';
+    52	  if (/buy|customer|khach|nguoi.?mua|lead|prospect/.test(s)) return 'buyer';
+    53	  return 'other';
+    54	}
+    55	
+    56	/* Dựng nội dung gửi LLM. Với BÌNH LUẬN: kèm ngữ cảnh BÀI GỐC để AI đánh giá đúng ý định người bình luận. */
+----- lib/scorer.js dòng 117–187 -----
+   117	async function llmChat46(body, o) {
+   118	  o = o || {}; const tries = Math.max(1, o.tries || LLM46.tries); const base = String(CFG.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+   119	  const msgs = (body.messages || []).map(m => Object.assign({}, m, { content: sanitize46(m.content) }));
+   120	  let noJson = false, lastErr = null;
+   121	  for (let i = 0; i < tries; i++) {
+   122	    llmHealth46.attempts++;
+   123	    const req = Object.assign({}, body, { messages: msgs }); if (noJson) delete req.response_format;
+   124	    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), LLM46.timeoutMs);
+   125	    let r = null, txt = '', err = null;
+   126	    try { r = await fetch(base + '/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer ' + CFG.LLM_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(req), signal: ctl.signal }); txt = await r.text(); }
+   127	    catch (e) { err = mkErr46('net', 0, 'LLM mạng/timeout: ' + ((e && e.name === 'AbortError') ? ('quá ' + LLM46.timeoutMs + ' ms') : String((e && e.message) || e)).slice(0, 160)); }
+   128	    finally { clearTimeout(tm); }
+   129	    if (!err) {
+   130	      let j = null; try { j = JSON.parse(txt); } catch (_) { j = null; }
+   131	      if (!r.ok) {
+   132	        const eo = (j && j.error) || {}; const kind = kindOf46(r.status, eo.code, eo.type, eo.message || txt);
+   133	        if (kind === 'badreq' && !noJson && req.response_format && /response_format|json_object|json mode/i.test(String(eo.message || txt))) { noJson = true; llmHealth46.attemptsFail++; continue; }
+   134	        err = mkErr46(kind, r.status, 'LLM ' + r.status + (eo.code ? ' ' + eo.code : '') + (eo.type ? ' [' + eo.type + ']' : '') + ': ' + String(eo.message || txt).slice(0, 200));
+   135	        err.retryAfter = Number(r.headers && r.headers.get && r.headers.get('retry-after')) || 0;
+   136	      } else {
+   137	        const ch = (j && j.choices && j.choices[0]) || {}; const content = (ch.message && ch.message.content) || '';
+   138	        const obj = parseJson46(content);
+   139	        if (!obj) err = mkErr46('format', 200, 'LLM 200 nhưng không đọc được JSON (finish=' + (ch.finish_reason || '?') + ', ' + content.length + ' ký tự): ' + content.slice(0, 120));
+   140	        else return { obj, usage: j.usage || {}, model: j.model || body.model || '', finish: ch.finish_reason || '' };
+   141	      }
+   142	    }
+   143	    lastErr = err; llmHealth46.attemptsFail++;
+   144	    if (!RETRY46[err.kind] || i === tries - 1) break;
+   145	    let w = LLM46.waits[Math.min(i, LLM46.waits.length - 1)]; if (err.retryAfter) w = Math.max(w, err.retryAfter * 1000); w = Math.min(w, LLM46.maxWaitMs) + Math.floor(Math.random() * 500);
+   146	    await new Promise(res => setTimeout(res, w));
+   147	  }
+   148	  throw lastErr || mkErr46('net', 0, 'LLM: không rõ lỗi');
+   149	}
+   150	const usage46 = u => { u = u || {}; const pt = Number(u.prompt_tokens) || 0, ct = Number(u.completion_tokens) || 0; return { prompt: pt, completion: ct, total: Number(u.total_tokens) || (pt + ct) }; };
+   151	/* bài chờ AI quá hạn (score_retry hết 6 lần/24 h) → lead DỰ PHÒNG kẹp ≤ 59 (lạnh), ai_scored:false, intent nói rõ; sweeper chấm lại sau */
+   152	function heuristicCapped46(post, source) {
+   153	  const h = heuristic((post && post.text) || '', source || {});
+   154	  h.hotness = Math.min(59, h.hotness); h.is_real_lead = h.hotness >= 40;
+   155	  h.intent = 'Điểm tạm – AI chưa chấm được lúc quét (bộ lọc từ khoá dự phòng); hệ thống sẽ tự chấm lại bằng AI'; h.need = ''; h._fallback = true;
+   156	  return h;
+   157	}
+   158	function heuristic(text, source) {
+   159	  const t = (text || '').toLowerCase();
+   160	  const buy = ['cần tìm', 'thuê', 'tìm agency', 'tìm đơn vị', 'báo giá', 'trọn gói', 'cần chạy', 'nhận vận hành', 'cần tư vấn'];
+   161	  const bad = ['khoá học', 'khóa học', 'tuyển', 'chia sẻ kinh nghiệm', 'inbox nhé', '2k', 'sinh viên', 'tự học'];
+   162	  let score = 35;
+   163	  if (buy.some(k => t.includes(k))) score += 45;
+   164	  if (/\d+\s*(tr|triệu|k\b)/.test(t)) score += 10;     // có ngân sách
+   165	  if (bad.some(k => t.includes(k))) score -= 40;
+   166	  score = Math.max(0, Math.min(100, score));
+   167	  return {
+   168	    is_real_lead: score >= 40,
+   169	    hotness: score,
+   170	    intent: score >= 60 ? 'Cần mua / tìm nhà cung cấp' : 'Hỏi kinh nghiệm / không rõ',
+   171	    industry: source.industry || '',
+   172	    service: source.industry ? 'Performance Marketing' : '',
+   173	    reply: '',
+   174	    _llm: false,
+   175	    _usage: { prompt: 0, completion: 0, total: 0 }
+   176	  };
+   177	}
+   178	
+   179	/* Gợi ý trọng số chấm điểm (từ config/app.weights) → 1 dòng hướng dẫn cho LLM */
+   180	function weightsHint(weights) {
+   181	  if (!Array.isArray(weights) || !weights.length) return '';
+   182	  const parts = weights
+   183	    .filter(w => w && w.label)
+   184	    .map(w => `${w.label}: ${w.weight ?? 0}%`);
+   185	  return parts.length ? `\nƯu tiên chấm điểm theo trọng số: ${parts.join(', ')}.` : '';
+   186	}
+   187	
+----- lib/scraper.js dòng 1–60 -----
+     1	import { getFirestore as __getFs } from 'firebase-admin/firestore';
+     2	/* Lấy bài CÔNG KHAI từ group Facebook qua Scraper API (Bright Data — Posts by group URL).
+     3	   Không dùng nick đăng nhập → không có bài toán checkpoint.
+     4	   Có MOCK_MODE để chạy thử không cần token. */
+     5	import { CFG } from './config.js';
+     6	import { log } from './logger.js';
+     7	
+     8	const BD = '<che>';
+     9	
+    10	/* Chuẩn hoá field (tên field tuỳ dataset, map tại đây) */
+    11	export function normalizePost(p, source) {
+    12	  return {
+    13	    post_id: String(p.post_id || p.id || p.url || Math.random()),
+    14	    url:     p.url || p.post_url || '',
+    15	    author:  p.user_name || p.author || p.profile_name || p.user_username_raw || 'Ẩn danh',
+    16	    user_url: p.user_url || p.profile_url || p.user_profile_url || '',  /* v-patch user_url-map: giu link profile nguoi dang */
+    17	    text:    dedupeTxt(p.content || p.post_text || p.text || ''),
+    18	    time:    p.date_posted || p.time || new Date().toISOString(),
+    19	    source:  source.name,
+    20	    kind:    'post'
+    21	  };
+    22	}
+    23	
+    24	/* Chuẩn hoá 1 COMMENT về cùng "hình dạng" như post để đi chung pipeline AI.
+    25	   Tên field comment tuỳ dataset Bright Data → map rộng tay tại đây. */
+    26	export function normalizeComment(c, source, parentUrl) {
+    27	  const cid = c.comment_id || c.id || c.comment_url || c.url
+    28	    || ((parentUrl || '') + '#' + (c.user_url || c.commenter_id || Math.random()));
+    29	  return {
+    30	    post_id:    'cmt_' + String(cid),
+    31	    url:        c.comment_url || c.url || parentUrl || '',
+    32	    author:     c.user_name || c.commenter_name || c.author || c.profile_name || c.user_username_raw || 'Ẩn danh',
+    33	    user_url:  c.user_url || c.commenter_url || c.commenter_profile_url || '',
+    34	    text:       dedupeTxt(c.comment_text || c.comment || c.text || c.content || ''),
+    35	    time:       c.date_created || c.date || c.comment_date || c.time || new Date().toISOString(),
+    36	    source:     source.name,
+    37	    kind:       'comment',
+    38	    parent_url: parentUrl || c.post_url || '',
+    39	    comment_id: (() => {
+    40	      const raw = String(c.comment_id || c.id || '');
+    41	      if (/^\d+$/.test(raw)) return raw;
+    42	      try { const dm = Buffer.from(raw, 'base64').toString('utf8').match(/^comment:\d+_(\d+)$/); if (dm) return dm[1]; } catch (e) {}
+    43	      const m = String(c.comment_link || c.comment_url || c.url || '').match(/comment_id=(\d+)/);
+    44	      return m ? m[1] : '';
+    45	    })(),
+    46	    comment_url: (() => {
+    47	      const link = String(c.comment_link || '');
+    48	      if (/comment_id=\d+/.test(link)) return link;
+    49	      const raw = String(c.comment_id || c.id || '');
+    50	      let numId = /^\d+$/.test(raw) ? raw : '';
+    51	      if (!numId) { try { const dm = Buffer.from(raw, 'base64').toString('utf8').match(/^comment:\d+_(\d+)$/); if (dm) numId = dm[1]; } catch (e) {} }
+    52	      if (!numId) numId = (String(c.comment_link || c.comment_url || c.url || '').match(/comment_id=(\d+)/) || [])[1] || '';
+    53	      if (numId && parentUrl) return parentUrl.split('?')[0] + '?comment_id=' + numId;
+    54	      return c.comment_link || c.comment_url || c.url || '';
+    55	    })()
+    56	  };
+    57	}
+    58	
+    59	/* ---- MOCK: sinh bài giả để demo pipeline end-to-end ---- */
+    60	const MOCK_POOL = [
+----- FILE lib/config.js (78 dòng) -----
+     1	/* Cấu hình tập trung — đọc từ biến môi trường (.env) */
+     2	const env = process.env;
+     3	const num = (v, d) => (v === undefined || v === '' ? d : Number(v));
+     4	const bool = (v, d = false) => (v === undefined ? d : /^(1|true|yes|on)$/i.test(String(v)));
+     5	
+     6	export const CFG = {
+     7	  // Chế độ chạy
+     8	  MOCK_MODE: bool(env.MOCK_MODE, false),     // true = dùng dữ liệu giả để chạy thử (không cần token)
+     9	  PORT:      num(env.PORT, 8787),
+    10	  POLL_MINUTES: num(env.POLL_MINUTES, 3),
+    11	  POSTS_PER_GROUP: num(env.POSTS_PER_GROUP, 20),
+    12	  // v-sow 05/09/2026: quét theo lịch GIEO snapshot (không chờ trong lượt); nhịp gieo mỗi nguồn (phút) — config/app.scanIntervalMin ghi đè
+    13	  BD_SOW_MODE: bool(env.BD_SOW_MODE, true),
+    14	  SCAN_SOURCE_INTERVAL_MIN: num(env.SCAN_SOURCE_INTERVAL_MIN, 10),
+    15	  PROBE_POSTS: num(env.PROBE_POSTS, 5),          // số bài dò mỗi nhịp (mặc định cũ trong code = 5)
+    16	  FULLSWEEP_HOURS: num(env.FULLSWEEP_HOURS, 2),  // nhịp quét đủ POSTS_PER_GROUP (mặc định cũ = 2h)
+    17	  // v-ttl-vps 05/09/2026: TTL 'Bài đã quét' KHÔNG thành lead (ngày) — .env có sẵn nhưng config.js quên đọc → trước đây luôn 1 ngày
+    18	  SCANNED_TTL_DAYS: num(env.SCANNED_TTL_DAYS, 3),
+    19	  // LENH #32 (06/09/2026): quét bằng nick qua browser service (scraper.fetchPostsAuth đọc CFG.BROWSER_SVC_URL/SECRET nhưng config.js chưa map → luôn "Chưa cấu hình"). Địa chỉ CHỈ ở .env.
+    20	  BROWSER_SVC_URL: env.BROWSER_SVC_URL || '',
+    21	  BROWSER_SVC_SECRET: env.BROWSER_SVC_SECRET || '',
+    22	  HOT_THRESHOLD: num(env.HOT_THRESHOLD, 80),
+    23	  MIN_KEEP_SCORE: num(env.MIN_KEEP_SCORE, 40), // dưới mức này không lưu làm lead
+    24	
+    25	  // Scraper API (Bright Data — Facebook Posts by group URL)
+    26	  BRIGHTDATA_TOKEN: env.BRIGHTDATA_TOKEN || '',
+    27	  BRIGHTDATA_DATASET_ID: env.BRIGHTDATA_DATASET_ID || 'gd_<che>',
+    28	  // v17: danh thuc Pha 1b — 3 bien nay co trong .env tu dau nhung config.js quen doc (cung lo voi vu $NaN)
+    29	  BRIGHTDATA_COMMENTS_DATASET_ID: env.BRIGHTDATA_COMMENTS_DATASET_ID || 'gd_<che>',
+    30	  SCAN_COMMENTS: bool(env.SCAN_COMMENTS, false),
+    31	  COMMENTS_PER_POST: num(env.COMMENTS_PER_POST, 30), // tran chong bai viral no records
+    32	
+    33	
+    34	  // LLM chấm điểm (tương thích OpenAI; đổi sang Claude/Gemini tuỳ ý)
+    35	  LLM_API_KEY: env.LLM_API_KEY || '',
+    36	  LLM_BASE_URL: env.LLM_BASE_URL || 'https://api.openai.com/v1',
+    37	  LLM_MODEL: env.LLM_MODEL || 'gpt-4o-mini',
+    38	  LLM_PREFILTER_MODEL: env.LLM_PREFILTER_MODEL || 'gpt-5-nano',
+    39	  // Đơn giá để ước tính chi phí (USD / 1 TRIỆU token). Chỉnh theo model thực tế trong .env.
+    40	  LLM_PRICE_IN:  num(env.LLM_PRICE_IN, 0.15),
+    41	  LLM_PRICE_OUT: num(env.LLM_PRICE_OUT, 0.60),
+    42	  LLM_PREFILTER_PRICE_IN: num(env.LLM_PREFILTER_PRICE_IN, 0.05),
+    43	  LLM_PREFILTER_PRICE_OUT: num(env.LLM_PREFILTER_PRICE_OUT, 0.40),
+    44	  // Số bài chấm điểm AI song song cùng lúc (tăng tốc; chỉnh nếu gặp rate limit của OpenAI)
+    45	  SCORE_CONCURRENCY: num(env.SCORE_CONCURRENCY, 6),
+    46	
+    47	  // Kênh cảnh báo
+    48	  TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN || '',
+    49	  TELEGRAM_CHAT_ID:   env.TELEGRAM_CHAT_ID || '',
+    50	
+    51	  RESEND_API_KEY: env.RESEND_API_KEY || '',     // gửi email qua HTTP API (không cần SMTP)
+    52	  EMAIL_FROM: env.EMAIL_FROM || 'SmartLead <onboarding@resend.dev>',
+    53	  EMAIL_TO:   env.EMAIL_TO || '',
+    54	
+    55	  SHEET_WEBHOOK_URL: env.SHEET_WEBHOOK_URL || '', // Google Apps Script web app (append row)
+    56	  CUSTOM_WEBHOOK_URL: env.CUSTOM_WEBHOOK_URL || '', // n8n / CRM / cầu nối tuỳ ý
+    57	
+    58	  ZALO_OA_TOKEN: env.ZALO_OA_TOKEN || '',
+    59	  ZALO_USER_ID:  env.ZALO_USER_ID || '',          // user đã follow OA (chỉ gửi được cho người đã tương tác)
+    60	
+    61	  // VPS (browser automation server)
+    62	  VPS_URL: env.VPS_URL || '',  // v-ttl-vps 05/09/2026: địa chỉ VPS CHỈ ở .env (không để trong code)
+    63	  VPS_SECRET: env.VPS_SECRET || '',
+    64	
+    65	  // Bảo mật API (token đơn giản để dashboard gọi — tuỳ chọn)
+    66	  API_TOKEN: env.API_TOKEN || ''
+    67	};
+    68	
+    69	/** Danh sách kênh đang bật (để hiển thị trên dashboard) */
+    70	export function activeChannels() {
+    71	  return {
+    72	    telegram: !!(CFG.TELEGRAM_BOT_TOKEN && CFG.TELEGRAM_CHAT_ID),
+    73	    email:    !!(CFG.RESEND_API_KEY && CFG.EMAIL_TO),
+    74	    sheet:    !!CFG.SHEET_WEBHOOK_URL,
+    75	    webhook:  !!CFG.CUSTOM_WEBHOOK_URL,
+    76	    zalo:     !!(CFG.ZALO_OA_TOKEN && CFG.ZALO_USER_ID)
+    77	  };
+    78	}
+----- lib/zaloCheck.js dòng 1–40 -----
+     1	// lib/zaloCheck.js — SmartLead (Session 17)
+     2	// Bắt SĐT VN trong text + chuẩn hoá E.164 + check Zalo qua eKYC Pro (cache Firestore, fail-safe). ESM, Node 22.
+     3	const EKYC_URL = '<che>';
+     4	
+     5	export function normalizePhoneVN(raw) {
+     6	  let d = String(raw || '').replace(/[^\d+]/g, '');
+     7	  if (d.startsWith('+')) d = d.slice(1);
+     8	  if (d.startsWith('84')) d = d.slice(2);
+     9	  else if (d.startsWith('0')) d = d.slice(1);
+    10	  else return '';
+    11	  if (!/^[35789]\d{8}$/.test(d)) return '';
+    12	  return '+84' + d;
+    13	}
+    14	
+    15	export function extractPhonesVN(text) {
+    16	  const s = String(text || '');
+    17	  const re = /(?:\+?84|0)(?:[\s.\-]?\d){9}(?!\d)/g;
+    18	  const out = new Set();
+    19	  let m;
+    20	  while ((m = re.exec(s)) !== null) {
+    21	    const e164 = normalizePhoneVN(m[0]);
+    22	    if (e164) out.add(e164);
+    23	  }
+    24	  return [...out];
+    25	}
+    26	
+    27	export async function checkZalo(phoneE164, { db, apiKey, cacheDays = 90, timeoutMs = 12000 } = {}) { // v89 timeout 12s
+    28	  if (!phoneE164) return { registered: null, cached: false, source: 'invalid' };
+    29	  if (!apiKey)   return { registered: null, cached: false, source: 'no_key' };
+    30	  const cacheRef = db ? db.collection('zalo_cache').doc(phoneE164.replace('+', '')) : null;
+    31	  if (cacheRef) {
+    32	    try {
+    33	      const snap = await cacheRef.get();
+    34	      if (snap.exists) {
+    35	        const c = snap.data() || {};
+    36	        const ageMs = Date.now() - (c.checked_ms || 0);
+    37	        if (typeof c.registered === 'boolean' && ageMs < cacheDays * 864e5) {
+    38	          return { registered: c.registered, cached: true, source: 'cache' };
+    39	        }
+    40	      }
+----- FILE lib/logger.js (8 dòng) -----
+     1	/* Logger gọn, có mốc thời gian VN */
+     2	const ts = () => new Date().toLocaleString('vi-VN', { hour12: false });
+     3	export const log = {
+     4	  info:  (...a) => console.log(`[${ts()}]`, ...a),
+     5	  warn:  (...a) => console.warn(`[${ts()}] ⚠️ `, ...a),
+     6	  error: (...a) => console.error(`[${ts()}] ❌`, ...a),
+     7	  ok:    (...a) => console.log(`[${ts()}] ✅`, ...a)
+     8	};
+-- tagLeadBrand nằm ở file nào (3 codebase):
+/home/xuanvinhsc68_work/firebase-s13/functions/index.js
+/home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js
+/home/xuanvinhsc68_work/codebase2/notifyBrandZalo/index.js
+/home/xuanvinhsc68_work/codebase2/tagLeadBrand/index.js
+/home/xuanvinhsc68_work/codebase2/sendZaloZBS/index.js
+--- /home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js :: /exports\.notifyBrandZalo/ từ dòng 281 (75 dòng) ---
+   281	exports.notifyBrandZalo = onDocumentUpdated(
+   282	  { document: 'leads/{leadId}', secrets: [ZALO_APP_ID, ZALO_SECRET_KEY] },
+   283	  async (event) => {
+   284	    const before = event.data.before.data() || {};
+   285	    const after = event.data.after.data() || {};
+   286	    const leadId = event.params.leadId;
+   287	
+   288	    const brand = after.brand && String(after.brand).trim();
+   289	    if (!brand) return;                       // no brand yet
+   290	    if (after.zalo_notified) return;          // already notified (dedupe)
+   291	
+   292	    const cfg = await getConfig();
+   293	    if (!cfg.enabled) return;
+   294	
+   295	    // only act on the brand-just-set transition (or first time threshold met)
+   296	    const brandBefore = before.brand && String(before.brand).trim();
+   297	    const justTagged = !brandBefore && !!brand;
+   298	    if (!justTagged && before.score === after.score) return;
+   299	
+   300	    // score gate
+   301	    const scoreField = cfg.score_field || 'score';
+   302	    const threshold = (cfg.score_threshold != null) ? Number(cfg.score_threshold) : 0;
+   303	    const score = Number(after[scoreField]);
+   304	    if (!isNaN(score) && score < threshold) return;
+   305	
+   306	    const appId = ZALO_APP_ID.value();
+   307	    const secretKey = ZALO_SECRET_KEY.value();
+   308	    const messageType = cfg.message_type || 'promotion';
+   309	    const results = [];
+   310	
+   311	    // Notify ONLY the sales staff of this brand (internal alert — never the lead).
+   312	    // Recipients are managed by the superadmin in the web app (collection
+   313	    // `brand_sales`), read dynamically here — nothing is hardcoded in config.
+   314	    if (cfg.notify_sales !== false && cfg.template_id_sales) {
+   315	      const recipients = await getBrandSales(brand);
+   316	      const baseTdata = buildTemplateData(cfg.sales_param_map || {}, after);
+   317	
+   318	      // auto-stamp the lead-detection moment into the template (no manual input):
+   319	      // the time the lead was detected / brand-tagged IS the notification time.
+   320	      const timeParam = cfg.sales_time_param || 'created_time';
+   321	      const detectedAt = after.detected_at || after.brand_tagged_at || after.detectedAt;
+   322	      baseTdata[timeParam] = formatVNTime(detectedAt);
+   323	
+   324	      // optional per-recipient greeting personalisation: cfg.sales_name_param
+   325	      // names the template param holding the salutation (e.g. "customer_name").
+   326	      const nameParam = cfg.sales_name_param;
+   327	      for (const rec of recipients) {
+   328	        const phone = rec.phone;
+   329	        if (!phone) continue;
+   330	        let tdata = baseTdata;
+   331	        if (nameParam && rec.name) {
+   332	          tdata = Object.assign({}, baseTdata, { [nameParam]: String(rec.name) });
+   333	        }
+   334	        try {
+   335	          const r = await sendZns({ phone, templateId: cfg.template_id_sales, templateData: tdata, messageType, appId, secretKey });
+   336	          results.push({ to: 'sales', phone, name: rec.name || '', ok: r.ok });
+   337	        } catch (e) { results.push({ to: 'sales', phone, name: rec.name || '', ok: false, err: e.message }); }
+   338	      }
+   339	    }
+   340	
+   341	    await event.data.after.ref.set({
+   342	      zalo_notified: true,
+   343	      zalo_notified_at: FieldValue.serverTimestamp(),
+   344	      zalo_notify_results: results,
+   345	    }, { merge: true });
+   346	    console.info(`[notifyBrandZalo] lead ${leadId} brand=${brand} -> ${results.length} sends`);
+   347	  }
+   348	);
+--- /home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js :: /function getBrandSales|getBrandSales ?=/ từ dòng 179 (30 dòng) ---
+   179	async function getBrandSales(brand) {
+   180	  const out = [];
+   181	  try {
+   182	    const snap = await db.collection('brand_sales').where('brand', '==', brand).get();
+   183	    snap.forEach((d) => {
+   184	      const v = d.data() || {};
+   185	      if (v.active === false) return;
+   186	      const phone = normalizePhone(v.phone);
+   187	      if (phone) out.push({ phone, name: v.name || '' });
+   188	    });
+   189	  } catch (e) {
+   190	    console.warn('[getBrandSales] read failed:', e.message);
+   191	  }
+   192	  return out;
+   193	}
+   194	
+   195	/* Format a lead-detection moment into "HH:mm DD/MM/YYYY" (Asia/Ho_Chi_Minh).
+   196	   Accepts Firestore Timestamp, {_seconds}, epoch ms, ISO string, or null=now. */
+   197	function formatVNTime(ts) {
+   198	  let d;
+   199	  if (!ts) d = new Date();
+   200	  else if (typeof ts.toDate === 'function') d = ts.toDate();
+   201	  else if (ts._seconds != null) d = new Date(ts._seconds * 1000);
+   202	  else if (typeof ts === 'number') d = new Date(ts);
+   203	  else d = new Date(ts);
+   204	  if (isNaN(d.getTime())) d = new Date();
+   205	  try {
+   206	    const parts = new Intl.DateTimeFormat('vi-VN', {
+   207	      timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit',
+   208	      day: '2-digit', month: '2-digit', year: 'numeric', hour12: false,
+--- /home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js :: /function buildTemplateData|buildTemplateData ?=/ từ dòng 161 (20 dòng) ---
+   161	function buildTemplateData(paramMap, lead) {
+   162	  const out = {};
+   163	  Object.keys(paramMap || {}).forEach((paramName) => {
+   164	    const spec = paramMap[paramName];
+   165	    let val;
+   166	    if (typeof spec === 'string' && spec.startsWith('literal:')) {
+   167	      val = spec.substring('literal:'.length);
+   168	    } else {
+   169	      val = lead[spec];
+   170	    }
+   171	    out[paramName] = (val == null) ? '' : String(val);
+   172	  });
+   173	  return out;
+   174	}
+   175	
+   176	/* Read the sales recipients for a brand from Firestore (`brand_sales`).
+   177	   These are managed dynamically by the superadmin in the web app — NOT
+   178	   hardcoded in config. Returns [{ phone, name }], skipping disabled ones. */
+   179	async function getBrandSales(brand) {
+   180	  const out = [];
+--- /home/xuanvinhsc68_work/smartlead-zalo-fn/functions/index.js :: KHONG THAY MOC /exports\.tagLeadBrand|tagLeadBrand ?=/
+-- package.json (engines/type/deps):
+{"engines":{"node":"22"},"type":"module","deps":["@google-cloud/bigquery","@google-cloud/secret-manager","firebase-admin","firebase-functions","node-fetch","openai"],"scripts":[]}
+-- firebase.json:
+{
+  "functions": {
+    "source": "functions"
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}== XONG — file: /home/xuanvinhsc68_work/scan-dump-0912d.txt (dán nguyên output hoặc cloudshell download /home/xuanvinhsc68_work/scan-dump-0912d.txt) ==
